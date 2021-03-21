@@ -1,39 +1,41 @@
 use serde_json::{Result, Value};
 
-enum JsonPath {
+#[derive(Debug)]
+pub enum JsonPath<'a> {
     Root,
+    Name(String),
+    Path(&'a Vec<JsonPath<'a>>),
     Current,
-    Path(Vec<JsonPath>),
     Descent,
     Wildcard,
-    Index(String, JsonPathIndex),
+    Index(String, JsonPathIndex<'a>),
 }
 
-enum JsonPathIndex {
-    Single(u32),
-    Union(Vec<JsonPath>),
+#[derive(Debug)]
+pub enum JsonPathIndex<'a> {
+    Single(usize),
+    Union(Vec<&'a JsonPath<'a>>),
     Slice(i32, i32, i32),
-    Filter(Operand, FilterSign, Operand),
-    Script(Operand, ScriptSign, Operand),
+    Filter(Operand<'a>, FilterSign, Operand<'a>),
+    Script(Operand<'a>, ScriptSign, Operand<'a>),
 }
 
-enum Operand {
+#[derive(Debug)]
+pub enum Operand<'a> {
     Static(Value),
-    Dynamic(JsonPath),
+    Dynamic(&'a JsonPath<'a>),
 }
 
-enum FilterSign {}
+#[derive(Debug)]
+pub enum FilterSign {}
 
-enum ScriptSign {}
+#[derive(Debug)]
+pub enum ScriptSign {}
 
 
-fn parse(json: &str) -> Result<Value> {
+pub fn parse(json: &str) -> Result<Value> {
     serde_json::from_str(json)
 }
-
-
-
-
 
 
 #[cfg(test)]
@@ -41,7 +43,7 @@ mod tests {
     use crate::structures::parse;
 
     #[test]
-    fn it_works() {
+    fn parser_check() {
         let res = parse(r#"
         {
             "name": "John Doe",
