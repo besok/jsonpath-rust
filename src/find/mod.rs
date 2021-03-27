@@ -2,7 +2,7 @@ mod calculations;
 
 use serde_json::{Value};
 use crate::structures::{JsonPath, JsonPathIndex};
-use crate::find::calculations::{find_in_object, find_in_array};
+use crate::find::calculations::{find_in_object};
 
 pub trait Find {
     fn find<'a>(&self, data: &'a Value, root: &'a Value) -> &'a Value;
@@ -12,7 +12,8 @@ pub trait Find {
 impl Find for JsonPathIndex<'_> {
     fn find<'a>(&self, data: &'a Value, root: &'a Value) -> &'a Value {
         match self {
-            JsonPathIndex::Single(idx) => find_in_array(data, *idx),
+            // JsonPathIndex::Single(idx) => find_in_array(data, *idx),
+            // JsonPathIndex::Slice(start, end, step) => slice_in_array(data, *start, *end, *step),
             _ => &Value::Null
         }
     }
@@ -23,7 +24,7 @@ impl Find for JsonPath<'_> {
         match self {
             JsonPath::Root => root,
             JsonPath::Path(elems) => elems.iter().fold(data, |n, p| { p.find(n, root) }),
-            JsonPath::Name(key) => find_in_object(data, key),
+            JsonPath::Field(key) => find_in_object(data, key),
             JsonPath::Index(key, idx) => idx.find(find_in_object(data, key), root),
             _ => root
         }
@@ -78,10 +79,10 @@ mod tests {
         let res_expected = parse("42").unwrap();
         let path = vec![
             JsonPath::Root,
-            JsonPath::Name(String::from("product")),
-            JsonPath::Name(String::from("trait")),
-            JsonPath::Name(String::from("detail")),
-            JsonPath::Name(String::from("id")),
+            JsonPath::Field(String::from("product")),
+            JsonPath::Field(String::from("trait")),
+            JsonPath::Field(String::from("detail")),
+            JsonPath::Field(String::from("id")),
         ];
         let res = JsonPath::Path(&path).find(&res_income, &res_income);
         assert_eq!(res, &res_expected)
@@ -99,9 +100,9 @@ mod tests {
         let res_expected = parse("5").unwrap();
         let path = vec![
             JsonPath::Root,
-            JsonPath::Name(String::from("product")),
-            JsonPath::Name(String::from("trait")),
-            JsonPath::Name(String::from("detail")),
+            JsonPath::Field(String::from("product")),
+            JsonPath::Field(String::from("trait")),
+            JsonPath::Field(String::from("detail")),
             JsonPath::Index(String::from("id"), JsonPathIndex::Single(5)),
         ];
         let res = JsonPath::Path(&path).find(&res_income, &res_income);

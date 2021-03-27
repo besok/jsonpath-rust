@@ -3,7 +3,7 @@ use serde_json::{Result, Value};
 #[derive(Debug)]
 pub enum JsonPath<'a> {
     Root,
-    Name(String),
+    Field(String),
     Path(&'a Vec<JsonPath<'a>>),
     Current,
     Descent,
@@ -15,7 +15,7 @@ pub enum JsonPath<'a> {
 pub enum JsonPathIndex<'a> {
     Single(usize),
     Union(Vec<&'a JsonPath<'a>>),
-    Slice(i32, i32, i32),
+    Slice(i32, i32, usize),
     Filter(Operand<'a>, FilterSign, Operand<'a>),
     Script(Operand<'a>, ScriptSign, Operand<'a>),
 }
