@@ -8,7 +8,7 @@ pub enum JsonPath<'a> {
     Current,
     Descent,
     Wildcard,
-    Index(String, JsonPathIndex<'a>),
+    Index(JsonPathIndex<'a>),
 }
 
 

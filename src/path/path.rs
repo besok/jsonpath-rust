@@ -15,15 +15,16 @@ fn process_path<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a
         JsonPath::Root => Box::new(RootPointer::new(root)),
         JsonPath::Field(key) => Box::new(ObjectField::new(key)),
         JsonPath::Path(chain) => Box::new(Chain::from(chain, root)),
-        JsonPath::Index(key, index) => Box::new(Chain::from_index(Box::new(ObjectField::new(key)), process_path_index(index, root))),
+        JsonPath::Index(index) => process_index(index, root),
         _ => Box::new(EmptyPath {})
     }
 }
 
-fn process_path_index<'a>(json_path_index: &'a JsonPathIndex, _root: &'a Value) -> PathInstance<'a> {
+fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> PathInstance<'a> {
     match json_path_index {
         JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(*index)),
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
+        JsonPathIndex::Union(elems) => Box::new(UnionIndex::from(elems, root)),
         _ => Box::new(EmptyPath {})
     }
 }
@@ -182,6 +183,39 @@ impl<'a> Path<'a> for Chain<'a> {
     }
 }
 
+struct UnionIndex<'a> {
+    indexes: Vec<PathInstance<'a>>
+}
+
+impl<'a> UnionIndex<'a> {
+    pub fn from(elems: &'a Vec<&'a JsonPath<'a>>, root: &'a Value) -> Self {
+        let mut indexes: Vec<PathInstance<'a>> = vec![];
+
+        for p in elems.iter() {
+            indexes.push(match p {
+                path @ JsonPath::Field(_) => process_path(path, root),
+                JsonPath::Index(index @ JsonPathIndex::Single(_)) => process_index(&index, root),
+                _ => Box::new(EmptyPath {})
+            })
+        }
+
+        UnionIndex::new(indexes)
+    }
+
+    pub fn new(indexes: Vec<PathInstance<'a>>) -> Self {
+        UnionIndex { indexes }
+    }
+}
+
+impl<'a> Path<'a> for UnionIndex<'a> {
+    type Data = Value;
+
+    fn path(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+        self.indexes.iter().flat_map(|e| e.path(data)).collect()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use crate::path::structures::{JsonPath, parse, JsonPathIndex};
@@ -309,20 +343,32 @@ mod tests {
         let exp_json = parse(r#"42"#).unwrap();
         assert_eq!(path_inst.path(&json), vec![&exp_json]);
 
-        let index = JsonPath::Index(String::from("array"), JsonPathIndex::Single(3));
-        let chain = vec![&root, &field1, &field2, &index];
+
+        let field4 = JsonPath::Field(String::from("array"));
+        let index1 = JsonPath::Index(JsonPathIndex::Single(3));
+        let index2 = JsonPath::Index(JsonPathIndex::Single(2));
+        let chain = vec![&root, &field1, &field2, &field4, &index1];
         let chain = JsonPath::Path(&chain);
 
         let path_inst = process_path(&chain, &json);
         let exp_json = parse(r#"3"#).unwrap();
         assert_eq!(path_inst.path(&json), vec![&exp_json]);
 
-        let index = JsonPath::Index(String::from("array"), JsonPathIndex::Slice(1, -1, 2));
-        let chain = vec![&root, &field1, &field2, &index];
+        let index = JsonPath::Index(JsonPathIndex::Slice(1, -1, 2));
+        let chain = vec![&root, &field1, &field2, &field4, &index];
         let chain = JsonPath::Path(&chain);
         let path_inst = process_path(&chain, &json);
         let one = json!(1);
         let tree = json!(3);
+        assert_eq!(path_inst.path(&json), vec![&one, &tree]);
+
+
+        let union = JsonPath::Index(JsonPathIndex::Union(vec![&index1,&index2]));
+        let chain = vec![&root, &field1, &field2, &field4, &union];
+        let chain = JsonPath::Path(&chain);
+        let path_inst = process_path(&chain, &json);
+        let one = json!(3);
+        let tree = json!(2);
         assert_eq!(path_inst.path(&json), vec![&one, &tree]);
     }
 }
