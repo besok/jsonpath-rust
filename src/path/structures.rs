@@ -4,12 +4,13 @@ use serde_json::{Result, Value};
 pub enum JsonPath<'a> {
     Root,
     Field(String),
-    Path(&'a Vec<JsonPath<'a>>),
+    Path(&'a Vec<&'a JsonPath<'a>>),
     Current,
     Descent,
     Wildcard,
     Index(String, JsonPathIndex<'a>),
 }
+
 
 #[derive(Debug)]
 pub enum JsonPathIndex<'a> {
@@ -40,10 +41,10 @@ pub fn parse(json: &str) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use crate::structures::parse;
+    use crate::path::structures::parse;
 
     #[test]
-    fn parser_check() {
+    fn parser_dummy_test() {
         let res = parse(r#"
         {
             "name": "John Doe",
