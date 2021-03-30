@@ -5,10 +5,10 @@ pub enum JsonPath<'a> {
     Root,
     Field(String),
     Path(&'a Vec<&'a JsonPath<'a>>),
-    Current,
-    Descent,
-    Wildcard,
+    Descent(String),
     Index(JsonPathIndex<'a>),
+    Current,
+    Wildcard,
 }
 
 

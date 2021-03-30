@@ -15,6 +15,7 @@ fn process_path<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a
         JsonPath::Root => Box::new(RootPointer::new(root)),
         JsonPath::Field(key) => Box::new(ObjectField::new(key)),
         JsonPath::Path(chain) => Box::new(Chain::from(chain, root)),
+        JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
         JsonPath::Index(index) => process_index(index, root),
         _ => Box::new(EmptyPath {})
     }
@@ -34,7 +35,6 @@ pub(crate) struct EmptyPath {}
 
 impl<'a> Path<'a> for EmptyPath {
     type Data = Value;
-
     fn path(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
         vec![&data]
     }
@@ -146,6 +146,12 @@ impl<'a> ObjectField<'a> {
     }
 }
 
+impl<'a> Clone for ObjectField<'a> {
+    fn clone(&self) -> Self {
+        ObjectField::new(self.key)
+    }
+}
+
 impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
 
@@ -156,6 +162,37 @@ impl<'a> Path<'a> for ObjectField<'a> {
             .unwrap_or(vec![])
     }
 }
+
+pub(crate) struct DescentObjectField<'a> {
+    key: &'a String,
+}
+
+impl<'a> Path<'a> for DescentObjectField<'a> {
+    type Data = Value;
+
+    fn path(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+        fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
+            let mut level: Vec<&Value> = key.path(data);
+            match data.as_object() {
+                Some(elems) => {
+                    let mut next_levels: Vec<&Value> = elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
+                    level.append(&mut next_levels);
+                    level
+                }
+                None => vec![]
+            }
+        }
+        let key = ObjectField::new(self.key);
+        deep_path(data, key)
+    }
+}
+
+impl<'a> DescentObjectField<'a> {
+    pub fn new(key: &'a String) -> Self {
+        DescentObjectField { key }
+    }
+}
+
 
 struct Chain<'a> {
     chain: Vec<PathInstance<'a>>,
@@ -321,20 +358,24 @@ mod tests {
 
     #[test]
     fn path_instance_test() {
-        let json = parse(r#"{"v": {"k":{"f":42,"array":[0,1,2,3,4,5]}}}"#).unwrap();
+        let json = parse(r#"{"v": {"k":{"f":42,"array":[0,1,2,3,4,5],"object":{"field1":"val1","field2":"val2"}}}}"#).unwrap();
+        let field1 = JsonPath::Field(String::from("v"));
+        let field2 = JsonPath::Field(String::from("k"));
+        let field3 = JsonPath::Field(String::from("f"));
+        let field4 = JsonPath::Field(String::from("array"));
+        let field5 = JsonPath::Field(String::from("object"));
+        let field6 = JsonPath::Field(String::from("field1"));
+        let field7 = JsonPath::Field(String::from("field2"));
 
         let root = JsonPath::Root;
         let path_inst = process_path(&root, &json);
         assert_eq!(path_inst.path(&json), vec![&json]);
 
-        let field1 = JsonPath::Field(String::from("v"));
 
         let path_inst = process_path(&field1, &json);
-        let exp_json = parse(r#"{"k":{"f":42,"array":[0,1,2,3,4,5]}}"#).unwrap();
+        let exp_json = parse(r#"{"k":{"f":42,"array":[0,1,2,3,4,5],"object":{"field1":"val1","field2":"val2"}}}"#).unwrap();
         assert_eq!(path_inst.path(&json), vec![&exp_json]);
 
-        let field2 = JsonPath::Field(String::from("k"));
-        let field3 = JsonPath::Field(String::from("f"));
 
         let chain = vec![&root, &field1, &field2, &field3];
         let chain = JsonPath::Path(&chain);
@@ -344,14 +385,12 @@ mod tests {
         assert_eq!(path_inst.path(&json), vec![&exp_json]);
 
 
-        let field4 = JsonPath::Field(String::from("array"));
         let index1 = JsonPath::Index(JsonPathIndex::Single(3));
         let index2 = JsonPath::Index(JsonPathIndex::Single(2));
         let chain = vec![&root, &field1, &field2, &field4, &index1];
         let chain = JsonPath::Path(&chain);
-
         let path_inst = process_path(&chain, &json);
-        let exp_json = parse(r#"3"#).unwrap();
+        let exp_json = json!(3);
         assert_eq!(path_inst.path(&json), vec![&exp_json]);
 
         let index = JsonPath::Index(JsonPathIndex::Slice(1, -1, 2));
@@ -363,12 +402,51 @@ mod tests {
         assert_eq!(path_inst.path(&json), vec![&one, &tree]);
 
 
-        let union = JsonPath::Index(JsonPathIndex::Union(vec![&index1,&index2]));
+        let union = JsonPath::Index(JsonPathIndex::Union(vec![&index1, &index2]));
         let chain = vec![&root, &field1, &field2, &field4, &union];
         let chain = JsonPath::Path(&chain);
         let path_inst = process_path(&chain, &json);
-        let one = json!(3);
-        let tree = json!(2);
-        assert_eq!(path_inst.path(&json), vec![&one, &tree]);
+        let tree = json!(3);
+        let two = json!(2);
+        assert_eq!(path_inst.path(&json), vec![&tree, &two]);
+
+        let union = JsonPath::Index(JsonPathIndex::Union(vec![&field6, &field7]));
+        let chain = vec![&root, &field1, &field2, &field5, &union];
+        let chain = JsonPath::Path(&chain);
+        let path_inst = process_path(&chain, &json);
+        let one = json!("val1");
+        let two = json!("val2");
+        assert_eq!(path_inst.path(&json), vec![&one, &two]);
+    }
+
+    #[test]
+    fn path_descent_test() {
+        let json = parse(r#"
+        {
+            "key1": [1,2,3],
+            "key2": "key",
+            "key3": {
+                "key1": "key1",
+                "key2": {
+                    "key1": {
+                        "key1": 0
+                         }
+                     }
+            }
+        }"#).unwrap();
+        let key = JsonPath::Descent(String::from("key1"));
+        let root = JsonPath::Root;
+        let chain = vec![&root, &key];
+        let chain = JsonPath::Path(&chain);
+
+        let path_inst = process_path(&chain, &json);
+
+        let res1 = json!([1,2,3]);
+        let res2 = json!("key1");
+        let res3 = json!({"key1":0});
+        let res4 = json!(0);
+
+        let expected_res = vec![&res1,&res2,&res3,&res4];
+        assert_eq!(path_inst.path(&json), expected_res )
     }
 }
