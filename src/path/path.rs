@@ -1,6 +1,6 @@
 use serde_json::{Value, Map};
 use serde_json::json;
-use serde_json::value::Value::Array;
+use serde_json::value::Value::{Array, Object};
 use crate::path::structures::{JsonPath, JsonPathIndex};
 
 pub(crate) trait Path<'a> {
@@ -15,6 +15,7 @@ fn process_path<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a
         JsonPath::Root => Box::new(RootPointer::new(root)),
         JsonPath::Field(key) => Box::new(ObjectField::new(key)),
         JsonPath::Path(chain) => Box::new(Chain::from(chain, root)),
+        JsonPath::Wildcard => Box::new(Wildcard {}),
         JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
         JsonPath::Index(index) => process_index(index, root),
         _ => Box::new(EmptyPath {})
@@ -30,6 +31,31 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
     }
 }
 
+pub(crate) struct Wildcard {}
+
+impl<'a> Path<'a> for Wildcard {
+    type Data = Value;
+
+    fn path(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+        match data {
+            Array(elems) => {
+                let mut res: Vec<&Value> = vec![];
+                for el in elems.iter() {
+                    res.push(el);
+                }
+                res
+            }
+            Object(elems) => {
+                let mut res: Vec<&Value> = vec![];
+                for el in elems.values() {
+                    res.push(el);
+                }
+                res
+            }
+            _ => vec![]
+        }
+    }
+}
 
 pub(crate) struct EmptyPath {}
 
@@ -446,7 +472,30 @@ mod tests {
         let res3 = json!({"key1":0});
         let res4 = json!(0);
 
-        let expected_res = vec![&res1,&res2,&res3,&res4];
-        assert_eq!(path_inst.path(&json), expected_res )
+        let expected_res = vec![&res1, &res2, &res3, &res4];
+        assert_eq!(path_inst.path(&json), expected_res)
+    }
+
+    #[test]
+    fn wildcard_test() {
+        let json = parse(r#"
+        {
+            "key1": [1,2,3],
+            "key2": "key",
+            "key3": {}
+        }"#).unwrap();
+
+        let root = JsonPath::Root;
+        let wildcard = JsonPath::Wildcard;
+        let chain = vec![&root, &wildcard];
+        let chain = JsonPath::Path(&chain);
+        let path_inst = process_path(&chain, &json);
+
+        let res1 = json!([1,2,3]);
+        let res2 = json!("key");
+        let res3 = json!({});
+
+        let expected_res = vec![&res1, &res2, &res3];
+        assert_eq!(path_inst.path(&json), expected_res)
     }
 }

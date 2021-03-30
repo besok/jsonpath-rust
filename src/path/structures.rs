@@ -28,7 +28,22 @@ pub enum Operand<'a> {
 }
 
 #[derive(Debug)]
-pub enum FilterSign {}
+pub enum FilterSign {
+    Equal,
+    Unequal,
+    Less,
+    Greater,
+    LeOrEq,
+    GrOrEq,
+    Regex,
+    In,
+    Nin,
+    Size,
+    Empty,
+    NoneOf,
+    AnyOf,
+    SubSetOf
+}
 
 #[derive(Debug)]
 pub enum ScriptSign {}
