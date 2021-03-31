@@ -17,6 +17,8 @@ fn process_path<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a
         JsonPath::Path(chain) => Box::new(Chain::from(chain, root)),
         JsonPath::Wildcard => Box::new(Wildcard {}),
         JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
+        JsonPath::Current(Some(tail)) => Box::new(Current::new(process_path(tail, root))),
+        JsonPath::Current(None) => Box::new(Current::none()),
         JsonPath::Index(index) => process_index(index, root),
         _ => Box::new(EmptyPath {})
     }
@@ -30,6 +32,47 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         _ => Box::new(EmptyPath {})
     }
 }
+
+
+pub(crate) struct Current<'a> {
+    tail: Option<PathInstance<'a>>
+}
+
+impl<'a> Current<'a> {
+    fn new(tail: PathInstance<'a>) -> Self {
+        Current { tail: Some(tail) }
+    }
+    fn none() -> Self {
+        Current { tail: None }
+    }
+}
+
+impl<'a> Path<'a> for Current<'a> {
+    type Data = Value;
+
+    fn path(&self, data: &'a Self::Data) -> Vec<&'a Value> {
+        let mut res: Vec<&'a Value> = vec![];
+
+        match data {
+            Array(elems) => {
+                for el in elems {
+                    let mut path = self.tail.as_ref().map(|p| p.path(el)).unwrap_or(vec![el]);
+                    res.append(&mut path)
+                }
+                res
+            }
+            Object(elems) => {
+                for el in elems.values() {
+                    let mut path = self.tail.as_ref().map(|p| p.path(el)).unwrap_or(vec![el]);
+                    res.append(&mut path)
+                }
+                res
+            }
+            _ => vec![]
+        }
+    }
+}
+
 
 pub(crate) struct Wildcard {}
 
@@ -497,5 +540,48 @@ mod tests {
 
         let expected_res = vec![&res1, &res2, &res3];
         assert_eq!(path_inst.path(&json), expected_res)
+    }
+
+    #[test]
+    fn current_test() {
+        let json = parse(r#"
+        {
+            "object":{
+                "field_1":[1,2,3],
+                "field_2":42,
+                "field_3":{"a":"b"}
+
+            }
+        }"#).unwrap();
+
+        let root = JsonPath::Root;
+        let object = JsonPath::Field(String::from("object"));
+        let cur = JsonPath::Current(None);
+
+        let chain = vec![&root,&object,&cur];
+        let chain = JsonPath::Path(&chain);
+
+        let path_inst = process_path(&chain, &json);
+        let res1 = json!([1,2,3]);
+        let res2 = json!(42);
+        let res3 = json!({"a":"b"});
+
+        let expected_res = vec![&res1, &res2, &res3];
+        assert_eq!(path_inst.path(&json), expected_res);
+
+        let field_a = JsonPath::Field(String::from("a"));
+        let chain_in = vec![&field_a];
+        let chain_in = JsonPath::Path(&chain_in);
+        let cur = JsonPath::Current(Some(&chain_in));
+
+        let chain = vec![&root,&object,&cur];
+        let chain = JsonPath::Path(&chain);
+
+        let path_inst = process_path(&chain, &json);
+        let res1 = json!("b");
+
+        let expected_res = vec![&res1];
+        assert_eq!(path_inst.path(&json), expected_res);
+
     }
 }

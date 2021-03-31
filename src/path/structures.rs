@@ -7,8 +7,9 @@ pub enum JsonPath<'a> {
     Path(&'a Vec<&'a JsonPath<'a>>),
     Descent(String),
     Index(JsonPathIndex<'a>),
-    Current,
+    Current(Option<&'a JsonPath<'a>>),
     Wildcard,
+    Function(FnType)
 }
 
 
@@ -42,7 +43,11 @@ pub enum FilterSign {
     Empty,
     NoneOf,
     AnyOf,
-    SubSetOf
+    SubSetOf,
+}
+
+pub enum FnType{
+    Len
 }
 
 #[derive(Debug)]
