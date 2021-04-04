@@ -30,6 +30,7 @@ pub enum Operand<'a> {
 
 #[derive(Debug)]
 pub enum FilterSign {
+    Exist,
     Equal,
     Unequal,
     Less,
@@ -46,7 +47,9 @@ pub enum FilterSign {
     SubSetOf,
 }
 
-pub enum FnType{
+
+#[derive(Debug)]
+pub enum FnType {
     Len
 }
 

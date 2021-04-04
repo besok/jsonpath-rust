@@ -1,7 +1,8 @@
 use serde_json::{Value, Map};
 use serde_json::json;
 use serde_json::value::Value::{Array, Object};
-use crate::path::structures::{JsonPath, JsonPathIndex};
+use crate::path::structures::{JsonPath, JsonPathIndex, FilterSign, Operand};
+use std::fs::File;
 
 pub(crate) trait Path<'a> {
     type Data;
@@ -29,10 +30,17 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(*index)),
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
         JsonPathIndex::Union(elems) => Box::new(UnionIndex::from(elems, root)),
+        JsonPathIndex::Filter(l, op, r) => Box::new(Filter::new(l, r, op, root)),
         _ => Box::new(EmptyPath {})
     }
 }
 
+fn process_operand<'a>(op: &'a Operand, root: &'a Value) -> PathInstance<'a> {
+    match op {
+        Operand::Static(v) => process_path(&JsonPath::Root, v),
+        Operand::Dynamic(jp) => process_path(jp, root)
+    }
+}
 
 pub(crate) struct Current<'a> {
     tail: Option<PathInstance<'a>>
@@ -321,6 +329,73 @@ impl<'a> Path<'a> for UnionIndex<'a> {
     }
 }
 
+struct Filter<'a> {
+    left: PathInstance<'a>,
+    right: PathInstance<'a>,
+    op: &'a FilterSign,
+}
+
+impl<'a> Filter<'a> {
+    fn new(left: &'a Operand, right: &'a Operand, op: &'a FilterSign, root: &'a Value) -> Self {
+        Filter {
+            left: process_operand(left, root),
+            right: process_operand(right, root),
+            op,
+        }
+    }
+
+    fn process(op: &'a FilterSign, left: Vec<&'a Value>, right: Vec<&'a Value>) -> bool {
+        match op {
+            FilterSign::Equal => {}
+            FilterSign::Unequal => !Filter::process(&FilterSign::Equal, left, right),
+            FilterSign::Less => {}
+            FilterSign::LeOrEq =>
+                Filter::process(&FilterSign::Less, left, right)
+                    || Filter::process(&FilterSign::Equal, left.clone(), right.clone()),
+            FilterSign::Greater => !Filter::process(&FilterSign::LeOrEq, left, right),
+            FilterSign::GrOrEq => !Filter::process(&FilterSign::Less, left, right),
+            FilterSign::Regex => {}
+            FilterSign::In => {}
+            FilterSign::Nin => !Filter::process(&FilterSign::In, left, right),
+            FilterSign::Size => {}
+            FilterSign::Empty => {}
+            FilterSign::NoneOf => {}
+            FilterSign::AnyOf => {}
+            FilterSign::SubSetOf => {}
+            FilterSign::Exist => !left.is_empty()
+        }
+        false
+    }
+}
+
+impl<'a> Path<'a> for Filter<'a> {
+    type Data = Value;
+
+    fn path(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+        let mut res: Vec<&Value> = vec![];
+
+        match data {
+            Array(elems) => {
+                for el in elems.iter() {
+                    if Filter::process(&self.op, self.left.path(el), self.right.path(el)) {
+                        res.push(el)
+                    }
+                }
+                res
+            }
+            Object(pairs) => {
+                for el in pairs.values() {
+                    if Filter::process(&self.op, self.left.path(el), self.right.path(el)) {
+                        res.push(el)
+                    }
+                }
+                res
+            }
+            _ => vec![]
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -558,7 +633,7 @@ mod tests {
         let object = JsonPath::Field(String::from("object"));
         let cur = JsonPath::Current(None);
 
-        let chain = vec![&root,&object,&cur];
+        let chain = vec![&root, &object, &cur];
         let chain = JsonPath::Path(&chain);
 
         let path_inst = process_path(&chain, &json);
@@ -574,7 +649,7 @@ mod tests {
         let chain_in = JsonPath::Path(&chain_in);
         let cur = JsonPath::Current(Some(&chain_in));
 
-        let chain = vec![&root,&object,&cur];
+        let chain = vec![&root, &object, &cur];
         let chain = JsonPath::Path(&chain);
 
         let path_inst = process_path(&chain, &json);
@@ -582,6 +657,5 @@ mod tests {
 
         let expected_res = vec![&res1];
         assert_eq!(path_inst.path(&json), expected_res);
-
     }
 }
