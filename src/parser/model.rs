@@ -1,10 +1,10 @@
-use serde_json::{Result, Value};
+use serde_json::Value;
 
 #[derive(Debug)]
 pub enum JsonPath<'a> {
     Root,
     Field(String),
-    Path(&'a Vec<&'a JsonPath<'a>>),
+    Chain(&'a Vec<&'a JsonPath<'a>>),
     Descent(String),
     Index(JsonPathIndex<'a>),
     Current(Option<&'a JsonPath<'a>>),
@@ -30,7 +30,6 @@ pub enum Operand<'a> {
 
 #[derive(Debug)]
 pub enum FilterSign {
-    Exist,
     Equal,
     Unequal,
     Less,
@@ -41,10 +40,10 @@ pub enum FilterSign {
     In,
     Nin,
     Size,
-    Empty,
     NoneOf,
     AnyOf,
     SubSetOf,
+    Exists
 }
 
 
@@ -55,31 +54,3 @@ pub enum FnType {
 
 #[derive(Debug)]
 pub enum ScriptSign {}
-
-
-pub fn parse(json: &str) -> Result<Value> {
-    serde_json::from_str(json)
-}
-
-
-#[cfg(test)]
-mod tests {
-    use crate::path::structures::parse;
-
-    #[test]
-    fn parser_dummy_test() {
-        let res = parse(r#"
-        {
-            "name": "John Doe",
-            "age": 43,
-            "phones": [
-                "+44 1234567",
-                "+44 2345678"
-            ]
-        }"#).unwrap();
-
-        for (el, v) in res.as_object().unwrap() {
-            println!("{} : {}", el, v)
-        }
-    }
-}
