@@ -164,14 +164,14 @@ impl<'a> Filter<'a> {
             FilterSign::LeOrEq => Filter::or(&FilterSign::Less, &FilterSign::Equal, left, right),
             FilterSign::Greater => !Filter::process(&FilterSign::LeOrEq, left, right),
             FilterSign::GrOrEq => !Filter::process(&FilterSign::Less, left, right),
-            FilterSign::Regex => false,
+            FilterSign::Regex => regex(left,right),
             FilterSign::In => inside(left, right),
             FilterSign::Nin => !Filter::process(&FilterSign::In, left, right),
-            FilterSign::NoneOf => false,
-            FilterSign::AnyOf => false,
-            FilterSign::SubSetOf => false,
+            FilterSign::NoneOf => !Filter::process(&FilterSign::AnyOf, left, right),
+            FilterSign::AnyOf => any_of(left,right),
+            FilterSign::SubSetOf => sub_set_of(left,right),
             FilterSign::Exists => !left.is_empty(),
-            FilterSign::Size => false
+            FilterSign::Size => size(left,right)
         }
     }
 }
@@ -390,6 +390,107 @@ mod tests {
         let exp1 = json!( {"field":10});
         let exp2 = json!( {"field":5});
         let expected_res = vec![&exp1, &exp2];
+        assert_eq!(path_inst.path(&json), expected_res)
+    }
+
+    #[test]
+    fn filter_regex_test() {
+        let json = json!({
+                "key":[
+                    {"field":"a11#"},
+                    {"field":"a1#1"},
+                    {"field":"a#11"},
+                    {"field":"#a11"},
+                ]
+            });
+
+
+        let field = JsonPath::Field(String::from("field"));
+        let cur = JsonPath::Current(Some(&field));
+        let operand = Operand::Dynamic(&cur);
+        let right_operand = Operand::Static(json!("[a-zA-Z]+[0-9]#[0-9]+"));
+
+
+        let root = JsonPath::Root;
+        let key = JsonPath::Field(String::from("key"));
+        let filter = JsonPathIndex::Filter(operand, FilterSign::Regex, right_operand);
+        let index = JsonPath::Index(filter);
+
+        let chain = vec![&root, &key, &index];
+        let chain = JsonPath::Chain(&chain);
+
+        let path_inst = process_path(&chain, &json);
+
+        let exp2 = json!( {"field":"a1#1"});
+        let expected_res = vec![ &exp2];
+        assert_eq!(path_inst.path(&json), expected_res)
+    }
+
+    #[test]
+    fn filter_any_of_test() {
+        let json = json!({
+                "key":[
+                    {"field":"a11#"},
+                    {"field":"a1#1"},
+                    {"field":"a#11"},
+                    {"field":"#a11"},
+                ]
+            });
+
+
+        let field = JsonPath::Field(String::from("field"));
+        let cur = JsonPath::Current(Some(&field));
+        let operand = Operand::Dynamic(&cur);
+        let right_operand = Operand::Static(json!(["a11#","aaa","111"]));
+
+
+        let root = JsonPath::Root;
+        let key = JsonPath::Field(String::from("key"));
+        let filter = JsonPathIndex::Filter(operand, FilterSign::AnyOf, right_operand);
+        let index = JsonPath::Index(filter);
+
+        let chain = vec![&root, &key, &index];
+        let chain = JsonPath::Chain(&chain);
+
+        let path_inst = process_path(&chain, &json);
+
+        let exp2 = json!( {"field":"a11#"});
+        let expected_res = vec![&exp2];
+        assert_eq!(path_inst.path(&json), expected_res)
+    }
+    #[test]
+    fn size_test() {
+        let json = json!({
+                "key":[
+                    {"field":"aaaa"},
+                    {"field":"bbb"},
+                    {"field":"cc"},
+                    {"field":"dddd"},
+                    {"field":[1,1,1,1]},
+                ]
+            });
+
+
+        let field = JsonPath::Field(String::from("field"));
+        let cur = JsonPath::Current(Some(&field));
+        let operand = Operand::Dynamic(&cur);
+        let right_operand = Operand::Static(json!(4));
+
+
+        let root = JsonPath::Root;
+        let key = JsonPath::Field(String::from("key"));
+        let filter = JsonPathIndex::Filter(operand, FilterSign::Size, right_operand);
+        let index = JsonPath::Index(filter);
+
+        let chain = vec![&root, &key, &index];
+        let chain = JsonPath::Chain(&chain);
+
+        let path_inst = process_path(&chain, &json);
+
+        let exp2 = json!( {"field":"aaaa"});
+        let exp3 = json!( {"field":"dddd"});
+        let exp4 = json!( {"field":[1,1,1,1]});
+        let expected_res = vec![&exp2,&exp3,&exp4];
         assert_eq!(path_inst.path(&json), expected_res)
     }
 }

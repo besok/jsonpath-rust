@@ -1,4 +1,111 @@
 use serde_json::Value;
+use regex::Regex;
+
+
+pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+    if let Some(Value::Number(n)) = right.get(0) {
+        if let Some(sz) = n.as_u64() {
+            for el in left.iter(){
+                match el {
+                    Value::String(v) if v.len() == sz as usize => true,
+                    Value::Array(elems) if  elems.len() == sz as usize => true,
+                    Value::Object(fields) if fields.len() == sz as usize => true,
+                    _ => return false
+                };
+            }
+            return true;
+        }
+    }
+    false
+}
+
+//todo change the naive impl to sets
+pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+    if left.is_empty() {
+        return true;
+    }
+    if right.is_empty() {
+        return false;
+    }
+
+    if let Some(Value::Array(right_elems)) = right.get(0) {
+        if right_elems.is_empty() {
+            return false;
+        }
+
+        for el in left.iter() {
+            let mut res = false;
+
+            for r in right_elems.iter() {
+                if el.eq(&r) {
+                    res = true
+                }
+            }
+            if !res { return res; }
+        }
+        return true;
+    }
+
+    false
+}
+
+//todo change the naive impl to sets
+pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+    if left.is_empty() {
+        return true;
+    }
+    if right.is_empty() {
+        return false;
+    }
+
+    if let Some(Value::Array(elems)) = right.get(0) {
+        if elems.is_empty() {
+            return false;
+        }
+
+        for el in left.iter() {
+            if let Some(left_elems) = el.as_array() {
+                for l in left_elems.iter() {
+                    for r in elems.iter() {
+                        if l.eq(r) {
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                for r in elems.iter() {
+                    if el.eq(&r) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+    if left.is_empty() || right.is_empty() {
+        return false;
+    }
+
+    match right.get(0) {
+        Some(Value::String(str)) => {
+            if let Ok(regex) = Regex::new(str) {
+                for el in left.iter() {
+                    if let Some(v) = el.as_str() {
+                        if regex.is_match(v) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+        _ => false
+    }
+}
 
 pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.is_empty() {
@@ -55,7 +162,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use crate::json::{eq, less};
+    use crate::json::{eq, less, regex, any_of, sub_set_of, size};
 
     #[test]
     fn value_eq_test() {
@@ -90,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn left_value_test() {
+    fn less_value_test() {
         let left = json!(10);
         let right = json!(11);
 
@@ -111,5 +218,52 @@ mod tests {
 
         assert!(!less(vec![], vec![&right]));
         assert!(!less(vec![&right, &right], vec![&left]));
+    }
+
+    #[test]
+    fn regex_test() {
+        let right = json!("[a-zA-Z]+[0-9]#[0-9]+");
+        let left1 = json!("a11#");
+        let left2 = json!("a1#1");
+        let left3 = json!("a#11");
+        let left4 = json!("#a11");
+
+        assert!(regex(vec![&left1, &left2, &left3, &left4], vec![&right]));
+        assert!(!regex(vec![&left1, &left3, &left4], vec![&right]))
+    }
+
+    #[test]
+    fn any_of_test() {
+        let right = json!([1,2,3,4,5,6]);
+        let left = json!([1,100,101]);
+        assert!(any_of(vec![&left], vec![&right]));
+
+        let left = json!([11,100,101]);
+        assert!(!any_of(vec![&left], vec![&right]));
+
+        let left1 = json!(1);
+        let left2 = json!(11);
+        assert!(any_of(vec![&left1, &left2], vec![&right]));
+    }
+
+    #[test]
+    fn sub_set_of_test() {
+        let left1 = json!(1);
+        let left2 = json!(2);
+        let left3 = json!(3);
+        let left40 = json!(40);
+        let right = json!([1,2,3,4,5,6]);
+        assert!(sub_set_of(vec![&left1, &left2, &left3], vec![&right]));
+        assert!(!sub_set_of(vec![&left1, &left2, &left3, &left40], vec![&right]));
+    }
+    #[test]
+    fn size_test() {
+        let left1 = json!("abc");
+        let left2 = json!([1,2,3]);
+        let left3 = json!([1,2,3,4]);
+        let right = json!(3);
+        assert!(size(vec![&left1], vec![&right]));
+        assert!(size(vec![&left2], vec![&right]));
+        assert!(!size(vec![&left3], vec![&right]));
     }
 }
