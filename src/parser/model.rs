@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum JsonPath<'a> {
     Root,
     Field(String),
@@ -9,26 +9,24 @@ pub enum JsonPath<'a> {
     Index(JsonPathIndex<'a>),
     Current(Option<&'a JsonPath<'a>>),
     Wildcard,
-    Function(FnType)
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum JsonPathIndex<'a> {
     Single(usize),
-    Union(Vec<&'a JsonPath<'a>>),
+    Union(Vec<&'a Operand<'a>>),
     Slice(i32, i32, usize),
     Filter(Operand<'a>, FilterSign, Operand<'a>),
-    Script(Operand<'a>, ScriptSign, Operand<'a>),
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum Operand<'a> {
     Static(Value),
     Dynamic(&'a JsonPath<'a>),
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum FilterSign {
     Equal,
     Unequal,
@@ -43,14 +41,8 @@ pub enum FilterSign {
     NoneOf,
     AnyOf,
     SubSetOf,
-    Exists
+    Exists,
 }
 
 
-#[derive(Debug)]
-pub enum FnType {
-    Len
-}
 
-#[derive(Debug)]
-pub enum ScriptSign {}
