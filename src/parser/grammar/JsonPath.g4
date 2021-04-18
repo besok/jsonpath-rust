@@ -1,18 +1,18 @@
-grammar json_path;
+grammar JsonPath;
 
 path: ROOT? chain? EOF;
 chain: (descent | wildcard | current | key | index)+ ;
 descent: DOT DOT (keyPlain | keyBr);
 wildcard: DOT? BL W BR | DOT W ;
 current: CUR chain?;
-index: BL (single | union | slice | filter) BR;
+index: BL (single | several | slice | filter) BR;
 key: DOT? keyBr | DOT keyPlain;
 
 keyPlain: (ALAPHABET | NUM | PL |PR  | Q | COL | C | LOGIC | H | CL | CR )+ ;
 keyBr :  BL STRING_QT BR  ;
 
 single: NUM;
-union:  STRING_QT (C STRING_QT)+ | NUM (C NUM)+ ;
+several:  STRING_QT (C STRING_QT)+ | NUM (C NUM)+ ;
 slice:  NUM? COL NUM? COL? NUM? ;
 filter:  Q PL op sign op PR ;
 

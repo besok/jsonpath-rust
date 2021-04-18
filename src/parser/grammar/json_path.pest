@@ -1,0 +1,32 @@
+WHITESPACE = _{ " " | "\t" | "\r\n" | "\n"}
+
+dot =  _{ "." }
+
+word = _{ ('a'..'z' | 'A'..'Z')+ }
+specs = _{ "_" | "-" | "/" | "\\" | "#" }
+number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
+
+string_qt = ${ "\'" ~ inner ~ "\'" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\" | "\'") ~ ANY
+    | "\\" ~ ("\"" | "\'" |  "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
+
+key_lim = {(word | ASCII_DIGIT | specs)+}
+key_unlim = {"[" ~ string_qt ~ "]"}
+key = {key_lim | key_unlim}
+
+descent = {dot ~ dot ~ key}
+wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
+current = {"@" ~ chain}
+field = {dot? ~ key_unlim | dot ~ key_lim }
+chain = {(descent | wildcard | current | field)+}
+
+path = {("$")? ~ chain}
+
+single_path = {SOI ~ path ~ EOI }
+
