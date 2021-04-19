@@ -8,12 +8,12 @@ number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGI
 
 string_qt = ${ "\'" ~ inner ~ "\'" }
 inner = @{ char* }
-char = {
+char = _{
     !("\"" | "\\" | "\'") ~ ANY
     | "\\" ~ ("\"" | "\'" |  "\\" | "/" | "b" | "f" | "n" | "r" | "t")
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
-
+root = {"$"}
 sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
 
 key_lim = {(word | ASCII_DIGIT | specs)+}
@@ -26,7 +26,5 @@ current = {"@" ~ chain}
 field = {dot? ~ key_unlim | dot ~ key_lim }
 chain = {(descent | wildcard | current | field)+}
 
-path = {("$")? ~ chain}
-
-single_path = {SOI ~ path ~ EOI }
+path = {SOI ~ root? ~ chain ~ EOI }
 
