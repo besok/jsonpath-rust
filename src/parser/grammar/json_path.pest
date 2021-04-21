@@ -1,9 +1,9 @@
 WHITESPACE = _{ " " | "\t" | "\r\n" | "\n"}
 
 dot =  _{ "." }
-
 word = _{ ('a'..'z' | 'A'..'Z')+ }
 specs = _{ "_" | "-" | "/" | "\\" | "#" }
+unsigned = {ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*}
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
 
 string_qt = ${ "\'" ~ inner ~ "\'" }
@@ -24,7 +24,11 @@ descent = {dot ~ dot ~ key}
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain}
 field = {dot? ~ key_unlim | dot ~ key_lim }
-chain = {(root | descent | wildcard | current | field)+}
+
+index = {"["~ (unsigned) ~ "]" }
+
+
+chain = {(root | descent | wildcard | current | field | index)+}
 
 path = {SOI ~ chain ~ EOI }
 

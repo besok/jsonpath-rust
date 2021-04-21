@@ -13,9 +13,13 @@ pub enum JsonPath {
 }
 
 impl JsonPath {
+    pub fn descent(key: &str) -> Self {
+        JsonPath::Descent(String::from(key))
+    }
     pub fn field(key: &str) -> Self {
         JsonPath::Field(String::from(key))
     }
+
 }
 
 #[derive(Debug, Clone)]
