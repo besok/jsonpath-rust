@@ -1,7 +1,7 @@
-use pest::iterators::{Pair};
+use pest::iterators::{Pair, Pairs};
 use pest::{Parser, Position};
 
-use crate::parser::model::JsonPath;
+use crate::parser::model::{JsonPath, JsonPathIndex};
 use pest::error::{Error, ErrorVariant};
 
 #[derive(Parser)]
@@ -22,6 +22,31 @@ fn parse_key(rule: Pair<Rule>) -> Option<String> {
         _ => None
     }
 }
+fn parse_slice(mut pairs:Pairs<Rule>) -> JsonPathIndex{
+    let mut start = 0;
+    let mut end = 0;
+    let mut step = 1;
+    while pairs.peek().is_some() {
+        let in_pair = pairs.next().unwrap();
+        match in_pair.as_rule() {
+            Rule::start_slice => start = in_pair.as_str().parse::<i32>().unwrap(),
+            Rule::end_slice => end = in_pair.as_str().parse::<i32>().unwrap(),
+            Rule::step_slice => step = in_pair.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
+            _ => ()
+        }
+    }
+    JsonPathIndex::Slice(start,end,step)
+}
+
+fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
+    println!(">>index {}", rule.to_string());
+    let next = down(rule);
+    match next.as_rule() {
+       Rule::unsigned => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap()),
+       Rule::slice => parse_slice(next.into_inner()),
+       _ => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap())
+    }
+}
 
 
 fn down(rule: Pair<Rule>) -> Pair<Rule> {
@@ -29,7 +54,7 @@ fn down(rule: Pair<Rule>) -> Pair<Rule> {
 }
 
 fn parse(rule: Pair<Rule>) -> JsonPath {
-    println!(">> {}", rule.to_string());
+    println!(">> path {}", rule.to_string());
 
     match rule.as_rule() {
         Rule::path => rule.into_inner().next().map(parse).unwrap_or(JsonPath::Empty),
@@ -38,6 +63,7 @@ fn parse(rule: Pair<Rule>) -> JsonPath {
         Rule::wildcard => JsonPath::Wildcard,
         Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
         Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
+        Rule::index => JsonPath::Index(parse_index(rule)),
         _ => JsonPath::Empty
     }
 }
@@ -109,5 +135,19 @@ mod tests {
         test(".abc[*]", vec![JsonPath::field("abc"),JsonPath::Wildcard]);
         test_failed("..*");
         test_failed("abc*");
+    }
+    #[test]
+    fn index_test() {
+        test("[1]", vec![JsonPath::Index(JsonPathIndex::Single(1))]);
+        test_failed("[-1]");
+        test_failed("[1a]");
+
+        test("[1:1000:1]",vec![JsonPath::Index(JsonPathIndex::Slice(1,1000,1))]);
+        test("[:1000:1]",vec![JsonPath::Index(JsonPathIndex::Slice(0,1000,1))]);
+        test("[:1000]",vec![JsonPath::Index(JsonPathIndex::Slice(0,1000,1))]);
+        test("[:]",vec![JsonPath::Index(JsonPathIndex::Slice(0,0,1))]);
+        test("[::10]",vec![JsonPath::Index(JsonPathIndex::Slice(0,0,10))]);
+        test_failed("[::-1]");
+        test_failed("[:::0]");
     }
 }

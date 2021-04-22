@@ -1,9 +1,10 @@
 WHITESPACE = _{ " " | "\t" | "\r\n" | "\n"}
 
+min = _{"-"}
+col = _{":"}
 dot =  _{ "." }
 word = _{ ('a'..'z' | 'A'..'Z')+ }
 specs = _{ "_" | "-" | "/" | "\\" | "#" }
-unsigned = {ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*}
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
 
 string_qt = ${ "\'" ~ inner ~ "\'" }
@@ -25,8 +26,18 @@ wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain}
 field = {dot? ~ key_unlim | dot ~ key_lim }
 
-index = {"["~ (unsigned) ~ "]" }
+unsigned = {("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
+signed = {min? ~ unsigned}
+start_slice = {signed}
+end_slice = {signed}
+step_slice = {col ~ unsigned}
+slice = {start_slice? ~ col ~ end_slice? ~ step_slice? }
 
+unit = {string_qt ~ ("," ~ string_qt)* | number ~ ("," ~ number) }
+filter = {"?"~ "(" ~ op ~ sign ~ op ~ ")"}
+op = {chain | string_qt}
+
+index = {"["~ (slice | unsigned |filter  | unit ) ~ "]" }
 
 chain = {(root | descent | wildcard | current | field | index)+}
 
