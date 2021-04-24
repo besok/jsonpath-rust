@@ -1,7 +1,8 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser, Position};
-
-use crate::parser::model::{JsonPath, JsonPathIndex};
+use serde_json::Value;
+use serde_json::json;
+use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
 use pest::error::{Error, ErrorVariant};
 
 #[derive(Parser)]
@@ -9,7 +10,22 @@ use pest::error::{Error, ErrorVariant};
 struct JsonPathParser;
 
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
-    Ok(parse(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
+    Ok(parse_impl(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
+}
+
+fn parse_impl(rule: Pair<Rule>) -> JsonPath {
+    println!(">> path {}", rule.to_string());
+
+    match rule.as_rule() {
+        Rule::path => rule.into_inner().next().map(parse_impl).unwrap_or(JsonPath::Empty),
+        Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_impl).collect()),
+        Rule::root => JsonPath::Root,
+        Rule::wildcard => JsonPath::Wildcard,
+        Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
+        Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
+        Rule::index => JsonPath::Index(parse_index(rule)),
+        _ => JsonPath::Empty
+    }
 }
 
 fn parse_key(rule: Pair<Rule>) -> Option<String> {
@@ -38,36 +54,38 @@ fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     }
     JsonPathIndex::Slice(start, end, step)
 }
+fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+    let mut keys = vec![];
 
+    while pairs.peek().is_some() {
+        keys.push(String::from(pairs.next().unwrap().into_inner().next().unwrap().as_str()));
+    }
+    JsonPathIndex::UnionKeys(keys)
+}
+fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+    let mut keys = vec![];
+
+    while pairs.peek().is_some() {
+        keys.push(pairs.next().unwrap().as_str().parse::<usize>().unwrap_or(usize::MAX));
+    }
+    JsonPathIndex::UnionIndex(keys)
+}
 fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
-    println!(">>index {}", rule.to_string());
+    println!(">> index {}", rule.to_string());
     let next = down(rule);
     match next.as_rule() {
         Rule::unsigned => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap()),
         Rule::slice => parse_slice(next.into_inner()),
+        Rule::unit_indexes => parse_unit_indexes(next.into_inner()),
+        Rule::unit_keys => parse_unit_keys(next.into_inner()),
         _ => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap())
     }
 }
-
 
 fn down(rule: Pair<Rule>) -> Pair<Rule> {
     rule.into_inner().next().unwrap()
 }
 
-fn parse(rule: Pair<Rule>) -> JsonPath {
-    println!(">> path {}", rule.to_string());
-
-    match rule.as_rule() {
-        Rule::path => rule.into_inner().next().map(parse).unwrap_or(JsonPath::Empty),
-        Rule::chain => JsonPath::Chain(rule.into_inner().map(parse).collect()),
-        Rule::root => JsonPath::Root,
-        Rule::wildcard => JsonPath::Wildcard,
-        Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
-        Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
-        Rule::index => JsonPath::Index(parse_index(rule)),
-        _ => JsonPath::Empty
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -150,5 +168,14 @@ mod tests {
         test("[::10]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 0, 10))]);
         test_failed("[::-1]");
         test_failed("[:::0]");
+
+        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![1,2,3]))]);
+        test("['abc','bcd']", vec![JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("abc"),String::from("bcd")]))]);
+        test_failed("[]");
+        test("[-1,-2]",vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![usize::MAX,usize::MAX]))]);
+        test_failed("[abc,bcd]");
+        test_failed("[\"abc\",\"bcd\"]");
+
+
     }
 }

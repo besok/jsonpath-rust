@@ -19,13 +19,13 @@ impl JsonPath {
     pub fn field(key: &str) -> Self {
         JsonPath::Field(String::from(key))
     }
-
 }
 
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     Single(usize),
-    Union(Vec<Operand>),
+    UnionIndex(Vec<usize>),
+    UnionKeys(Vec<String>),
     Slice(i32, i32, usize),
     Filter(Operand, FilterSign, Operand),
 }
@@ -37,7 +37,7 @@ pub enum Operand {
 }
 
 
-#[derive(Debug, Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FilterSign {
     Equal,
     Unequal,
@@ -64,13 +64,7 @@ impl PartialEq for JsonPath {
             (JsonPath::Wildcard, JsonPath::Wildcard) => true,
             (JsonPath::Empty, JsonPath::Empty) => true,
             (JsonPath::Current(jp1), JsonPath::Current(jp2)) => jp1 == jp2,
-            (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => {
-                if ch1.len() == ch2.len() {
-                    ch1.iter()
-                        .zip(ch2.iter())
-                        .filter(|(a, b)| a != b).count() > 0
-                } else { false }
-            }
+            (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => ch1 == ch2,
             (JsonPath::Index(idx1), JsonPath::Index(idx2)) => idx1 == idx2,
             (_, _) => false
         }
@@ -80,18 +74,13 @@ impl PartialEq for JsonPath {
 impl PartialEq for JsonPathIndex {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (JsonPathIndex::Slice(s1, e1, st1), JsonPathIndex::Slice(s2, e2, st2)) =>
-                s1 == s2 && e1 == e2 && st1 == st2,
+            (JsonPathIndex::Slice(s1, e1, st1),
+                JsonPathIndex::Slice(s2, e2, st2)) => s1 == s2 && e1 == e2 && st1 == st2,
             (JsonPathIndex::Single(el1), JsonPathIndex::Single(el2)) => el1 == el2,
-            (JsonPathIndex::Union(elms1), JsonPathIndex::Union(elems2)) => {
-                if elms1.len() == elems2.len() {
-                    elms1.iter()
-                        .zip(elems2.iter())
-                        .filter(|(a, b)| a != b).count() > 0
-                } else { false }
-            }
-            (JsonPathIndex::Filter(l1, s1, r1), JsonPathIndex::Filter(l2, s2, r2)) =>
-                l1 == l2 && s1 == s2 && r1 == r2,
+            (JsonPathIndex::UnionIndex(elems1), JsonPathIndex::UnionIndex(elems2)) => elems1 == elems2,
+            (JsonPathIndex::UnionKeys(elems1), JsonPathIndex::UnionKeys(elems2)) => elems1 == elems2,
+            (JsonPathIndex::Filter(l1, s1, r1),
+                JsonPathIndex::Filter(l2, s2, r2)) => l1 == l2 && s1 == s2 && r1 == r2,
             (_, _) => false
         }
     }
