@@ -35,8 +35,8 @@ slice = {start_slice? ~ col ~ end_slice? ~ step_slice? }
 
 unit_keys = { string_qt ~ ("," ~ string_qt)+ }
 unit_indexes = { number ~ ("," ~ number)+  }
-filter = {"?"~ "(" ~ op ~ sign ~ op ~ ")"}
-op = {chain | string_qt}
+filter = {"?"~ "(" ~ op ~ (sign ~ op)? ~ ")"}
+op = _{chain | string_qt | number}
 
 index = {"["~ (unit_keys | unit_indexes | slice | unsigned |filter ) ~ "]" }
 

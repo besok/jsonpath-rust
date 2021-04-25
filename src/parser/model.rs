@@ -1,4 +1,5 @@
 use serde_json::Value;
+use crate::parser::model::FilterSign::{Equal, Unequal, Less};
 
 #[derive(Debug, Clone)]
 pub enum JsonPath {
@@ -30,10 +31,28 @@ pub enum JsonPathIndex {
     Filter(Operand, FilterSign, Operand),
 }
 
+impl JsonPathIndex {
+    pub fn exists(op: Operand) -> Self {
+        JsonPathIndex::Filter(op, FilterSign::Exists, Operand::Dynamic(Box::new(JsonPath::Empty)))
+    }
+    pub fn false_filter() -> Self {
+        JsonPathIndex::Filter(Operand::Static(Value::Bool(false)), FilterSign::Equal, Operand::Static(Value::Bool(true)))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Operand {
     Static(Value),
     Dynamic(Box<JsonPath>),
+}
+
+impl Operand {
+    pub fn str(v:&str) -> Self{
+        Operand::Static(Value::from(v))
+    }
+    pub fn val(v:Value) ->Self{
+        Operand::Static(v)
+    }
 }
 
 
@@ -53,6 +72,27 @@ pub enum FilterSign {
     AnyOf,
     SubSetOf,
     Exists,
+}
+
+impl FilterSign {
+    pub fn new(key: &str) -> Self {
+        match key {
+            "==" => FilterSign::Equal,
+            "!=" => FilterSign::Unequal,
+            "<" => FilterSign::Less,
+            ">" => FilterSign::Greater,
+            "<=" => FilterSign::LeOrEq,
+            ">=" => FilterSign::GrOrEq,
+            "~=" => FilterSign::Regex,
+            "in" => FilterSign::In,
+            "nin" => FilterSign::Nin,
+            "size" => FilterSign::Size,
+            "noneOf" => FilterSign::NoneOf,
+            "anyOf" => FilterSign::AnyOf,
+            "subSetOf" => FilterSign::SubSetOf,
+            _ => FilterSign::Exists,
+        }
+    }
 }
 
 impl PartialEq for JsonPath {

@@ -2,7 +2,7 @@ use pest::iterators::{Pair, Pairs};
 use pest::{Parser, Position};
 use serde_json::Value;
 use serde_json::json;
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
+use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
 use pest::error::{Error, ErrorVariant};
 
 #[derive(Parser)]
@@ -18,6 +18,7 @@ fn parse_impl(rule: Pair<Rule>) -> JsonPath {
 
     match rule.as_rule() {
         Rule::path => rule.into_inner().next().map(parse_impl).unwrap_or(JsonPath::Empty),
+        Rule::current => JsonPath::Current(Box::new(rule.into_inner().next().map(parse_impl).unwrap_or(JsonPath::Empty))),
         Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_impl).collect()),
         Rule::root => JsonPath::Root,
         Rule::wildcard => JsonPath::Wildcard,
@@ -54,6 +55,7 @@ fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     }
     JsonPathIndex::Slice(start, end, step)
 }
+
 fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     let mut keys = vec![];
 
@@ -62,6 +64,7 @@ fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     }
     JsonPathIndex::UnionKeys(keys)
 }
+
 fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     let mut keys = vec![];
 
@@ -70,6 +73,27 @@ fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     }
     JsonPathIndex::UnionIndex(keys)
 }
+
+fn parse_filter_index(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+    fn process_op(rule: Pair<Rule>) -> Operand {
+        println!(">> filter {}", rule.to_string());
+        match rule.as_rule() {
+            Rule::number => Operand::Static(Value::from(rule.as_str().parse::<f64>().unwrap())),
+            Rule::string_qt => Operand::Static(Value::from(rule.into_inner().next().unwrap().as_str())),
+            Rule::chain => Operand::Dynamic(Box::new(parse_impl(rule))),
+            _ => Operand::Static(Value::Null)
+        }
+    }
+    let mut left: Operand = process_op(pairs.next().unwrap());
+    if pairs.peek().is_none() {
+        JsonPathIndex::exists(left)
+    } else {
+        let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
+        let right: Operand = process_op(pairs.next().unwrap());
+        JsonPathIndex::Filter(left, sign, right)
+    }
+}
+
 fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
     println!(">> index {}", rule.to_string());
     let next = down(rule);
@@ -78,6 +102,7 @@ fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
         Rule::slice => parse_slice(next.into_inner()),
         Rule::unit_indexes => parse_unit_indexes(next.into_inner()),
         Rule::unit_keys => parse_unit_keys(next.into_inner()),
+        Rule::filter => parse_filter_index(next.into_inner()),
         _ => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap())
     }
 }
@@ -156,11 +181,14 @@ mod tests {
     }
 
     #[test]
-    fn index_test() {
+    fn index__single_test() {
         test("[1]", vec![JsonPath::Index(JsonPathIndex::Single(1))]);
         test_failed("[-1]");
         test_failed("[1a]");
+    }
 
+    #[test]
+    fn index__slice_test() {
         test("[1:1000:10]", vec![JsonPath::Index(JsonPathIndex::Slice(1, 1000, 10))]);
         test("[:1000:10]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 1000, 10))]);
         test("[:1000]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 1000, 1))]);
@@ -168,14 +196,29 @@ mod tests {
         test("[::10]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 0, 10))]);
         test_failed("[::-1]");
         test_failed("[:::0]");
+    }
 
-        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![1,2,3]))]);
-        test("['abc','bcd']", vec![JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("abc"),String::from("bcd")]))]);
+    #[test]
+    fn index_union_test() {
+        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![1, 2, 3]))]);
+        test("['abc','bcd']", vec![JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("abc"), String::from("bcd")]))]);
         test_failed("[]");
-        test("[-1,-2]",vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![usize::MAX,usize::MAX]))]);
+        test("[-1,-2]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![usize::MAX, usize::MAX]))]);
         test_failed("[abc,bcd]");
         test_failed("[\"abc\",\"bcd\"]");
+    }
 
-
+    #[test]
+    fn index_filter_test() {
+        test("[?('abc' == 'abc')]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::str("abc"),
+            FilterSign::Equal,
+            Operand::str("abc"),
+        ))]);
+        test("[?('abc' == 1)]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::str("abc"),
+            FilterSign::Equal,
+            Operand::val(json!(1.0)),
+        ))]);
     }
 }
