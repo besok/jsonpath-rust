@@ -19,12 +19,12 @@ sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | 
 
 key_lim = {(word | ASCII_DIGIT | specs)+}
 key_unlim = {"[" ~ string_qt ~ "]"}
-key = {key_lim | key_unlim}
+key = ${key_lim | key_unlim}
 
 descent = {dot ~ dot ~ key}
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain}
-field = {dot? ~ key_unlim | dot ~ key_lim }
+field = ${dot? ~ key_unlim | dot ~ key_lim }
 
 unsigned = {("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
 signed = {min? ~ unsigned}

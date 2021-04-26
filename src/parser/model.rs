@@ -25,7 +25,7 @@ impl JsonPath {
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     Single(usize),
-    UnionIndex(Vec<usize>),
+    UnionIndex(Vec<f64>),
     UnionKeys(Vec<String>),
     Slice(i32, i32, usize),
     Filter(Operand, FilterSign, Operand),

@@ -69,7 +69,7 @@ fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     let mut keys = vec![];
 
     while pairs.peek().is_some() {
-        keys.push(pairs.next().unwrap().as_str().parse::<usize>().unwrap_or(usize::MAX));
+        keys.push(pairs.next().unwrap().as_str().parse::<f64>().unwrap_or(-1.0));
     }
     JsonPathIndex::UnionIndex(keys)
 }
@@ -80,7 +80,22 @@ fn parse_filter_index(mut pairs: Pairs<Rule>) -> JsonPathIndex {
         match rule.as_rule() {
             Rule::number => Operand::Static(Value::from(rule.as_str().parse::<f64>().unwrap())),
             Rule::string_qt => Operand::Static(Value::from(rule.into_inner().next().unwrap().as_str())),
-            Rule::chain => Operand::Dynamic(Box::new(parse_impl(rule))),
+            Rule::chain => {
+                match parse_impl(rule) {
+                   JsonPath::Chain(elems) => {
+                        if elems.len() == 1 {
+                            match elems.first() {
+                                Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => Operand::Static(Value::from(keys.clone())),
+                                Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => Operand::Static(Value::from(keys.clone())),
+                                _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
+                            }
+                        } else {
+                            Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
+                        }
+                    }
+                    jp => Operand::Dynamic(Box::new(jp))
+                }
+            }
             _ => Operand::Static(Value::Null)
         }
     }
@@ -116,6 +131,7 @@ fn down(rule: Pair<Rule>) -> Pair<Rule> {
 mod tests {
     use super::*;
     use std::panic;
+    use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
@@ -200,10 +216,10 @@ mod tests {
 
     #[test]
     fn index_union_test() {
-        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![1, 2, 3]))]);
+        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![1.0, 2.0, 3.0]))]);
         test("['abc','bcd']", vec![JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("abc"), String::from("bcd")]))]);
         test_failed("[]");
-        test("[-1,-2]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![usize::MAX, usize::MAX]))]);
+        test("[-1,-2]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![-1.0, -1.0]))]);
         test_failed("[abc,bcd]");
         test_failed("[\"abc\",\"bcd\"]");
     }
@@ -219,6 +235,28 @@ mod tests {
             Operand::str("abc"),
             FilterSign::Equal,
             Operand::val(json!(1.0)),
+        ))]);
+
+        test("[?(@.abc in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc"))])))]))),
+            FilterSign::In,
+            Operand::val(json!(["abc","bcd"])),
+        ))]);
+        test("[?(@.abc.[*] in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc")),Wildcard])))]))),
+            FilterSign::In,
+            Operand::val(json!(["abc","bcd"])),
+        ))]);
+        test("[?(@.[*]..next in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Wildcard,Descent(String::from("next"))])))]))),
+            FilterSign::In,
+            Operand::val(json!(["abc","bcd"])),
+        ))]);
+
+        test("[?(@[1] in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![JsonPath::Index(JsonPathIndex::Single(1))])))]))),
+            FilterSign::In,
+            Operand::val(json!(["abc","bcd"])),
         ))]);
     }
 }
