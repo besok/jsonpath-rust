@@ -10,16 +10,16 @@ use pest::error::{Error, ErrorVariant};
 struct JsonPathParser;
 
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
-    Ok(parse_impl(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
+    Ok(parse_internal(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
 }
 
-fn parse_impl(rule: Pair<Rule>) -> JsonPath {
+fn parse_internal(rule: Pair<Rule>) -> JsonPath {
     println!(">> path {}", rule.to_string());
 
     match rule.as_rule() {
-        Rule::path => rule.into_inner().next().map(parse_impl).unwrap_or(JsonPath::Empty),
-        Rule::current => JsonPath::Current(Box::new(rule.into_inner().next().map(parse_impl).unwrap_or(JsonPath::Empty))),
-        Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_impl).collect()),
+        Rule::path => rule.into_inner().next().map(parse_internal).unwrap_or(JsonPath::Empty),
+        Rule::current => JsonPath::Current(Box::new(rule.into_inner().next().map(parse_internal).unwrap_or(JsonPath::Empty))),
+        Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_internal).collect()),
         Rule::root => JsonPath::Root,
         Rule::wildcard => JsonPath::Wildcard,
         Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
@@ -49,7 +49,7 @@ fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
         match in_pair.as_rule() {
             Rule::start_slice => start = in_pair.as_str().parse::<i32>().unwrap_or(start),
             Rule::end_slice => end = in_pair.as_str().parse::<i32>().unwrap_or(end),
-            Rule::step_slice => step = in_pair.into_inner().next().unwrap().as_str().parse::<usize>().unwrap_or(step),
+            Rule::step_slice => step = down(in_pair).as_str().parse::<usize>().unwrap_or(step),
             _ => ()
         }
     }
@@ -60,7 +60,7 @@ fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     let mut keys = vec![];
 
     while pairs.peek().is_some() {
-        keys.push(String::from(pairs.next().unwrap().into_inner().next().unwrap().as_str()));
+        keys.push(String::from(down(pairs.next().unwrap()).as_str()));
     }
     JsonPathIndex::UnionKeys(keys)
 }
@@ -74,43 +74,44 @@ fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     JsonPathIndex::UnionIndex(keys)
 }
 
-fn parse_filter_index(mut pairs: Pairs<Rule>) -> JsonPathIndex {
-    fn process_op(rule: Pair<Rule>) -> Operand {
-        println!(">> filter {}", rule.to_string());
-        match rule.as_rule() {
-            Rule::number => Operand::Static(Value::from(rule.as_str().parse::<f64>().unwrap())),
-            Rule::string_qt => Operand::Static(Value::from(rule.into_inner().next().unwrap().as_str())),
-            Rule::chain => {
-                match parse_impl(rule) {
-                   JsonPath::Chain(elems) => {
-                        if elems.len() == 1 {
-                            match elems.first() {
-                                Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => Operand::Static(Value::from(keys.clone())),
-                                Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => Operand::Static(Value::from(keys.clone())),
-                                _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
-                            }
-                        } else {
-                            Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
-                        }
-                    }
-                    jp => Operand::Dynamic(Box::new(jp))
+fn parse_chain_in_operand(rule: Pair<Rule>) -> Operand{
+    match parse_internal(rule) {
+        JsonPath::Chain(elems) => {
+            if elems.len() == 1 {
+                match elems.first() {
+                    Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => Operand::val(Value::from(keys.clone())),
+                    Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => Operand::val(Value::from(keys.clone())),
+                    _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
                 }
+            } else {
+                Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
             }
-            _ => Operand::Static(Value::Null)
         }
+        jp => Operand::Dynamic(Box::new(jp))
     }
-    let mut left: Operand = process_op(pairs.next().unwrap());
+}
+
+fn parse_operand(rule: Pair<Rule>) -> Operand {
+    match rule.as_rule() {
+        Rule::number => Operand::Static(Value::from(rule.as_str().parse::<f64>().unwrap())),
+        Rule::string_qt => Operand::Static(Value::from(down(rule).as_str())),
+        Rule::chain => parse_chain_in_operand(rule),
+        _ => Operand::Static(Value::Null)
+    }
+}
+
+fn parse_filter_index(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+    let mut left: Operand = parse_operand(pairs.next().unwrap());
     if pairs.peek().is_none() {
         JsonPathIndex::exists(left)
     } else {
         let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
-        let right: Operand = process_op(pairs.next().unwrap());
+        let right: Operand = parse_operand(pairs.next().unwrap());
         JsonPathIndex::Filter(left, sign, right)
     }
 }
 
 fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
-    println!(">> index {}", rule.to_string());
     let next = down(rule);
     match next.as_rule() {
         Rule::unsigned => JsonPathIndex::Single(next.as_str().parse::<usize>().unwrap()),
@@ -243,12 +244,12 @@ mod tests {
             Operand::val(json!(["abc","bcd"])),
         ))]);
         test("[?(@.abc.[*] in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc")),Wildcard])))]))),
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc")), Wildcard])))]))),
             FilterSign::In,
             Operand::val(json!(["abc","bcd"])),
         ))]);
         test("[?(@.[*]..next in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Wildcard,Descent(String::from("next"))])))]))),
+            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Wildcard, Descent(String::from("next"))])))]))),
             FilterSign::In,
             Operand::val(json!(["abc","bcd"])),
         ))]);

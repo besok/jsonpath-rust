@@ -47,12 +47,10 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn str(v:&str) -> Self{
+    pub fn str(v: &str) -> Self {
         Operand::Static(Value::from(v))
     }
-    pub fn val(v:Value) ->Self{
-        Operand::Static(v)
-    }
+    pub fn val(v: Value) -> Self { Operand::Static(v) }
 }
 
 
