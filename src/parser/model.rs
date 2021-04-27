@@ -1,5 +1,4 @@
 use serde_json::Value;
-use crate::parser::model::FilterSign::{Equal, Unequal, Less};
 
 #[derive(Debug, Clone)]
 pub enum JsonPath {
@@ -35,9 +34,6 @@ impl JsonPathIndex {
     pub fn exists(op: Operand) -> Self {
         JsonPathIndex::Filter(op, FilterSign::Exists, Operand::Dynamic(Box::new(JsonPath::Empty)))
     }
-    pub fn false_filter() -> Self {
-        JsonPathIndex::Filter(Operand::Static(Value::Bool(false)), FilterSign::Equal, Operand::Static(Value::Bool(true)))
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +47,9 @@ impl Operand {
         Operand::Static(Value::from(v))
     }
     pub fn val(v: Value) -> Self { Operand::Static(v) }
+    pub fn path(p: JsonPath) ->Self{
+        Operand::Dynamic(Box::new(p))
+    }
 }
 
 
@@ -87,7 +86,7 @@ impl FilterSign {
             "size" => FilterSign::Size,
             "noneOf" => FilterSign::NoneOf,
             "anyOf" => FilterSign::AnyOf,
-            "subSetOf" => FilterSign::SubSetOf,
+            "subsetOf" => FilterSign::SubSetOf,
             _ => FilterSign::Exists,
         }
     }

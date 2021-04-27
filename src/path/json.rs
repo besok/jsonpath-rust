@@ -1,14 +1,13 @@
 use serde_json::Value;
 use regex::Regex;
 
-
 pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if let Some(Value::Number(n)) = right.get(0) {
         if let Some(sz) = n.as_u64() {
-            for el in left.iter(){
+            for el in left.iter() {
                 match el {
                     Value::String(v) if v.len() == sz as usize => true,
-                    Value::Array(elems) if  elems.len() == sz as usize => true,
+                    Value::Array(elems) if elems.len() == sz as usize => true,
                     Value::Object(fields) if fields.len() == sz as usize => true,
                     _ => return false
                 };
@@ -256,6 +255,7 @@ mod tests {
         assert!(sub_set_of(vec![&left1, &left2, &left3], vec![&right]));
         assert!(!sub_set_of(vec![&left1, &left2, &left3, &left40], vec![&right]));
     }
+
     #[test]
     fn size_test() {
         let left1 = json!("abc");

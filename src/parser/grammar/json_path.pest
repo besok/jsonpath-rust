@@ -23,7 +23,7 @@ key = ${key_lim | key_unlim}
 
 descent = {dot ~ dot ~ key}
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
-current = {"@" ~ chain}
+current = {"@" ~ chain?}
 field = ${dot? ~ key_unlim | dot ~ key_lim }
 
 unsigned = {("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
