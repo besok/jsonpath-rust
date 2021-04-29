@@ -169,6 +169,43 @@ mod tests {
         }
     }
 
+    fn template_json<'a>() -> &'a str {
+        r#" {"store": { "book": [
+             {
+                 "category": "reference",
+                 "author": "Nigel Rees",
+                 "title": "Sayings of the Century",
+                 "price": 8.95
+             },
+             {
+                 "category": "fiction",
+                 "author": "Evelyn Waugh",
+                 "title": "Sword of Honour",
+                 "price": 12.99
+             },
+             {
+                 "category": "fiction",
+                 "author": "Herman Melville",
+                 "title": "Moby Dick",
+                 "isbn": "0-553-21311-3",
+                 "price": 8.99
+             },
+             {
+                 "category": "fiction",
+                 "author": "J. R. R. Tolkien",
+                 "title": "The Lord of the Rings",
+                 "isbn": "0-395-19395-8",
+                 "price": 22.99
+             }
+         ],
+         "bicycle": {
+             "color": "red",
+             "price": 19.95
+         }
+     },
+     "expensive": 10 }"#
+    }
+
     #[test]
     fn simple_test() {
         test("[1,2,3]", "$[1]", vec![&json!(2)]);
@@ -176,5 +213,87 @@ mod tests {
         test(r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
              "$.field.field[?(@.active)]",
              vec![&json!({"active":1})]);
+
+        test(template_json(),
+             "$.store.book[*].author",
+             vec![
+                 &json!("Nigel Rees"),
+                 &json!("Evelyn Waugh"),
+                 &json!("Herman Melville"),
+                 &json!("J. R. R. Tolkien")
+             ],
+        );
+        test(template_json(),
+             "$.store.*",
+             vec![
+                 &json!({"color":"red","price":19.95}),
+                 &json!([
+      {
+         "category" : "reference",
+         "author" : "Nigel Rees",
+         "title" : "Sayings of the Century",
+         "price" : 8.95
+      },
+      {
+         "category" : "fiction",
+         "author" : "Evelyn Waugh",
+         "title" : "Sword of Honour",
+         "price" : 12.99
+      },
+      {
+         "category" : "fiction",
+         "author" : "Herman Melville",
+         "title" : "Moby Dick",
+         "isbn" : "0-553-21311-3",
+         "price" : 8.99
+      },
+      {
+         "category" : "fiction",
+         "author" : "J. R. R. Tolkien",
+         "title" : "The Lord of the Rings",
+         "isbn" : "0-395-19395-8",
+         "price" : 22.99
+      }
+   ])]);
+
+        test(template_json(),
+             "$.store.book[?(@.price < 10)]",
+             vec![
+                 &json!(  {
+      "category" : "reference",
+      "author" : "Nigel Rees",
+      "title" : "Sayings of the Century",
+      "price" : 8.95
+   }),
+                 &json!({
+      "category" : "fiction",
+      "author" : "Herman Melville",
+      "title" : "Moby Dick",
+      "isbn" : "0-553-21311-3",
+      "price" : 8.99
+   })],
+        );
+
+        // test(template_json(),
+        //      "$.store..price",
+        //      vec![
+        //          &json!(8.95),
+        //          &json!(12.99),
+        //          &json!(8.99),
+        //          &json!(22.99),
+        //          &json!(19.95)
+        //      ],
+        // );
+
+
+        // test(template_json(),
+        //      "$..author",
+        //      vec![
+        //          &json!("Nigel Rees"),
+        //          &json!("Evelyn Waugh"),
+        //          &json!("Herman Melville"),
+        //          &json!("J. R. R. Tolkien")
+        //      ],
+        // );
     }
 }

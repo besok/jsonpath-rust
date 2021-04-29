@@ -111,7 +111,7 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
                     level.append(&mut next_levels);
                     level
                 }
-                None => vec![]
+                None => level
             }
         }
         let key = ObjectField::new(self.key);

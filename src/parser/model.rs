@@ -4,13 +4,21 @@ use serde_json::Value;
 /// The common logic of the structures pursues to correspond the internal parsing structure.
 #[derive(Debug, Clone)]
 pub enum JsonPath {
+    /// The $ operator
     Root,
+    /// Field represents key
     Field(String),
+    /// The whole chain of the path.
     Chain(Vec<JsonPath>),
+    /// The .. operator
     Descent(String),
+    /// The indexes for array
     Index(JsonPathIndex),
+    /// The @ operator
     Current(Box<JsonPath>),
+    /// The * operator
     Wildcard,
+    /// The item uses to define the unresolved state
     Empty,
 }
 
@@ -24,10 +32,15 @@ impl JsonPath {
 }
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
+    /// The single element in array
     Single(usize),
+    /// Union represents a several indexes
     UnionIndex(Vec<f64>),
+    /// Union represents a several keys
     UnionKeys(Vec<String>),
+    /// DEfault slice where the items are start/end/step respectively
     Slice(i32, i32, usize),
+    /// Filter ?()
     Filter(Operand, FilterSign, Operand),
 }
 

@@ -109,8 +109,9 @@ The expression in general consists of the following elements:
  | JsonPath | Result |
  | :------- | :----- |
  | `$.store.book[*].author`| The authors of all books     |
- | `$..author`                   | All authors                         |
+ | `$..book[?(@.isbn)]`          | All books with an ISBN number         |
  | `$.store.*`                  | All things, both books and bicycles  |
+ | `$..author`                   | All authors                         |
  | `$.store..price`             | The price of everything         |
  | `$..book[2]`                 | The third book                      |
  | `$..book[-2]`                 | The second to last book            |
@@ -119,7 +120,6 @@ The expression in general consists of the following elements:
  | `$..book[1:2]`                | All books from index 1 (inclusive) until index 2 (exclusive) |
  | `$..book[-2:]`                | Last two books                   |
  | `$..book[2:]`                | Book number two from tail          |
- | `$..book[?(@.isbn)]`          | All books with an ISBN number         |
  | `$.store.book[?(@.price < 10)]` | All books in store cheaper than 10  |
  | `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"  |
  | `$..book[?(@.author =~ /.*REES/i)]` | All books matching regex (ignore case)  |
