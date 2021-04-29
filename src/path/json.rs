@@ -161,7 +161,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use crate::json::{eq, less, regex, any_of, sub_set_of, size};
+    use crate::path::json::{eq, less, regex, any_of, sub_set_of, size};
 
     #[test]
     fn value_eq_test() {

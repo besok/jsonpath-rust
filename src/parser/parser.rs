@@ -9,12 +9,12 @@ use pest::error::{Error};
 #[grammar = "parser/grammar/json_path.pest"]
 struct JsonPathParser;
 
+/// the parsing function.
+/// Since the parsing can finish with error the result is [[Result]]
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
     Ok(parse_internal(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
 }
-
 fn parse_internal(rule: Pair<Rule>) -> JsonPath {
-    println!(">> path {} -> {}", rule.as_str(), rule.to_string());
 
     match rule.as_rule() {
         Rule::path => rule.into_inner().next().map(parse_internal).unwrap_or(JsonPath::Empty),
@@ -28,7 +28,6 @@ fn parse_internal(rule: Pair<Rule>) -> JsonPath {
         _ => JsonPath::Empty
     }
 }
-
 fn parse_key(rule: Pair<Rule>) -> Option<String> {
     match rule.as_rule() {
         Rule::key

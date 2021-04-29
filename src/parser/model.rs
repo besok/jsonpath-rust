@@ -1,5 +1,7 @@
 use serde_json::Value;
 
+/// The basic structures for parsing json paths.
+/// The common logic of the structures pursues to correspond the internal parsing structure.
 #[derive(Debug, Clone)]
 pub enum JsonPath {
     Root,
@@ -20,7 +22,6 @@ impl JsonPath {
         JsonPath::Field(String::from(key))
     }
 }
-
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     Single(usize),
