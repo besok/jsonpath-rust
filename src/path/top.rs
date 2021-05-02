@@ -105,13 +105,20 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
         fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
             let mut level: Vec<&Value> = key.find(data);
-            match data.as_object() {
-                Some(elems) => {
-                    let mut next_levels: Vec<&Value> = elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
+            match data {
+                Value::Object(elems) => {
+                    let mut next_levels: Vec<&Value> =
+                        elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
                     level
                 }
-                None => level
+                Value::Array(elems) => {
+                    let mut next_levels: Vec<&Value> =
+                        elems.iter().flat_map(|v|deep_path(v,key.clone())).collect();
+                    level.append(&mut next_levels);
+                    level
+                }
+                _ => level
             }
         }
         let key = ObjectField::new(self.key);
@@ -210,8 +217,8 @@ mod tests {
         assert_eq!(path_inst.find(&json), vec![&exp_json]);
 
 
-        let index1 = JsonPath::Index(JsonPathIndex::Single(3));
-        let index2 = JsonPath::Index(JsonPathIndex::Single(2));
+        let index1 = JsonPath::Index(JsonPathIndex::Single(json!(3)));
+        let index2 = JsonPath::Index(JsonPathIndex::Single(json!(2)));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), index1.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
@@ -227,7 +234,7 @@ mod tests {
         assert_eq!(path_inst.find(&json), vec![&one, &tree]);
 
 
-        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![1.0, 2.0]));
+        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1),json!(2)]));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), union.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
@@ -235,12 +242,11 @@ mod tests {
         let two = json!(2);
         assert_eq!(path_inst.find(&json), vec![&tree, &two]);
 
-        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![-1.0]));
+        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1),json!(2)]));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), union.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
-        let vec: Vec<&Value> = vec![];
-        assert_eq!(path_inst.find(&json), vec);
+        assert_eq!(path_inst.find(&json), vec![&json!(1),&json!(2)]);
 
 
         let op6 = Operand::Dynamic(Box::new(field6));

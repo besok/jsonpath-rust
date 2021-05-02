@@ -3,7 +3,7 @@ use regex::Regex;
 
 pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if let Some(Value::Number(n)) = right.get(0) {
-        if let Some(sz) = n.as_u64() {
+        if let Some(sz) = n.as_f64() {
             for el in left.iter() {
                 match el {
                     Value::String(v) if v.len() == sz as usize => true,
@@ -27,24 +27,25 @@ pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         return false;
     }
 
-    if let Some(Value::Array(right_elems)) = right.get(0) {
-        if right_elems.is_empty() {
-            return false;
-        }
-
-        for el in left.iter() {
-            let mut res = false;
-
-            for r in right_elems.iter() {
-                if el.eq(&r) {
-                    res = true
-                }
+    if let Some(elems) = left.first().and_then(|e| e.as_array()) {
+        if let Some(Value::Array(right_elems)) = right.get(0) {
+            if right_elems.is_empty() {
+                return false;
             }
-            if !res { return res; }
-        }
-        return true;
-    }
 
+            for el in elems {
+                let mut res = false;
+
+                for r in right_elems.iter() {
+                    if el.eq(r) {
+                        res = true
+                    }
+                }
+                if res == false { return false; }
+            }
+            return true;
+        }
+    }
     false
 }
 
@@ -160,7 +161,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
     use crate::path::json::{eq, less, regex, any_of, sub_set_of, size};
 
     #[test]
@@ -252,8 +253,8 @@ mod tests {
         let left3 = json!(3);
         let left40 = json!(40);
         let right = json!([1,2,3,4,5,6]);
-        assert!(sub_set_of(vec![&left1, &left2, &left3], vec![&right]));
-        assert!(!sub_set_of(vec![&left1, &left2, &left3, &left40], vec![&right]));
+        assert!(sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone()])], vec![&right]));
+        assert!(!sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone(),left40.clone()])], vec![&right]));
     }
 
     #[test]

@@ -203,17 +203,60 @@ mod tests {
              "price": 19.95
          }
      },
+     "array":[0,1,2,3,4,5,6,7,8,9],
+     "orders":[{"ref":[1,2,3],"id":1},{"ref":[4,5,6],"id":2},{"ref":[7,8,9],"id":3}],
      "expensive": 10 }"#
     }
 
     #[test]
     fn simple_test() {
         test("[1,2,3]", "$[1]", vec![&json!(2)]);
+    }
 
-        test(r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
-             "$.field.field[?(@.active)]",
-             vec![&json!({"active":1})]);
+    #[test]
+    fn root_test() {
+        test(template_json(), "$", vec![&serde_json::from_str(template_json()).unwrap()]);
+    }
 
+    #[test]
+    fn descent_test() {
+        test(template_json(), "$..category",
+             vec![
+                 &json!("reference"),
+                 &json!("fiction"),
+                 &json!("fiction"),
+                 &json!("fiction"),
+             ]);
+        test(template_json(),
+             "$.store..price",
+             vec![
+                 &json!(19.95),
+                 &json!(8.95),
+                 &json!(12.99),
+                 &json!(8.99),
+                 &json!(22.99),
+             ],
+        );
+        test(template_json(),
+             "$..author",
+             vec![
+                 &json!("Nigel Rees"),
+                 &json!("Evelyn Waugh"),
+                 &json!("Herman Melville"),
+                 &json!("J. R. R. Tolkien")
+             ],
+        );
+    }
+
+    #[test]
+    fn wildcard_test() {
+        test(template_json(), "$..book.[*].category",
+             vec![
+                 &json!("reference"),
+                 &json!("fiction"),
+                 &json!("fiction"),
+                 &json!("fiction"),
+             ]);
         test(template_json(),
              "$.store.book[*].author",
              vec![
@@ -223,77 +266,187 @@ mod tests {
                  &json!("J. R. R. Tolkien")
              ],
         );
-        test(template_json(),
-             "$.store.*",
+    }
+
+    #[test]
+    fn field_test() {
+        test(r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
+             "$.field.field[?(@.active)]",
+             vec![&json!({"active":1})]);
+    }
+
+    #[test]
+    fn index_index_test() {
+        test(template_json(), "$..book[2].isbn",
              vec![
-                 &json!({"color":"red","price":19.95}),
-                 &json!([
-      {
-         "category" : "reference",
-         "author" : "Nigel Rees",
-         "title" : "Sayings of the Century",
-         "price" : 8.95
-      },
-      {
-         "category" : "fiction",
-         "author" : "Evelyn Waugh",
-         "title" : "Sword of Honour",
-         "price" : 12.99
-      },
-      {
-         "category" : "fiction",
-         "author" : "Herman Melville",
-         "title" : "Moby Dick",
-         "isbn" : "0-553-21311-3",
-         "price" : 8.99
-      },
-      {
-         "category" : "fiction",
-         "author" : "J. R. R. Tolkien",
-         "title" : "The Lord of the Rings",
-         "isbn" : "0-395-19395-8",
-         "price" : 22.99
-      }
-   ])]);
+                 &json!("0-553-21311-3"),
+             ]);
+    }
 
-        test(template_json(),
-             "$.store.book[?(@.price < 10)]",
+    #[test]
+    fn index_unit_index_test() {
+        test(template_json(), "$..book[2,4].isbn",
              vec![
-                 &json!(  {
-      "category" : "reference",
-      "author" : "Nigel Rees",
-      "title" : "Sayings of the Century",
-      "price" : 8.95
-   }),
-                 &json!({
-      "category" : "fiction",
-      "author" : "Herman Melville",
-      "title" : "Moby Dick",
-      "isbn" : "0-553-21311-3",
-      "price" : 8.99
-   })],
-        );
+                 &json!("0-553-21311-3"),
+             ]);
+        test(template_json(), "$..book[2,3].isbn",
+             vec![
+                 &json!("0-553-21311-3"),
+                 &json!("0-395-19395-8"),
+             ]);
+    }
 
-        // test(template_json(),
-        //      "$.store..price",
-        //      vec![
-        //          &json!(8.95),
-        //          &json!(12.99),
-        //          &json!(8.99),
-        //          &json!(22.99),
-        //          &json!(19.95)
-        //      ],
-        // );
+    #[test]
+    fn index_unit_keys_test() {
+        test(template_json(), "$..book[2,3]['title','price']",
+             vec![
+                 &json!("Moby Dick"),
+                 &json!(8.99),
+                 &json!("The Lord of the Rings"),
+                 &json!(22.99),
+             ]);
+    }
 
+    #[test]
+    fn index_slice_test() {
+        test(template_json(),
+             "$.array[:]",
+             vec![
+                 &json!(0),
+                 &json!(1),
+                 &json!(2),
+                 &json!(3),
+                 &json!(4),
+                 &json!(5),
+                 &json!(6),
+                 &json!(7),
+                 &json!(8),
+                 &json!(9),
+             ]);
+        test(template_json(),
+             "$.array[1:4:2]",
+             vec![
+                 &json!(1),
+                 &json!(3),
+             ]);
+        test(template_json(),
+             "$.array[::3]",
+             vec![
+                 &json!(0),
+                 &json!(3),
+                 &json!(6),
+                 &json!(9),
+             ]);
+        test(template_json(),
+             "$.array[-1:]",
+             vec![
+                 &json!(9),
+             ]);
+        test(template_json(),
+             "$.array[-2:-1]",
+             vec![
+                 &json!(8),
+             ]);
+    }
 
-        // test(template_json(),
-        //      "$..author",
-        //      vec![
-        //          &json!("Nigel Rees"),
-        //          &json!("Evelyn Waugh"),
-        //          &json!("Herman Melville"),
-        //          &json!("J. R. R. Tolkien")
-        //      ],
-        // );
+    #[test]
+    fn index_filter_test() {
+        test(template_json(),
+             "$..book[?(@.isbn)].title",
+             vec![
+                 &json!("Moby Dick"),
+                 &json!("The Lord of the Rings"),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price != 8.95)].title",
+             vec![
+                 &json!("Sword of Honour"),
+                 &json!("Moby Dick"),
+                 &json!("The Lord of the Rings"),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price == 8.95)].title",
+             vec![
+                 &json!("Sayings of the Century"),
+             ]);
+        test(template_json(),
+             "$..book[?(@.author ~= '.*Rees')].price",
+             vec![
+                 &json!(8.95),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price >= 8.99)].price",
+             vec![
+                 &json!(12.99),
+                 &json!(8.99),
+                 &json!(22.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price > 8.99)].price",
+             vec![
+                 &json!(12.99),
+                 &json!(22.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price < 8.99)].price",
+             vec![
+                 &json!(8.95),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price <= 8.99)].price",
+             vec![
+                 &json!(8.95),
+                 &json!(8.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price <= $.expensive)].price",
+             vec![
+                 &json!(8.95),
+                 &json!(8.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.price >= $.expensive)].price",
+             vec![
+                 &json!(12.99),
+                 &json!(22.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.title in ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].price",
+             vec![
+                 &json!(8.99),
+             ]);
+        test(template_json(),
+             "$..book[?(@.title nin ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].title",
+             vec![
+                 &json!("Sayings of the Century"),
+                 &json!("Sword of Honour"),
+                 &json!("The Lord of the Rings"),
+             ]);
+        test(template_json(),
+             "$..book[?(@.author size 10)].title",
+             vec![
+                 &json!("Sayings of the Century"),
+             ]);
+
+    }
+    #[test]
+    fn index_filter_sets_test() {
+        test(template_json(),
+             "$.orders[?(@.ref subsetOf [1,2,3,4])].id",
+             vec![
+                 &json!(1),
+             ]);
+       test(template_json(),
+             "$.orders[?(@.ref anyOf [1,4])].id",
+             vec![
+                 &json!(1),
+                 &json!(2),
+             ]);
+        test(template_json(),
+             "$.orders[?(@.ref noneOf [3,6])].id",
+             vec![
+                 &json!(3),
+             ]);
+
     }
 }

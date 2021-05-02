@@ -1,5 +1,22 @@
 use serde_json::Value;
 
+/// The typical structure of the jsonpath will be the following:
+/// ```rust
+/// // example $.k.*[1]['k','k'][:][?(@)]
+/// use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
+///
+/// vec![
+///      JsonPath::Root,
+///      JsonPath::field("k"),
+///      JsonPath::Wildcard,
+///      JsonPath::Index(JsonPathIndex::Single(json!(1))),
+///      JsonPath::Index(JsonPathIndex::UnionKeys(vec!["k".to_string(), "k".to_string()])),
+///      JsonPath::Index(JsonPathIndex::Slice(0, 0, 1)),
+///      JsonPath::Index(JsonPathIndex::Filter(Operand::path(JsonPath::Chain(vec![JsonPath::Current(Box::new(JsonPath::Empty))])), FilterSign::Exists, Operand::path(JsonPath::Empty))),
+///     ];
+/// ```
+
+
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
 #[derive(Debug, Clone)]
@@ -30,12 +47,13 @@ impl JsonPath {
         JsonPath::Field(String::from(key))
     }
 }
+
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     /// The single element in array
-    Single(usize),
+    Single(Value),
     /// Union represents a several indexes
-    UnionIndex(Vec<f64>),
+    UnionIndex(Vec<Value>),
     /// Union represents a several keys
     UnionKeys(Vec<String>),
     /// DEfault slice where the items are start/end/step respectively
@@ -50,6 +68,7 @@ impl JsonPathIndex {
     }
 }
 
+/// Operand for filtering expressions
 #[derive(Debug, Clone)]
 pub enum Operand {
     Static(Value),
@@ -61,12 +80,12 @@ impl Operand {
         Operand::Static(Value::from(v))
     }
     pub fn val(v: Value) -> Self { Operand::Static(v) }
-    pub fn path(p: JsonPath) ->Self{
+    pub fn path(p: JsonPath) -> Self {
         Operand::Dynamic(Box::new(p))
     }
 }
 
-
+/// The operators for filtering functions
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterSign {
     Equal,

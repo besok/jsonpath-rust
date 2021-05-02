@@ -1,13 +1,25 @@
+//! The basic module denotes the strategy of processing jsonpath.
+//! Overall, the escape sequence is the following one:
+//! - define the json root
+//! - define the json path structure from the parsing [[JsonPath]]
+//! - transform json path into the [[PathInstance]]
+//!
 use serde_json::Value;
 
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, Filter, UnionIndex};
 use crate::path::top::*;
 
+/// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
+/// The module is in charge of processing [[JsonPathIndex]] elements
 mod index;
+/// The module is a helper module providing the set of helping funcitons to process a json elements
 mod json;
 
+/// The trait defining the behaviour of processing every separated element.
+/// type Data usually stands for json [[Value]]
+/// The trait also requires to have a root json to process. It needs
 pub trait Path<'a> {
     type Data;
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data>;
@@ -32,7 +44,7 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathI
 
 fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> PathInstance<'a> {
     match json_path_index {
-        JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(*index)),
+        JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(index.as_u64().unwrap() as usize)),
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
         JsonPathIndex::UnionKeys(elems) => Box::new(UnionIndex::from_keys(elems)),
         JsonPathIndex::UnionIndex(elems) => Box::new(UnionIndex::from_indexes(elems)),

@@ -116,11 +116,11 @@ pub(crate) struct UnionIndex<'a> {
 }
 
 impl<'a> UnionIndex<'a> {
-    pub fn from_indexes(elems: &'a Vec<f64>) -> Self {
+    pub fn from_indexes(elems: &'a Vec<Value>) -> Self {
         let mut indexes: Vec<PathInstance<'a>> = vec![];
 
         for idx in elems.iter() {
-            indexes.push(Box::new(ArrayIndex::new(*idx as usize)))
+            indexes.push(Box::new(ArrayIndex::new(idx.as_u64().unwrap() as usize)))
         }
 
         UnionIndex::new(indexes)
