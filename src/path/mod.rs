@@ -19,16 +19,18 @@ mod json;
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
-/// The trait also requires to have a root json to process. It needs
+/// The trait also requires to have a root json to process.
+/// It needs in case if in the filter there will be a pointer to the absolute path
 pub trait Path<'a> {
     type Data;
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data>;
 }
 
+/// The basic type for instances.
 pub type PathInstance<'a> = Box<dyn Path<'a, Data=Value> + 'a>;
 
 
-
+/// The major method to process the top part of json part
 pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a> {
     match json_path {
         JsonPath::Root => Box::new(RootPointer::new(root)),
@@ -41,7 +43,7 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathI
         JsonPath::Empty => Box::new(IdentityPath {})
     }
 }
-
+/// The method processes the indexes(all expressions indie [])
 fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> PathInstance<'a> {
     match json_path_index {
         JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(index.as_u64().unwrap() as usize)),
@@ -51,7 +53,7 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         JsonPathIndex::Filter(l, op, r) => Box::new(Filter::new(l, r, op, root)),
     }
 }
-
+/// The method processes the operand inside the filter expressions
 fn process_operand<'a>(op: &'a Operand, root: &'a Value) -> PathInstance<'a> {
     match op {
         Operand::Static(v) => json_path_instance(&JsonPath::Root, v),

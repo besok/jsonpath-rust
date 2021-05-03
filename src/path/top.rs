@@ -3,7 +3,7 @@ use serde_json::value::Value::{Array, Object};
 use crate::path::{PathInstance, Path, json_path_instance, process_index, process_operand};
 use crate::parser::model::*;
 use crate::path::json::{eq, less, inside};
-
+/// to process the element [*]
 pub(crate) struct Wildcard {}
 
 impl<'a> Path<'a> for Wildcard {
@@ -29,7 +29,7 @@ impl<'a> Path<'a> for Wildcard {
         }
     }
 }
-
+/// empty path. Returns incoming data.
 pub(crate) struct IdentityPath {}
 
 impl<'a> Path<'a> for IdentityPath {
@@ -49,7 +49,7 @@ impl<'a> Path<'a> for EmptyPath {
         vec![]
     }
 }
-
+/// process $ element
 pub(crate) struct RootPointer<'a, T> {
     root: &'a T
 }
@@ -67,7 +67,7 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
         vec![self.root]
     }
 }
-
+/// process object fields like ['key'] or .key
 pub(crate) struct ObjectField<'a> {
     key: &'a String,
 }
@@ -94,7 +94,7 @@ impl<'a> Path<'a> for ObjectField<'a> {
             .unwrap_or(vec![])
     }
 }
-
+/// processes decent object like ..
 pub(crate) struct DescentObjectField<'a> {
     key: &'a String,
 }
@@ -131,7 +131,7 @@ impl<'a> DescentObjectField<'a> {
         DescentObjectField { key }
     }
 }
-
+/// the top method of the processing representing the chain of other operators
 pub(crate) struct Chain<'a> {
     chain: Vec<PathInstance<'a>>,
 }

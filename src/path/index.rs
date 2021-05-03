@@ -5,6 +5,7 @@ use crate::path::json::*;
 use serde_json::value::Value::{Array, Object};
 use crate::path::top::{IdentityPath, ObjectField};
 
+/// process the slice like [start:end:step]
 #[derive(Debug)]
 pub(crate) struct ArraySlice {
     start_index: i32,
@@ -62,7 +63,7 @@ impl<'a> Path<'a> for ArraySlice {
             .unwrap_or(vec![])
     }
 }
-
+/// process the simple index like [index]
 pub(crate) struct ArrayIndex {
     index: usize
 }
@@ -83,7 +84,7 @@ impl<'a> Path<'a> for ArrayIndex {
             .unwrap_or(vec![])
     }
 }
-
+/// process @ element
 pub(crate) struct Current<'a> {
     tail: Option<PathInstance<'a>>
 }
@@ -110,7 +111,7 @@ impl<'a> Path<'a> for Current<'a> {
         self.tail.as_ref().map(|p| p.find(data)).unwrap_or(vec![data])
     }
 }
-
+/// the list of indexes like [1,2,3]
 pub(crate) struct UnionIndex<'a> {
     indexes: Vec<PathInstance<'a>>
 }
@@ -147,7 +148,7 @@ impl<'a> Path<'a> for UnionIndex<'a> {
         self.indexes.iter().flat_map(|e| e.find(data)).collect()
     }
 }
-
+/// process filter element like [?(op sign op)]
 pub(crate) struct Filter<'a> {
     left: PathInstance<'a>,
     right: PathInstance<'a>,
