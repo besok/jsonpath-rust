@@ -1,8 +1,7 @@
 use serde_json::{Value};
 use serde_json::value::Value::{Array, Object};
-use crate::path::{PathInstance, Path, json_path_instance, process_index, process_operand};
+use crate::path::{PathInstance, Path, json_path_instance};
 use crate::parser::model::*;
-use crate::path::json::{eq, less, inside};
 /// to process the element [*]
 pub(crate) struct Wildcard {}
 

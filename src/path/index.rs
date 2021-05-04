@@ -1,9 +1,9 @@
-use crate::path::{Path, PathInstance, json_path_instance, process_index, process_operand};
+use crate::path::{Path, PathInstance, json_path_instance, process_operand};
 use serde_json::Value;
 use crate::parser::model::{JsonPath, FilterSign, Operand};
 use crate::path::json::*;
 use serde_json::value::Value::{Array, Object};
-use crate::path::top::{IdentityPath, ObjectField};
+use crate::path::top::ObjectField;
 
 /// process the slice like [start:end:step]
 #[derive(Debug)]

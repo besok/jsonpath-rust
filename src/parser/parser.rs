@@ -11,19 +11,6 @@ struct JsonPathParser;
 
 /// the parsing function.
 /// Since the parsing can finish with error the result is [[Result]]
-/// ```rust
-/// fn main(){
-///
-///   match parse_json_path("$.key[::2].*.[?(@.array subsetOf [1,2,3,4])].value") {
-///             Ok(JsonPath::Chain(elems)) => assert_eq!(elems, elems),
-///             Ok(e) => panic!("unexpected value {:?}", e),
-///             Err(e) => {
-///                 println!("{}", e.to_string());
-///                 panic!("parsing error");
-///             },
-///         };
-/// }
-/// ```
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
     Ok(parse_internal(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
 }

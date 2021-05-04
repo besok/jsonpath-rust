@@ -1,22 +1,5 @@
 use serde_json::Value;
 
-/// The typical structure of the jsonpath will be the following:
-/// ```rust
-/// // example $.k.*[1]['k','k'][:][?(@)]
-/// use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
-///
-/// vec![
-///      JsonPath::Root,
-///      JsonPath::field("k"),
-///      JsonPath::Wildcard,
-///      JsonPath::Index(JsonPathIndex::Single(json!(1))),
-///      JsonPath::Index(JsonPathIndex::UnionKeys(vec!["k".to_string(), "k".to_string()])),
-///      JsonPath::Index(JsonPathIndex::Slice(0, 0, 1)),
-///      JsonPath::Index(JsonPathIndex::Filter(Operand::path(JsonPath::Chain(vec![JsonPath::Current(Box::new(JsonPath::Empty))])), FilterSign::Exists, Operand::path(JsonPath::Empty))),
-///     ];
-/// ```
-
-
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
 #[derive(Debug, Clone)]

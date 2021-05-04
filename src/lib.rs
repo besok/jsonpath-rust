@@ -81,36 +81,25 @@
 //!
 //! # Examples
 //!```
-//! use crate::{JsonPathFinder};
 //! use serde_json::{json,Value};
-//!
+//! use self::jsonpath_rust::JsonPathFinder;
 //! fn test(){
-//!     let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]")?;
+//!     let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
 //!     let slice_of_data:Vec<&Value> = finder.find();
 //!     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
 //! }
 //! ```
 //! or even simpler:
 //!
-//! ```rust
-//! use crate::{JsonPathFinder};
+//! ```
 //! use serde_json::{json,Value};
+//! use self::jsonpath_rust::JsonPathFinder;
 //!
 //! fn test(json: &str, path: &str, expected: Vec<&Value>) {
 //!    match JsonPathFinder::from_str(json, path) {
 //!        Ok(finder) => assert_eq!(finder.find(), expected),
 //!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
 //!    }
-//! }
-//! ```
-//!
-//! also it will work with the instances of [[Value]] as well.
-//! ```rust
-//!  use serde_json::Value;
-//!  use crate::path::{json_path_instance, PathInstance};
-//!  fn test(json: Value, path: &str) {
-//!     let path = parse_json_path(path).map_err(|e| e.to_string())?;
-//!    JsonPathFinder::new(json, path)
 //! }
 //! ```
 //!
@@ -131,7 +120,7 @@ extern crate pest_derive;
 extern crate pest;
 
 /// The base structure conjuncting the json instance and jsonpath instance
-struct JsonPathFinder {
+pub struct JsonPathFinder {
     json: Value,
     path: JsonPath,
 }
@@ -182,9 +171,9 @@ impl JsonPathFinder {
 #[cfg(test)]
 mod tests {
     use crate::parser::parser::parse_json_path;
-    use crate::{JsonPathFinder};
     use serde_json::{json, Value};
     use crate::path::json_path_instance;
+    use crate::JsonPathFinder;
 
     fn test(json: &str, path: &str, expected: Vec<&Value>) {
         match JsonPathFinder::from_str(json, path) {
