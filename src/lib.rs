@@ -90,10 +90,34 @@
 //!     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
 //! }
 //! ```
+//! or even simpler:
+//!
+//! ```rust
+//! use crate::{JsonPathFinder};
+//! use serde_json::{json,Value};
+//!
+//! fn test(json: &str, path: &str, expected: Vec<&Value>) {
+//!    match JsonPathFinder::from_str(json, path) {
+//!        Ok(finder) => assert_eq!(finder.find(), expected),
+//!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
+//!    }
+//! }
+//! ```
+//!
+//! also it will work with the instances of [[Value]] as well.
+//! ```rust
+//!  use serde_json::Value;
+//!  use crate::path::{json_path_instance, PathInstance};
+//!  fn test(json: Value, path: &str) {
+//!     let path = parse_json_path(path).map_err(|e| e.to_string())?;
+//!    JsonPathFinder::new(json, path)
+//! }
+//! ```
+//!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
-use serde_json::Value;
+use serde_json::{Value, from_str};
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
 use crate::parser::model::JsonPath;
@@ -427,8 +451,8 @@ mod tests {
              vec![
                  &json!("Sayings of the Century"),
              ]);
-
     }
+
     #[test]
     fn index_filter_sets_test() {
         test(template_json(),
@@ -436,7 +460,7 @@ mod tests {
              vec![
                  &json!(1),
              ]);
-       test(template_json(),
+        test(template_json(),
              "$.orders[?(@.ref anyOf [1,4])].id",
              vec![
                  &json!(1),
@@ -447,6 +471,5 @@ mod tests {
              vec![
                  &json!(3),
              ]);
-
     }
 }

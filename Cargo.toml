@@ -1,8 +1,15 @@
 [package]
 name = "jsonpath-rust"
+description = "The library provides the basic functionality to find the set of the data according to the filtering query."
 version = "0.1.0"
 authors = ["BorisZhguchev <zhguchev@gmail.com>"]
 edition = "2018"
+license-file = "LICENSE"
+homepage = "https://github.com/besok/jsonpath-rust"
+repository = "https://github.com/besok/jsonpath-rust"
+readme = "README.md"
+keywords = ["json", "json-path","jsonpath","jsonpath-rust","xpath"]
+categories = ["libraries","Parsing tools"]
 
 [dependencies]
 serde_json = "1.0"
