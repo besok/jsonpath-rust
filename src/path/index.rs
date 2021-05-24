@@ -24,7 +24,7 @@ impl ArraySlice {
         if self.end_index >= 0 {
             if self.end_index > len { None } else { Some(self.end_index as usize) }
         } else {
-            if self.end_index < len * -1 { None } else { Some((len - (self.end_index * -1)) as usize) }
+            if self.end_index < -len { None } else { Some((len - (-self.end_index)) as usize) }
         }
     }
 
@@ -32,11 +32,11 @@ impl ArraySlice {
         if self.start_index >= 0 {
             if self.start_index > len { None } else { Some(self.start_index as usize) }
         } else {
-            if self.start_index < len * -1 { None } else { Some((len - self.start_index * -1) as usize) }
+            if self.start_index < -len { None } else { Some((len - -self.start_index) as usize) }
         }
     }
 
-    fn process<'a, T>(&self, elements: &'a Vec<T>) -> Vec<&'a T> {
+    fn process<'a, T>(&self, elements: &'a [T]) -> Vec<&'a T> {
         let len = elements.len() as i32;
         let mut filtered_elems: Vec<&T> = vec![];
         match (self.start(len), self.end(len)) {
@@ -60,9 +60,10 @@ impl<'a> Path<'a> for ArraySlice {
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
         data.as_array()
             .map(|elems| self.process(elems))
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 }
+
 /// process the simple index like [index]
 pub(crate) struct ArrayIndex {
     index: usize
@@ -81,9 +82,10 @@ impl<'a> Path<'a> for ArrayIndex {
         data.as_array()
             .and_then(|elems| elems.get(self.index))
             .map(|e| vec![e])
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 }
+
 /// process @ element
 pub(crate) struct Current<'a> {
     tail: Option<PathInstance<'a>>
@@ -108,16 +110,17 @@ impl<'a> Path<'a> for Current<'a> {
     type Data = Value;
 
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Value> {
-        self.tail.as_ref().map(|p| p.find(data)).unwrap_or(vec![data])
+        self.tail.as_ref().map(|p| p.find(data)).unwrap_or_else(|| vec![data])
     }
 }
+
 /// the list of indexes like [1,2,3]
 pub(crate) struct UnionIndex<'a> {
     indexes: Vec<PathInstance<'a>>
 }
 
 impl<'a> UnionIndex<'a> {
-    pub fn from_indexes(elems: &'a Vec<Value>) -> Self {
+    pub fn from_indexes(elems: &'a [Value]) -> Self {
         let mut indexes: Vec<PathInstance<'a>> = vec![];
 
         for idx in elems.iter() {
@@ -126,7 +129,7 @@ impl<'a> UnionIndex<'a> {
 
         UnionIndex::new(indexes)
     }
-    pub fn from_keys(elems: &'a Vec<String>) -> Self {
+    pub fn from_keys(elems: &'a [String]) -> Self {
         let mut indexes: Vec<PathInstance<'a>> = vec![];
 
         for key in elems.iter() {
@@ -148,6 +151,7 @@ impl<'a> Path<'a> for UnionIndex<'a> {
         self.indexes.iter().flat_map(|e| e.find(data)).collect()
     }
 }
+
 /// process filter element like [?(op sign op)]
 pub(crate) struct Filter<'a> {
     left: PathInstance<'a>,

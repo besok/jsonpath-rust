@@ -45,13 +45,14 @@ pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
                         res = true
                     }
                 }
-                if res == false { return false; }
+                if !res { return false; }
             }
             return true;
         }
     }
     false
 }
+
 /// ensure at least one element in the array  on the left side belongs to the array on the right side.
 //todo change the naive impl to sets
 pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
@@ -88,6 +89,7 @@ pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 
     false
 }
+
 /// ensure that the element on the left sides mathes the regex on the right side
 pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.is_empty() || right.is_empty() {
@@ -110,6 +112,7 @@ pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         _ => false
     }
 }
+
 /// ensure that the element on the left side belongs to the array on the right side.
 pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.is_empty() {
@@ -138,6 +141,7 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         _ => false
     }
 }
+
 /// ensure the number on the left side is less the number on the right side
 pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.len() == 1 && right.len() == 1 {
@@ -150,6 +154,7 @@ pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         false
     }
 }
+
 /// compare elements
 pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.len() != right.len() {
@@ -158,7 +163,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         left.iter()
             .zip(right)
             .map(|(a, b)| a.eq(&b))
-            .fold(true, |a, n| a && n)
+            .all(|a| a)
     }
 }
 
@@ -258,7 +263,7 @@ mod tests {
         let left40 = json!(40);
         let right = json!([1,2,3,4,5,6]);
         assert!(sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone()])], vec![&right]));
-        assert!(!sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone(),left40.clone()])], vec![&right]));
+        assert!(!sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone(), left40.clone()])], vec![&right]));
     }
 
     #[test]

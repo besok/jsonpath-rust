@@ -2,6 +2,7 @@ use serde_json::{Value};
 use serde_json::value::Value::{Array, Object};
 use crate::path::{PathInstance, Path, json_path_instance};
 use crate::parser::model::*;
+
 /// to process the element [*]
 pub(crate) struct Wildcard {}
 
@@ -28,6 +29,7 @@ impl<'a> Path<'a> for Wildcard {
         }
     }
 }
+
 /// empty path. Returns incoming data.
 pub(crate) struct IdentityPath {}
 
@@ -48,6 +50,7 @@ impl<'a> Path<'a> for EmptyPath {
         vec![]
     }
 }
+
 /// process $ element
 pub(crate) struct RootPointer<'a, T> {
     root: &'a T
@@ -66,6 +69,7 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
         vec![self.root]
     }
 }
+
 /// process object fields like ['key'] or .key
 pub(crate) struct ObjectField<'a> {
     key: &'a String,
@@ -90,9 +94,10 @@ impl<'a> Path<'a> for ObjectField<'a> {
         data.as_object()
             .and_then(|fileds| fileds.get(self.key))
             .map(|e| vec![e])
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 }
+
 /// processes decent object like ..
 pub(crate) struct DescentObjectField<'a> {
     key: &'a String,
@@ -113,7 +118,7 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
                 }
                 Value::Array(elems) => {
                     let mut next_levels: Vec<&Value> =
-                        elems.iter().flat_map(|v|deep_path(v,key.clone())).collect();
+                        elems.iter().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
                     level
                 }
@@ -130,6 +135,7 @@ impl<'a> DescentObjectField<'a> {
         DescentObjectField { key }
     }
 }
+
 /// the top method of the processing representing the chain of other operators
 pub(crate) struct Chain<'a> {
     chain: Vec<PathInstance<'a>>,
@@ -139,10 +145,7 @@ impl<'a> Chain<'a> {
     pub fn new(chain: Vec<PathInstance<'a>>) -> Self {
         Chain { chain }
     }
-    pub fn from_index(key: PathInstance<'a>, index: PathInstance<'a>) -> Self {
-        Chain::new(vec![key, index])
-    }
-    pub fn from(chain: &'a Vec<JsonPath>, root: &'a Value) -> Self {
+    pub fn from(chain: &'a [JsonPath], root: &'a Value) -> Self {
         Chain::new(chain.iter().map(|p| json_path_instance(p, root)).collect())
     }
 }
@@ -233,7 +236,7 @@ mod tests {
         assert_eq!(path_inst.find(&json), vec![&one, &tree]);
 
 
-        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1),json!(2)]));
+        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1), json!(2)]));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), union.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
@@ -241,11 +244,11 @@ mod tests {
         let two = json!(2);
         assert_eq!(path_inst.find(&json), vec![&tree, &two]);
 
-        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1),json!(2)]));
+        let union = JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1), json!(2)]));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), union.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
-        assert_eq!(path_inst.find(&json), vec![&json!(1),&json!(2)]);
+        assert_eq!(path_inst.find(&json), vec![&json!(1), &json!(2)]);
 
 
         let op6 = Operand::Dynamic(Box::new(field6));

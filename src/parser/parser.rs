@@ -1,7 +1,6 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser};
-use serde_json::Value;
-use serde_json::json;
+use serde_json::{Value,json};
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
 use pest::error::{Error};
 
@@ -41,6 +40,7 @@ fn parse_key(rule: Pair<Rule>) -> Option<String> {
         _ => None
     }
 }
+
 fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
     let mut start = 0;
     let mut end = 0;
@@ -67,8 +67,8 @@ fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
 }
 
 fn number_to_value(number: &str) -> Value {
-    number.parse::<i64>().ok().map(|i| Value::from(i))
-        .or(number.parse::<f64>().ok().map(|f| Value::from(f)))
+    number.parse::<i64>().ok().map(Value::from)
+        .or_else(|| number.parse::<f64>().ok().map(Value::from))
         .unwrap()
 }
 

@@ -106,7 +106,7 @@
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
-use serde_json::{Value, from_str};
+use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
 use crate::parser::model::JsonPath;
