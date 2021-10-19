@@ -85,7 +85,7 @@
 //! use self::jsonpath_rust::JsonPathFinder;
 //! fn test(){
 //!     let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
-//!     let slice_of_data:Vec<&Value> = finder.find();
+//!     let slice_of_data:Vec<&Value> = finder.find_slice();
 //!     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
 //! }
 //! ```
@@ -97,7 +97,7 @@
 //!
 //! fn test(json: &str, path: &str, expected: Vec<&Value>) {
 //!    match JsonPathFinder::from_str(json, path) {
-//!        Ok(finder) => assert_eq!(finder.find(), expected),
+//!        Ok(finder) => assert_eq!(finder.find_slice(), expected),
 //!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
 //!    }
 //! }
@@ -119,6 +119,31 @@ mod path;
 extern crate pest_derive;
 extern crate pest;
 
+/// the trait allows to mix the method path to the value of [Value]
+/// and thus the using can be shortened to the following one:
+/// # Examples:
+/// ```
+/// use serde_json::{json,Value};
+/// use jsonpath_rust::JsonPathQuery;
+///
+///         let json: Value = serde_json::from_str("{}").expect("to get json");
+///         let v = json.path("$..book[?(@.author size 10)].title").expect("the path is correct");
+///         assert_eq!(v, json!([]))
+/// ```
+/// #Note:
+/// the result is going to be cloned and therefore it can be significant for the huge queries
+pub trait JsonPathQuery {
+    fn path(self, query: &str) -> Result<Value, String>;
+}
+
+impl JsonPathQuery for Value {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = parse_json_path(query).map_err(|e| e.to_string())?;
+        Ok(JsonPathFinder::new(self, p).find())
+    }
+}
+
+
 /// The base structure conjuncting the json instance and jsonpath instance
 pub struct JsonPathFinder {
     json: Value,
@@ -126,7 +151,7 @@ pub struct JsonPathFinder {
 }
 
 impl JsonPathFinder {
-    /// creates a new instance of [[JsonPathFinder]]
+    /// creates a new instance of [JsonPathFinder]
     pub fn new(json: Value, path: JsonPath) -> Self {
         JsonPathFinder { json, path }
     }
@@ -163,21 +188,25 @@ impl JsonPathFinder {
     }
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
-    pub fn find(&self) -> Vec<&Value> {
+    pub fn find_slice(&self) -> Vec<&Value> {
         self.instance().find(&self.json)
+    }
+
+    /// finds a slice of data and wrap it with Value::Array by cloning the data.
+    pub fn find(&self) -> Value {
+        Value::Array(self.find_slice().into_iter().map(|x| x.clone()).collect())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parser::parse_json_path;
     use serde_json::{json, Value};
-    use crate::path::json_path_instance;
     use crate::JsonPathFinder;
+    use crate::JsonPathQuery;
 
     fn test(json: &str, path: &str, expected: Vec<&Value>) {
         match JsonPathFinder::from_str(json, path) {
-            Ok(finder) => assert_eq!(finder.find(), expected),
+            Ok(finder) => assert_eq!(finder.find_slice(), expected),
             Err(e) => panic!("error while parsing json or jsonpath: {}", e)
         }
     }
@@ -256,7 +285,7 @@ mod tests {
                  &json!("Nigel Rees"),
                  &json!("Evelyn Waugh"),
                  &json!("Herman Melville"),
-                 &json!("J. R. R. Tolkien")
+                 &json!("J. R. R. Tolkien"),
              ],
         );
     }
@@ -276,7 +305,7 @@ mod tests {
                  &json!("Nigel Rees"),
                  &json!("Evelyn Waugh"),
                  &json!("Herman Melville"),
-                 &json!("J. R. R. Tolkien")
+                 &json!("J. R. R. Tolkien"),
              ],
         );
     }
@@ -460,5 +489,14 @@ mod tests {
              vec![
                  &json!(3),
              ]);
+    }
+
+    #[test]
+    fn query_test() {
+        let json: Value = serde_json::from_str(template_json()).expect("to get json");
+        let v = json.path("$..book[?(@.author size 10)].title")
+            .expect("the path is correct");
+
+        assert_eq!(v, json!(["Sayings of the Century"]))
     }
 }
