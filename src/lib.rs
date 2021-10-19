@@ -125,10 +125,11 @@ extern crate pest;
 /// ```
 /// use serde_json::{json,Value};
 /// use jsonpath_rust::JsonPathQuery;
-///
+///fn test(){
 ///         let json: Value = serde_json::from_str("{}").expect("to get json");
 ///         let v = json.path("$..book[?(@.author size 10)].title").expect("the path is correct");
-///         assert_eq!(v, json!([]))
+///         assert_eq!(v, json!([]));
+/// }
 /// ```
 /// #Note:
 /// the result is going to be cloned and therefore it can be significant for the huge queries
