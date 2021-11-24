@@ -155,7 +155,7 @@ use serde_json::{json, Value};
 
 fn main() {
     let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]")?;
-    let slice_of_data: Vec<&Value> = finder.find();
+    let slice_of_data: Vec<&Value> = finder.find_slice();
     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
 }
 ```
@@ -168,7 +168,7 @@ use serde_json::{json, Value};
 
 fn test(json: &str, path: &str, expected: Vec<&Value>) {
     match JsonPathFinder::from_str(json, path) {
-        Ok(finder) => assert_eq!(finder.find(), expected),
+        Ok(finder) => assert_eq!(finder.find_slice(), expected),
         Err(e) => panic!("error while parsing json or jsonpath: {}", e)
     }
 }
@@ -182,7 +182,7 @@ use crate::path::{json_path_instance, PathInstance};
 
 fn test(json: Value, path: &str) {
     let path = parse_json_path(path).map_err(|e| e.to_string())?;
-    JsonPathFinder::new(json, path)
+    JsonPath()er::new(json, path)
 }
  ```
 
