@@ -182,7 +182,7 @@ use crate::path::{json_path_instance, PathInstance};
 
 fn test(json: Value, path: &str) {
     let path = parse_json_path(path).map_err(|e| e.to_string())?;
-    JsonPath()er::new(json, path)
+    JsonPathFinder::new(json, path)
 }
  ```
 
