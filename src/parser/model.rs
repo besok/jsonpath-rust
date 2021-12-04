@@ -1,4 +1,5 @@
 use serde_json::Value;
+use crate::parse_json_path;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
@@ -28,6 +29,13 @@ impl JsonPath {
     }
     pub fn field(key: &str) -> Self {
         JsonPath::Field(String::from(key))
+    }
+}
+
+impl JsonPath {
+    /// allows to create an JsonPath from string
+    pub fn from_str(v: &str) -> Result<JsonPath, String> {
+        parse_json_path(v).map_err(|e| e.to_string()).map_err(|e| e.to_string())
     }
 }
 
