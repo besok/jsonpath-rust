@@ -1,4 +1,5 @@
 use serde_json::Value;
+use crate::parse_json_path;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
@@ -22,12 +23,20 @@ pub enum JsonPath {
     Empty,
 }
 
+#[allow(dead_code)]
 impl JsonPath {
     pub fn descent(key: &str) -> Self {
         JsonPath::Descent(String::from(key))
     }
     pub fn field(key: &str) -> Self {
         JsonPath::Field(String::from(key))
+    }
+}
+
+impl JsonPath {
+    /// allows to create an JsonPath from string
+    pub fn from_str(v: &str) -> Result<JsonPath, String> {
+        parse_json_path(v).map_err(|e| e.to_string())
     }
 }
 
@@ -57,7 +66,7 @@ pub enum Operand {
     Static(Value),
     Dynamic(Box<JsonPath>),
 }
-
+#[allow(dead_code)]
 impl Operand {
     pub fn str(v: &str) -> Self {
         Operand::Static(Value::from(v))

@@ -23,16 +23,16 @@ impl ArraySlice {
     fn end(&self, len: i32) -> Option<usize> {
         if self.end_index >= 0 {
             if self.end_index > len { None } else { Some(self.end_index as usize) }
-        } else {
-            if self.end_index < -len { None } else { Some((len - (-self.end_index)) as usize) }
+        } else if self.end_index < -len { None } else {
+            Some((len - (-self.end_index)) as usize)
         }
     }
 
     fn start(&self, len: i32) -> Option<usize> {
         if self.start_index >= 0 {
             if self.start_index > len { None } else { Some(self.start_index as usize) }
-        } else {
-            if self.start_index < -len { None } else { Some((len - -self.start_index) as usize) }
+        } else if self.start_index < -len { None } else {
+            Some((len - -self.start_index) as usize)
         }
     }
 
@@ -66,7 +66,7 @@ impl<'a> Path<'a> for ArraySlice {
 
 /// process the simple index like [index]
 pub(crate) struct ArrayIndex {
-    index: usize
+    index: usize,
 }
 
 impl ArrayIndex {
@@ -88,7 +88,7 @@ impl<'a> Path<'a> for ArrayIndex {
 
 /// process @ element
 pub(crate) struct Current<'a> {
-    tail: Option<PathInstance<'a>>
+    tail: Option<PathInstance<'a>>,
 }
 
 impl<'a> Current<'a> {
@@ -116,7 +116,7 @@ impl<'a> Path<'a> for Current<'a> {
 
 /// the list of indexes like [1,2,3]
 pub(crate) struct UnionIndex<'a> {
-    indexes: Vec<PathInstance<'a>>
+    indexes: Vec<PathInstance<'a>>,
 }
 
 impl<'a> UnionIndex<'a> {
@@ -202,7 +202,7 @@ impl<'a> Path<'a> for Filter<'a> {
         match data {
             Array(elems) => {
                 for el in elems.iter() {
-                    if Filter::process(&self.op, self.left.find(el), self.right.find(el)) {
+                    if Filter::process(self.op, self.left.find(el), self.right.find(el)) {
                         res.push(el)
                     }
                 }
@@ -210,7 +210,7 @@ impl<'a> Path<'a> for Filter<'a> {
             }
             Object(pairs) => {
                 for el in pairs.values() {
-                    if Filter::process(&self.op, self.left.find(el), self.right.find(el)) {
+                    if Filter::process(self.op, self.left.find(el), self.right.find(el)) {
                         res.push(el)
                     }
                 }

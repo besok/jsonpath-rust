@@ -36,7 +36,7 @@ pub(crate) struct IdentityPath {}
 impl<'a> Path<'a> for IdentityPath {
     type Data = Value;
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        vec![&data]
+        vec![data]
     }
 }
 
@@ -72,11 +72,11 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
 
 /// process object fields like ['key'] or .key
 pub(crate) struct ObjectField<'a> {
-    key: &'a String,
+    key: &'a str,
 }
 
 impl<'a> ObjectField<'a> {
-    pub(crate) fn new(key: &'a String) -> ObjectField<'a> {
+    pub(crate) fn new(key: &'a str) -> ObjectField<'a> {
         ObjectField { key }
     }
 }
@@ -100,7 +100,7 @@ impl<'a> Path<'a> for ObjectField<'a> {
 
 /// processes decent object like ..
 pub(crate) struct DescentObjectField<'a> {
-    key: &'a String,
+    key: &'a str,
 }
 
 impl<'a> Path<'a> for DescentObjectField<'a> {
@@ -131,7 +131,7 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
 }
 
 impl<'a> DescentObjectField<'a> {
-    pub fn new(key: &'a String) -> Self {
+    pub fn new(key: &'a str) -> Self {
         DescentObjectField { key }
     }
 }
@@ -165,7 +165,7 @@ mod tests {
     use crate::path::top::{Path, ObjectField, RootPointer, json_path_instance};
     use serde_json::Value;
     use serde_json::json;
-    use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
+    use crate::parser::model::{JsonPath, JsonPathIndex};
 
     #[test]
     fn object_test() {
@@ -198,8 +198,6 @@ mod tests {
         let field3 = JsonPath::field("f");
         let field4 = JsonPath::field("array");
         let field5 = JsonPath::field("object");
-        let field6 = JsonPath::field("field1");
-        let field7 = JsonPath::field("field2");
 
         let root = JsonPath::Root;
         let path_inst = json_path_instance(&root, &json);
@@ -220,7 +218,6 @@ mod tests {
 
 
         let index1 = JsonPath::Index(JsonPathIndex::Single(json!(3)));
-        let index2 = JsonPath::Index(JsonPathIndex::Single(json!(2)));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field4.clone(), index1.clone()];
         let chain = JsonPath::Chain(chain);
         let path_inst = json_path_instance(&chain, &json);
@@ -251,8 +248,6 @@ mod tests {
         assert_eq!(path_inst.find(&json), vec![&json!(1), &json!(2)]);
 
 
-        let op6 = Operand::Dynamic(Box::new(field6));
-        let op7 = Operand::Dynamic(Box::new(field7));
         let union = JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("field1"), String::from("field2")]));
         let chain = vec![root.clone(), field1.clone(), field2.clone(), field5.clone(), union.clone()];
         let chain = JsonPath::Chain(chain);

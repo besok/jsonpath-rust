@@ -1,6 +1,6 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser};
-use serde_json::{Value,json};
+use serde_json::{Value};
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
 use pest::error::{Error};
 
@@ -141,6 +141,7 @@ mod tests {
     use super::*;
     use std::panic;
     use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
+    use serde_json::{json};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {

@@ -100,12 +100,15 @@
 //!        Ok(finder) => assert_eq!(finder.find_slice(), expected),
 //!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
 //!    }
+//!
+//!
 //! }
 //! ```
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
+use std::str::FromStr;
 use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
@@ -123,13 +126,27 @@ extern crate pest;
 /// and thus the using can be shortened to the following one:
 /// # Examples:
 /// ```
+/// use std::str::FromStr;
 /// use serde_json::{json,Value};
-/// use jsonpath_rust::JsonPathQuery;
+/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst};
 ///fn test(){
-///         let json: Value = serde_json::from_str("{}").expect("to get json");
-///         let v = json.path("$..book[?(@.author size 10)].title").expect("the path is correct");
+///         let json: Value = serde_json::from_str("{}").unwrap();
+///         let v = json.path("$..book[?(@.author size 10)].title").unwrap();
 ///         assert_eq!(v, json!([]));
-/// }
+///
+///         let json: Value = serde_json::from_str("{}").unwrap();
+///         let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
+///
+///         assert_eq!(path, &json!(["Sayings of the Century"]));
+///
+///         let json: Box<Value> = serde_json::from_str("{}").unwrap();
+///         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
+///         let finder = JsonPathFinder::new(json, path);
+///
+///         let v = finder.find_slice();
+///         assert_eq!(v, vec![&json!("Sayings of the Century")]);
+///     }
+///
 /// ```
 /// #Note:
 /// the result is going to be cloned and therefore it can be significant for the huge queries
@@ -137,32 +154,52 @@ pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
 
+pub struct JsonPathInst {
+    inner: JsonPath,
+}
+
+
+impl FromStr for JsonPathInst{
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        JsonPath::from_str(s).map(|inner| JsonPathInst { inner })
+    }
+}
+
+impl JsonPathQuery for Box<Value> {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new(self, Box::new(p)).find())
+    }
+}
+
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, String> {
-        let p = parse_json_path(query).map_err(|e| e.to_string())?;
-        Ok(JsonPathFinder::new(self, p).find())
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new(Box::from(self), Box::new(p)).find())
     }
 }
 
 
-/// The base structure conjuncting the json instance and jsonpath instance
+/// The base structure stitching the json instance and jsonpath instance
 pub struct JsonPathFinder {
-    json: Value,
-    path: JsonPath,
+    json: Box<Value>,
+    path: Box<JsonPathInst>,
 }
 
 impl JsonPathFinder {
     /// creates a new instance of [JsonPathFinder]
-    pub fn new(json: Value, path: JsonPath) -> Self {
+    pub fn new(json: Box<Value>, path: Box<JsonPathInst>) -> Self {
         JsonPathFinder { json, path }
     }
 
     /// updates a path with a new one
-    pub fn set_path(&mut self, path: JsonPath) {
+    pub fn set_path(&mut self, path: Box<JsonPathInst>) {
         self.path = path
     }
     /// updates a json with a new one
-    pub fn set_json(&mut self, json: Value) {
+    pub fn set_json(&mut self, json: Box<Value>) {
         self.json = json
     }
     /// updates a json from string and therefore can be some parsing errors
@@ -172,20 +209,20 @@ impl JsonPathFinder {
     }
     /// updates a path from string and therefore can be some parsing errors
     pub fn set_path_str(&mut self, path: &str) -> Result<(), String> {
-        self.path = parse_json_path(path).map_err(|e| e.to_string())?;
+        self.path = Box::new(JsonPathInst::from_str(path)?);
         Ok(())
     }
 
     /// create a new instance from string and therefore can be some parsing errors
     pub fn from_str(json: &str, path: &str) -> Result<Self, String> {
         let json = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        let path = parse_json_path(path).map_err(|e| e.to_string())?;
+        let path = Box::new(JsonPathInst::from_str(path)?);
         Ok(JsonPathFinder::new(json, path))
     }
 
     /// creates an instance to find a json slice from the json
     pub fn instance(&self) -> PathInstance {
-        json_path_instance(&self.path, &self.json)
+        json_path_instance(&self.path.inner, &self.json)
     }
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
@@ -195,14 +232,16 @@ impl JsonPathFinder {
 
     /// finds a slice of data and wrap it with Value::Array by cloning the data.
     pub fn find(&self) -> Value {
-        Value::Array(self.find_slice().into_iter().map(|x| x.clone()).collect())
+        Value::Array(self.find_slice().into_iter().cloned().collect())
     }
 }
 
+
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use serde_json::{json, Value};
-    use crate::JsonPathFinder;
+    use crate::{JsonPathFinder, JsonPathInst};
     use crate::JsonPathQuery;
 
     fn test(json: &str, path: &str, expected: Vec<&Value>) {
@@ -494,10 +533,26 @@ mod tests {
 
     #[test]
     fn query_test() {
-        let json: Value = serde_json::from_str(template_json()).expect("to get json");
+        let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
         let v = json.path("$..book[?(@.author size 10)].title")
             .expect("the path is correct");
+        assert_eq!(v, json!(["Sayings of the Century"]));
 
-        assert_eq!(v, json!(["Sayings of the Century"]))
+        let json: Value = serde_json::from_str(template_json()).expect("to get json");
+        let path = &json.path("$..book[?(@.author size 10)].title")
+            .expect("the path is correct");
+
+        assert_eq!(path, &json!(["Sayings of the Century"]));
+    }
+
+    #[test]
+    fn find_slice_test() {
+        let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
+        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title")
+            .expect("the path is correct"));
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find_slice();
+        assert_eq!(v, vec![&json!("Sayings of the Century")]);
     }
 }
