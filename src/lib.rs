@@ -108,6 +108,7 @@
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
+use std::str::FromStr;
 use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
@@ -125,6 +126,7 @@ extern crate pest;
 /// and thus the using can be shortened to the following one:
 /// # Examples:
 /// ```
+/// use std::str::FromStr;
 /// use serde_json::{json,Value};
 /// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst};
 ///fn test(){
@@ -156,9 +158,12 @@ pub struct JsonPathInst {
     inner: JsonPath,
 }
 
-impl JsonPathInst {
-    pub fn from_str(v: &str) -> Result<JsonPathInst, String> {
-        JsonPath::from_str(v).map(|inner| JsonPathInst { inner })
+
+impl FromStr for JsonPathInst{
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        JsonPath::from_str(s).map(|inner| JsonPathInst { inner })
     }
 }
 
@@ -227,15 +232,16 @@ impl JsonPathFinder {
 
     /// finds a slice of data and wrap it with Value::Array by cloning the data.
     pub fn find(&self) -> Value {
-        Value::Array(self.find_slice().into_iter().map(|x| x.clone()).collect())
+        Value::Array(self.find_slice().into_iter().cloned().collect())
     }
 }
 
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
     use serde_json::{json, Value};
-    use crate::{JsonPath, JsonPathFinder, JsonPathInst};
+    use crate::{JsonPathFinder, JsonPathInst};
     use crate::JsonPathQuery;
 
     fn test(json: &str, path: &str, expected: Vec<&Value>) {

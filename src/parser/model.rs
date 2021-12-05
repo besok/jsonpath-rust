@@ -23,6 +23,7 @@ pub enum JsonPath {
     Empty,
 }
 
+#[allow(dead_code)]
 impl JsonPath {
     pub fn descent(key: &str) -> Self {
         JsonPath::Descent(String::from(key))
@@ -35,7 +36,7 @@ impl JsonPath {
 impl JsonPath {
     /// allows to create an JsonPath from string
     pub fn from_str(v: &str) -> Result<JsonPath, String> {
-        parse_json_path(v).map_err(|e| e.to_string()).map_err(|e| e.to_string())
+        parse_json_path(v).map_err(|e| e.to_string())
     }
 }
 
@@ -65,7 +66,7 @@ pub enum Operand {
     Static(Value),
     Dynamic(Box<JsonPath>),
 }
-
+#[allow(dead_code)]
 impl Operand {
     pub fn str(v: &str) -> Self {
         Operand::Static(Value::from(v))

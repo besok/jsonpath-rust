@@ -36,7 +36,7 @@ pub(crate) struct IdentityPath {}
 impl<'a> Path<'a> for IdentityPath {
     type Data = Value;
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        vec![&data]
+        vec![data]
     }
 }
 
@@ -72,11 +72,11 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
 
 /// process object fields like ['key'] or .key
 pub(crate) struct ObjectField<'a> {
-    key: &'a String,
+    key: &'a str,
 }
 
 impl<'a> ObjectField<'a> {
-    pub(crate) fn new(key: &'a String) -> ObjectField<'a> {
+    pub(crate) fn new(key: &'a str) -> ObjectField<'a> {
         ObjectField { key }
     }
 }
@@ -100,7 +100,7 @@ impl<'a> Path<'a> for ObjectField<'a> {
 
 /// processes decent object like ..
 pub(crate) struct DescentObjectField<'a> {
-    key: &'a String,
+    key: &'a str,
 }
 
 impl<'a> Path<'a> for DescentObjectField<'a> {
@@ -131,7 +131,7 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
 }
 
 impl<'a> DescentObjectField<'a> {
-    pub fn new(key: &'a String) -> Self {
+    pub fn new(key: &'a str) -> Self {
         DescentObjectField { key }
     }
 }

@@ -165,6 +165,7 @@ or with a separate instantiation:
 ```rust
  use serde_json::{json,Value};
  use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst};
+ use std::str::FromStr;
 fn test(){
          let json: Value = serde_json::from_str("{}").unwrap();
          let v = json.path("$..book[?(@.author size 10)].title").unwrap();
