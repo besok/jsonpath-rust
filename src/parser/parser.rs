@@ -142,6 +142,8 @@ mod tests {
     use std::panic;
     use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
     use serde_json::{json};
+    use crate::parser::model::FilterSign::Equal;
+    use crate::parser::model::Operand::{Dynamic, Static};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
@@ -242,6 +244,18 @@ mod tests {
         test("[-1,-2]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(-1), json!(-2)]))]);
         test_failed("[abc,bcd]");
         test_failed("[\"abc\",\"bcd\"]");
+    }
+
+    #[test]
+    fn array_start_test() {
+        test("$.[?(@.verb== 'TEST')]", vec![
+            JsonPath::Root,
+            JsonPath::Index(
+                JsonPathIndex::Filter(
+                    Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field("verb".to_string())])))]))),
+                    Equal,
+                    Static(Value::from("TEST"))
+                ))]);
     }
 
     #[test]

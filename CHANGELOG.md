@@ -9,3 +9,5 @@
 * **`0.1.4`**
     * add an ability to use references instead of values
     * fix some clippy issues
+* **`0.1.5`**
+    * correct grammar for `$.[..]`
