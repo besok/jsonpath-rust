@@ -2,3 +2,4 @@
 .idea
 Cargo.lock
 .DS_Store
+.vscode

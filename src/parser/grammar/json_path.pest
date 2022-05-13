@@ -38,7 +38,7 @@ unit_indexes = { number ~ ("," ~ number)+  }
 filter = {"?"~ "(" ~ op ~ (sign ~ op)? ~ ")"}
 op = _{chain | string_qt | number}
 
-index = {"["~ (unit_keys | unit_indexes | slice | unsigned |filter ) ~ "]" }
+index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter ) ~ "]" }
 
 chain = {(root | descent | wildcard | current | field | index)+}
 

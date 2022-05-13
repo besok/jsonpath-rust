@@ -555,4 +555,14 @@ mod tests {
         let v = finder.find_slice();
         assert_eq!(v, vec![&json!("Sayings of the Century")]);
     }
+    #[test]
+    fn find_in_array_test() {
+        let json: Box<Value> = serde_json::from_str(r#"[ {"verb": "TEST"}, {"verb": "RUN"}]"#).expect("to get json");
+        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$.[?(@.verb== 'TEST')]")
+            .expect("the path is correct"));
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find_slice();
+        assert_eq!(v, vec![&json!({"verb":"TEST"})]);
+    }
 }
