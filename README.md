@@ -138,7 +138,7 @@ Given the json
 | `$..book[2:]`                | Book number two from tail          |
 | `$.store.book[?(@.price < 10)]` | All books in store cheaper than 10  |
 | `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"  |
-| `$..book[?(@.author =~ /.*REES/i)]` | All books matching regex (ignore case)  |
+| `$..book[?(@.author ~= /.*REES/i)]` | All books matching regex (ignore case)  |
 | `$..*`                        | Give me every thing
 
 ### The library
