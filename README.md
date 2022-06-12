@@ -145,16 +145,16 @@ Given the json
 
 The library intends to provide the basic functionality for ability to find the slices of data using the syntax, saying
 above. The dependency can be found as following:
-``` jsonpath-rust = 0.1.0 ```
+``` jsonpath-rust = 0.1.5 ```
 
 The basic example is the following one:
 
 ```rust
-use crate::{JsonPathFinder};
+use jsonpath_rust::JsonPathFinder;
 use serde_json::{json, Value};
 
 fn main() {
-    let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]")?;
+    let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
     let slice_of_data: Vec<&Value> = finder.find_slice();
     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
 }
