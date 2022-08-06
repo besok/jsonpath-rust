@@ -11,3 +11,7 @@
     * fix some clippy issues
 * **`0.1.5`**
     * correct grammar for `$.[..]`
+* **`0.1.6`**
+  * add logical OR and logical And to filters
+  * fix bugs with objects in filters
+  * add internal macros to generate path objects

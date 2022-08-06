@@ -1,8 +1,9 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser};
 use serde_json::{Value};
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
+use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression};
 use pest::error::{Error};
+use crate::parser::model::FilterExpression::{And, Or};
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path.pest"]
@@ -99,25 +100,64 @@ fn parse_chain_in_operand(rule: Pair<Rule>) -> Operand {
     }
 }
 
-fn parse_operand(rule: Pair<Rule>) -> Operand {
-    match rule.as_rule() {
+
+fn parse_filter_index( pair: Pair<Rule>) -> JsonPathIndex {
+    JsonPathIndex::Filter(parse_logic(pair.into_inner()))
+}
+
+fn parse_logic(mut pairs: Pairs<Rule>) -> FilterExpression {
+    let mut expr: Option<FilterExpression> = None;
+    while pairs.peek().is_some() {
+        let next_expr = parse_logic_and(pairs.next().unwrap().into_inner());
+        match expr {
+            None => expr = Some(next_expr),
+            Some(e) => expr = Some(Or(Box::new(e), Box::new(next_expr)))
+        }
+    }
+    expr.unwrap()
+}
+
+fn parse_logic_and(mut pairs: Pairs<Rule>) -> FilterExpression {
+    let mut expr: Option<FilterExpression> = None;
+
+    while pairs.peek().is_some() {
+        let next_expr = parse_logic_atom(pairs.next().unwrap().into_inner());
+        match expr {
+            None => expr = Some(next_expr),
+            Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr)))
+        }
+    }
+    expr.unwrap()
+}
+
+fn parse_logic_atom(mut pairs: Pairs<Rule>) -> FilterExpression {
+    match pairs.peek().map(|x| x.as_rule()) {
+        Some(Rule::logic) => parse_logic(pairs.next().unwrap().into_inner()),
+        Some(Rule::atom) => {
+            let left: Operand = parse_atom(pairs.next().unwrap());
+            if pairs.peek().is_none() {
+                FilterExpression::exists(left)
+            } else {
+                let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
+                let right: Operand = parse_atom(pairs.next().unwrap());
+                FilterExpression::Atom(left, sign, right)
+            }
+        }
+        Some(x) => panic!("unexpected => {:?}", x),
+        None => panic!("unexpected none")
+    }
+}
+
+fn parse_atom(rule: Pair<Rule>) -> Operand {
+    let atom = down(rule.clone());
+    match atom.as_rule() {
         Rule::number => Operand::Static(number_to_value(rule.as_str())),
-        Rule::string_qt => Operand::Static(Value::from(down(rule).as_str())),
-        Rule::chain => parse_chain_in_operand(rule),
+        Rule::string_qt => Operand::Static(Value::from(down(atom).as_str())),
+        Rule::chain => parse_chain_in_operand(down(rule)),
         _ => Operand::Static(Value::Null)
     }
 }
 
-fn parse_filter_index(mut pairs: Pairs<Rule>) -> JsonPathIndex {
-    let left: Operand = parse_operand(pairs.next().unwrap());
-    if pairs.peek().is_none() {
-        JsonPathIndex::exists(left)
-    } else {
-        let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
-        let right: Operand = parse_operand(pairs.next().unwrap());
-        JsonPathIndex::Filter(left, sign, right)
-    }
-}
 
 fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
     let next = down(rule);
@@ -126,7 +166,7 @@ fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
         Rule::slice => parse_slice(next.into_inner()),
         Rule::unit_indexes => parse_unit_indexes(next.into_inner()),
         Rule::unit_keys => parse_unit_keys(next.into_inner()),
-        Rule::filter => parse_filter_index(next.into_inner()),
+        Rule::filter => parse_filter_index(down(next)),
         _ => JsonPathIndex::Single(number_to_value(next.as_str()))
     }
 }
@@ -140,15 +180,13 @@ fn down(rule: Pair<Rule>) -> Pair<Rule> {
 mod tests {
     use super::*;
     use std::panic;
-    use crate::parser::model::JsonPath::{Chain, Current, Field, Descent, Wildcard};
     use serde_json::{json};
-    use crate::parser::model::FilterSign::Equal;
-    use crate::parser::model::Operand::{Dynamic, Static};
+    use crate::{filter, idx, op, path, chain};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
             Ok(elem) => panic!("should be false but got {:?}", elem),
-            Err(e) => println!("{}", e.to_string())
+            Err(e) => println!("{}", e)
         }
     }
 
@@ -157,8 +195,7 @@ mod tests {
             Ok(JsonPath::Chain(elems)) => assert_eq!(elems, expected),
             Ok(e) => panic!("unexpected value {:?}", e),
             Err(e) => {
-                println!("{}", e.to_string());
-                panic!("parsing error");
+                panic!("parsing error {}",e);
             }
         }
     }
@@ -167,41 +204,41 @@ mod tests {
     fn path_test() {
         test("$.k.['k']['k']..k..['k'].*.[*][*][1][1,2]['k','k'][:][10:][:10][10:10:10][?(@)][?(@.abc >= 10)]",
              vec![
-                 JsonPath::Root,
-                 JsonPath::field("k"),
-                 JsonPath::field("k"),
-                 JsonPath::field("k"),
-                 JsonPath::descent("k"),
-                 JsonPath::descent("k"),
-                 JsonPath::Wildcard,
-                 JsonPath::Wildcard,
-                 JsonPath::Wildcard,
-                 JsonPath::Index(JsonPathIndex::Single(json!(1))),
-                 JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1), json!(2)])),
-                 JsonPath::Index(JsonPathIndex::UnionKeys(vec!["k".to_string(), "k".to_string()])),
-                 JsonPath::Index(JsonPathIndex::Slice(0, 0, 1)),
-                 JsonPath::Index(JsonPathIndex::Slice(10, 0, 1)),
-                 JsonPath::Index(JsonPathIndex::Slice(0, 10, 1)),
-                 JsonPath::Index(JsonPathIndex::Slice(10, 10, 10)),
-                 JsonPath::Index(JsonPathIndex::Filter(Operand::path(Chain(vec![JsonPath::Current(Box::new(JsonPath::Empty))])), FilterSign::Exists, Operand::path(JsonPath::Empty))),
-                 JsonPath::Index(JsonPathIndex::Filter(Operand::path(Chain(vec![JsonPath::Current(Box::new(Chain(vec![JsonPath::field("abc")])))])), FilterSign::GrOrEq, Operand::val(json!(10)))),
+                 path!($),
+                 path!("k"),
+                 path!("k"),
+                 path!("k"),
+                 path!(.."k"),
+                 path!(.."k"),
+                 path!(*),
+                 path!(*),
+                 path!(*),
+                 path!(idx!(1)),
+                 path!(idx!(idx 1,2)),
+                 path!(idx!("k","k")),
+                 path!(idx!([; ;])),
+                 path!(idx!([10; ;])),
+                 path!(idx!([;10;])),
+                 path!(idx!([10;10;10])),
+                 path!(idx!(?filter!(op!(chain!(path!(@path!()))), "exists", op!(path!())))),
+                 path!(idx!(?filter!(op!(chain!(path!(@,path!("abc")))), ">=", op!(10)))),
              ])
     }
 
     #[test]
     fn descent_test() {
-        test("..abc", vec![JsonPath::descent("abc")]);
-        test("..['abc']", vec![JsonPath::descent("abc")]);
+        test("..abc", vec![path!(.."abc")]);
+        test("..['abc']", vec![path!(.."abc")]);
         test_failed("...['abc']");
         test_failed("...abc");
     }
 
     #[test]
     fn field_test() {
-        test(".abc", vec![JsonPath::field("abc")]);
-        test(".['abc']", vec![JsonPath::field("abc")]);
-        test("['abc']", vec![JsonPath::field("abc")]);
-        test(".['abc\\\"abc']", vec![JsonPath::field("abc\\\"abc")]);
+        test(".abc", vec![path!("abc")]);
+        test(".['abc']", vec![path!("abc")]);
+        test("['abc']", vec![path!("abc")]);
+        test(".['abc\\\"abc']", vec![path!("abc\\\"abc")]);
         test_failed(".abc()abc");
         test_failed("..[abc]");
         test_failed(".'abc'");
@@ -209,39 +246,39 @@ mod tests {
 
     #[test]
     fn wildcard_test() {
-        test(".*", vec![JsonPath::Wildcard]);
-        test(".[*]", vec![JsonPath::Wildcard]);
-        test(".abc.*", vec![JsonPath::field("abc"), JsonPath::Wildcard]);
-        test(".abc.[*]", vec![JsonPath::field("abc"), JsonPath::Wildcard]);
-        test(".abc[*]", vec![JsonPath::field("abc"), JsonPath::Wildcard]);
+        test(".*", vec![path!(*)]);
+        test(".[*]", vec![path!(*)]);
+        test(".abc.*", vec![path!("abc"), path!(*)]);
+        test(".abc.[*]", vec![path!("abc"), path!(*)]);
+        test(".abc[*]", vec![path!("abc"), path!(*)]);
         test_failed("..*");
         test_failed("abc*");
     }
 
     #[test]
     fn index_single_test() {
-        test("[1]", vec![JsonPath::Index(JsonPathIndex::Single(json!(1)))]);
+        test("[1]", vec![path!(idx!(1))]);
         test_failed("[-1]");
         test_failed("[1a]");
     }
 
     #[test]
     fn index_slice_test() {
-        test("[1:1000:10]", vec![JsonPath::Index(JsonPathIndex::Slice(1, 1000, 10))]);
-        test("[:1000:10]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 1000, 10))]);
-        test("[:1000]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 1000, 1))]);
-        test("[:]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 0, 1))]);
-        test("[::10]", vec![JsonPath::Index(JsonPathIndex::Slice(0, 0, 10))]);
+        test("[1:1000:10]", vec![path!(idx!([1; 1000; 10]))]);
+        test("[:1000:10]", vec![path!(idx!([0; 1000; 10]))]);
+        test("[:1000]", vec![path!(idx!([;1000;]))]);
+        test("[:]", vec![path!(idx!([;;]))]);
+        test("[::10]", vec![path!(idx!([;;10]))]);
         test_failed("[::-1]");
         test_failed("[:::0]");
     }
 
     #[test]
     fn index_union_test() {
-        test("[1,2,3]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(1), json!(2), json!(3)]))]);
-        test("['abc','bcd']", vec![JsonPath::Index(JsonPathIndex::UnionKeys(vec![String::from("abc"), String::from("bcd")]))]);
+        test("[1,2,3]", vec![path!(idx!(idx 1,2,3))]);
+        test("['abc','bcd']", vec![path!(idx!("abc","bcd"))]);
         test_failed("[]");
-        test("[-1,-2]", vec![JsonPath::Index(JsonPathIndex::UnionIndex(vec![json!(-1), json!(-2)]))]);
+        test("[-1,-2]", vec![path!(idx!(idx -1, -2))]);
         test_failed("[abc,bcd]");
         test_failed("[\"abc\",\"bcd\"]");
     }
@@ -249,69 +286,98 @@ mod tests {
     #[test]
     fn array_start_test() {
         test("$.[?(@.verb== 'TEST')]", vec![
-            JsonPath::Root,
-            JsonPath::Index(
-                JsonPathIndex::Filter(
-                    Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field("verb".to_string())])))]))),
-                    Equal,
-                    Static(Value::from("TEST"))
-                ))]);
+            path!($),
+            path!(idx!(?filter!(op!(chain!(path!(@,path!("verb")))),"==",op!("TEST"))))]);
+    }
+
+    #[test]
+    fn logical_filter_test() {
+        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10)]", vec![
+            path!($),
+            path!(idx!(?
+                filter!(
+                    filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
+                    ||,
+                    filter!(
+                        filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0)),
+                        &&,
+                        filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                    )
+                )))
+        ]);
+        test("$.[?((@.verb == 'T' || @.size > 0) && @.size < 10)]", vec![
+            path!($),
+            path!(idx!(?
+                filter!(
+                    filter!(
+                       filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
+                        ||,
+                        filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0))
+                    ),
+                    &&,
+                    filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                )))
+        ]);
+        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10 && @.elem == 0)]", vec![
+            path!($),
+            path!(idx!(?filter!(
+                    filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
+                    ||,
+                    filter!(
+                        filter!(
+                            filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0)),
+                            &&,
+                            filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                        ),
+                        &&,
+                        filter!(op!(chain!(path!(@,path!("elem")))), "==", op!(0))
+                    )
+
+                )))
+        ]);
     }
 
     #[test]
     fn index_filter_test() {
-        test("[?('abc' == 'abc')]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::str("abc"),
-            FilterSign::Equal,
-            Operand::str("abc"),
-        ))]);
-        test("[?('abc' == 1)]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::str("abc"),
-            FilterSign::Equal,
-            Operand::val(json!(1)),
-        ))]);
+        test("[?('abc' == 'abc')]", vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))]);
+        test("[?('abc' == 1)]", vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))]);
 
-        test("[?(@.abc in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc"))])))]))),
-            FilterSign::In,
-            Operand::val(json!(["abc","bcd"])),
-        ))]);
-        test("[?(@.abc.[*] in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Field(String::from("abc")), Wildcard])))]))),
-            FilterSign::In,
-            Operand::val(json!(["abc","bcd"])),
-        ))]);
-        test("[?(@.[*]..next in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![Wildcard, Descent(String::from("next"))])))]))),
-            FilterSign::In,
-            Operand::val(json!(["abc","bcd"])),
-        ))]);
+        test("[?(@.abc in ['abc','bcd'])]", vec![
+            path!(
+                idx!(?filter!(op!(chain!(path!(@,path!("abc")))),"in",Operand::val(json!(["abc","bcd"]))))
+            )
+        ]);
 
-        test("[?(@[1] in ['abc','bcd'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(Chain(vec![JsonPath::Index(JsonPathIndex::Single(json!(1)))])))]))),
-            FilterSign::In,
-            Operand::val(json!(["abc","bcd"])),
-        ))]);
-        test("[?(@ == 'abc')]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(JsonPath::Empty))]))),
-            FilterSign::Equal,
-            Operand::val(json!("abc")),
-        ))]);
-        test("[?(@ subsetOf ['abc'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(JsonPath::Empty))]))),
-            FilterSign::SubSetOf,
-            Operand::val(json!(["abc"])),
-        ))]);
-        test("[?(@[1] subsetOf ['abc','abc'])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(JsonPath::Chain(vec![JsonPath::Index(JsonPathIndex::Single(json!(1)))])))]))),
-            FilterSign::SubSetOf,
-            Operand::val(json!(["abc","abc"])),
-        ))]);
-        test("[?(@ subsetOf [1,2,3])]", vec![JsonPath::Index(JsonPathIndex::Filter(
-            Operand::Dynamic(Box::new(Chain(vec![Current(Box::new(JsonPath::Empty))]))),
-            FilterSign::SubSetOf,
-            Operand::val(json!([1,2,3])),
-        ))]);
+        test("[?(@.abc.[*] in ['abc','bcd'])]", vec![path!(idx!(?filter!(
+           op!(chain!(path!(@,path!("abc"), path!(*)))),
+            "in",
+            op!(s json!(["abc","bcd"]))
+        )))]);
+        test("[?(@.[*]..next in ['abc','bcd'])]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@,path!(*), path!(.."next")))),
+            "in",
+            op!(s json!(["abc","bcd"]))
+        )))]);
+
+        test("[?(@[1] in ['abc','bcd'])]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@,path!(idx!(1))))),
+            "in",
+            op!(s json!(["abc","bcd"]))
+        )))]);
+        test("[?(@ == 'abc')]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@path!()))),"==",op!("abc")
+        )))]);
+        test("[?(@ subsetOf ['abc'])]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@path!()))),"subsetOf",op!(s json!(["abc"]))
+        )))]);
+        test("[?(@[1] subsetOf ['abc','abc'])]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@,path!(idx!(1))))),
+            "subsetOf",
+            op!(s json!(["abc","abc"]))
+        )))]);
+        test("[?(@ subsetOf [1,2,3])]", vec![path!(idx!(?filter!(
+            op!(chain!(path!(@path!()))),"subsetOf",op!(s json!([1,2,3]))
+        )))]);
 
         test_failed("[?(@[1] subsetof ['abc','abc'])]");
         test_failed("[?(@ >< ['abc','abc'])]");
