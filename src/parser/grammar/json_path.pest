@@ -16,7 +16,6 @@ char = _{
 }
 root = {"$"}
 sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
-
 key_lim = {(word | ASCII_DIGIT | specs)+}
 key_unlim = {"[" ~ string_qt ~ "]"}
 key = ${key_lim | key_unlim}
@@ -35,12 +34,16 @@ slice = {start_slice? ~ col ~ end_slice? ~ step_slice? }
 
 unit_keys = { string_qt ~ ("," ~ string_qt)+ }
 unit_indexes = { number ~ ("," ~ number)+  }
-filter = {"?"~ "(" ~ op ~ (sign ~ op)? ~ ")"}
-op = _{chain | string_qt | number}
+filter = {"?"~ "(" ~ logic ~ ")"}
+
+logic = {logic_and ~ ("||" ~ logic_and)*}
+logic_and = {logic_atom ~ ("&&" ~ logic_atom)*}
+logic_atom = {atom ~ (sign ~ atom)? | "(" ~ logic ~ ")"}
+
+atom = {chain | string_qt | number }
 
 index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter ) ~ "]" }
 
 chain = {(root | descent | wildcard | current | field | index)+}
 
 path = {SOI ~ chain ~ EOI }
-

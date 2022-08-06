@@ -78,6 +78,33 @@ following elements:
 | `subsetOf` | The left is a subset of the right side
 |  | Exists operator. | The operator checks the existens of the field depicted on the left side like that `[?(@.key.isActive)]`
 
+Filter expressions can be chained using `||` and `&&` (logical or and logical and correspondingly) in the following way:
+```json
+          {
+                "key":[
+                    {"city":"London","capital":true, "size": "big"},
+                    {"city":"Berlin","capital":true,"size": "big"},
+                    {"city":"Tokyo","capital":true,"size": "big"},
+                    {"city":"Moscow","capital":true,"size": "big"},
+                    {"city":"Athlon","capital":false,"size": "small"},
+                    {"city":"Dortmund","capital":false,"size": "big"},
+                    {"city":"Dublin","capital":true,"size": "small"}
+                ]
+            }
+```
+
+The path ``` $.key[?(@.capital == false || @size == 'small')].city ``` will give the following result:
+```json
+["Athlon","Dublin","Dortmund"]
+```
+And the path ``` $.key[?(@.capital == false && @size != 'small')].city ``` ,in its turn, will give the following result:
+```json
+["Dortmund"]
+```
+
+By default, the operators have the different priority so `&&` has a higher priority so to change it the brackets can be used.
+``` $.[?((@.f == 0 || @.f == 1) && ($.x == 15))].city ```
+
 ### Examples
 
 Given the json

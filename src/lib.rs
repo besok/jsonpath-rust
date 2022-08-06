@@ -121,6 +121,7 @@ mod path;
 #[macro_use]
 extern crate pest_derive;
 extern crate pest;
+extern crate core;
 
 /// the trait allows to mix the method path to the value of [Value]
 /// and thus the using can be shortened to the following one:
@@ -453,9 +454,7 @@ mod tests {
              ]);
         test(template_json(),
              "$..book[?(@.author ~= '.*Rees')].price",
-             vec![
-                 &json!(8.95),
-             ]);
+             vec![&json!(8.95)]);
         test(template_json(),
              "$..book[?(@.price >= 8.99)].price",
              vec![
@@ -557,9 +556,10 @@ mod tests {
     }
     #[test]
     fn find_in_array_test() {
-        let json: Box<Value> = serde_json::from_str(r#"[ {"verb": "TEST"}, {"verb": "RUN"}]"#).expect("to get json");
-        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$.[?(@.verb== 'TEST')]")
-            .expect("the path is correct"));
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')]").expect("the path is correct")
+        );
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find_slice();

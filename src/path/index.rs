@@ -1,8 +1,8 @@
 use crate::path::{Path, PathInstance, json_path_instance, process_operand};
 use serde_json::Value;
-use crate::parser::model::{JsonPath, FilterSign, Operand};
+use crate::parser::model::{JsonPath, FilterSign, FilterExpression};
 use crate::path::json::*;
-use serde_json::value::Value::{Array, Object};
+use serde_json::value::Value::{Array};
 use crate::path::top::ObjectField;
 
 /// process the slice like [start:end:step]
@@ -153,79 +153,115 @@ impl<'a> Path<'a> for UnionIndex<'a> {
 }
 
 /// process filter element like [?(op sign op)]
-pub(crate) struct Filter<'a> {
-    left: PathInstance<'a>,
-    right: PathInstance<'a>,
-    op: &'a FilterSign,
+pub enum FilterPath<'a> {
+    Filter {
+        left: PathInstance<'a>,
+        right: PathInstance<'a>,
+        op: &'a FilterSign,
+    },
+    Or {
+        left: PathInstance<'a>,
+        right: PathInstance<'a>,
+    },
+    And {
+        left: PathInstance<'a>,
+        right: PathInstance<'a>,
+    },
 }
 
-impl<'a> Filter<'a> {
-    pub(crate) fn new(left: &'a Operand, right: &'a Operand, op: &'a FilterSign, root: &'a Value) -> Self {
-        Filter {
-            left: process_operand(left, root),
-            right: process_operand(right, root),
-            op,
+impl<'a> FilterPath<'a> {
+    pub(crate) fn new(expr: &'a FilterExpression, root: &'a Value) -> Self {
+        match expr {
+            FilterExpression::Atom(left, op, right) => FilterPath::Filter {
+                left: process_operand(left, root),
+                right: process_operand(right, root),
+                op,
+            },
+            FilterExpression::And(l, r) => FilterPath::And {
+                left: Box::new(FilterPath::new(l, root)),
+                right: Box::new(FilterPath::new(r, root)),
+            },
+            FilterExpression::Or(l, r) => FilterPath::Or {
+                left: Box::new(FilterPath::new(l, root)),
+                right: Box::new(FilterPath::new(r, root)),
+            },
         }
     }
-
-    fn or(one: &'a FilterSign, two: &'a FilterSign, left: Vec<&'a Value>, right: Vec<&'a Value>) -> bool {
-        Filter::process(one, left.clone(), right.clone())
-            || Filter::process(two, left.clone(), right.clone())
+    fn compound(one: &'a FilterSign, two: &'a FilterSign, left: Vec<&'a Value>, right: Vec<&'a Value>) -> bool {
+        FilterPath::process_atom(one, left.clone(), right.clone())
+            || FilterPath::process_atom(two, left.clone(), right.clone())
     }
-
-    fn process(op: &'a FilterSign, left: Vec<&'a Value>, right: Vec<&'a Value>) -> bool {
+    fn process_atom(op: &'a FilterSign, left: Vec<&'a Value>, right: Vec<&'a Value>) -> bool {
         match op {
             FilterSign::Equal => eq(left, right),
-            FilterSign::Unequal => !Filter::process(&FilterSign::Equal, left, right),
+            FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
             FilterSign::Less => less(left, right),
-            FilterSign::LeOrEq => Filter::or(&FilterSign::Less, &FilterSign::Equal, left, right),
-            FilterSign::Greater => !Filter::process(&FilterSign::LeOrEq, left, right),
-            FilterSign::GrOrEq => !Filter::process(&FilterSign::Less, left, right),
+            FilterSign::LeOrEq => FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right),
+            FilterSign::Greater => !FilterPath::process_atom(&FilterSign::LeOrEq, left, right),
+            FilterSign::GrOrEq => !FilterPath::process_atom(&FilterSign::Less, left, right),
             FilterSign::Regex => regex(left, right),
             FilterSign::In => inside(left, right),
-            FilterSign::Nin => !Filter::process(&FilterSign::In, left, right),
-            FilterSign::NoneOf => !Filter::process(&FilterSign::AnyOf, left, right),
+            FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
+            FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
             FilterSign::AnyOf => any_of(left, right),
             FilterSign::SubSetOf => sub_set_of(left, right),
             FilterSign::Exists => !left.is_empty(),
             FilterSign::Size => size(left, right)
         }
     }
+
+    fn process(&self, curr_el: &'a Value) -> bool {
+        match self {
+            FilterPath::Filter { left, right, op } => {
+                FilterPath::process_atom(op, left.find(curr_el), right.find(curr_el))
+            }
+            FilterPath::Or { left, right } => {
+                if !left.find(curr_el).is_empty() {
+                    true
+                } else {
+                    !right.find(curr_el).is_empty()
+                }
+            }
+            FilterPath::And { left, right } => {
+                if left.find(curr_el).is_empty() {
+                    false
+                } else {
+                    !right.find(curr_el).is_empty()
+                }
+            }
+        }
+    }
 }
 
-impl<'a> Path<'a> for Filter<'a> {
+impl<'a> Path<'a> for FilterPath<'a> {
     type Data = Value;
 
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
         let mut res: Vec<&Value> = vec![];
-
         match data {
             Array(elems) => {
                 for el in elems.iter() {
-                    if Filter::process(self.op, self.left.find(el), self.right.find(el)) {
+                    if self.process(el) {
                         res.push(el)
                     }
                 }
                 res
             }
-            Object(pairs) => {
-                for el in pairs.values() {
-                    if Filter::process(self.op, self.left.find(el), self.right.find(el)) {
-                        res.push(el)
-                    }
+            el => {
+                if self.process(el) {
+                    res.push(el)
                 }
                 res
             }
-            _ => vec![]
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::Value;
     use serde_json::json;
-    use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign};
+    use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression};
+    use crate::{chain, filter, idx, op, path};
     use crate::path::index::{ArraySlice, ArrayIndex};
     use crate::path::{Path, json_path_instance};
 
@@ -314,12 +350,7 @@ mod tests {
             }
         });
 
-        let root = JsonPath::Root;
-        let object = JsonPath::Field(String::from("object"));
-        let cur = JsonPath::Current(Box::new(JsonPath::Empty));
-
-        let chain = vec![root.clone(), object.clone(), cur.clone()];
-        let chain = JsonPath::Chain(chain);
+        let chain = chain!(path!($),path!("object"), path!(@) );
 
         let path_inst = json_path_instance(&chain, &json);
         let res = json!({
@@ -331,14 +362,8 @@ mod tests {
         let expected_res = vec![&res];
         assert_eq!(path_inst.find(&json), expected_res);
 
-        let field_3 = JsonPath::Field(String::from("field_3"));
-        let field_a = JsonPath::Field(String::from("a"));
-        let chain_in = vec![field_3, field_a];
-        let chain_in = JsonPath::Chain(chain_in);
-        let cur = JsonPath::Current(Box::new(chain_in));
-
-        let chain = vec![root.clone(), object.clone(), cur.clone()];
-        let chain = JsonPath::Chain(chain);
+        let cur = path!(@,path!("field_3"),path!("a"));
+        let chain = chain!(path!($),path!("object").clone(), cur.clone() );
 
         let path_inst = json_path_instance(&chain, &json);
         let res1 = json!("b");
@@ -350,23 +375,13 @@ mod tests {
     #[test]
     fn filter_exist_test() {
         let json = json!({
-            "key":[{"field":[1,2,3,4,5]},{"field":42}],
+            "threshold" : 3,
+            "key":[{"field":[1,2,3,4,5],"field1":[7]},{"field":42}],
         });
 
 
-        let field = JsonPath::Field(String::from("field"));
-        let cur = JsonPath::Current(Box::new(field.clone()));
-        let operand = Operand::Dynamic(Box::new(cur));
-        let empty_operand = Operand::Static(Value::Null);
-
-
-        let root = JsonPath::Root;
-        let key = JsonPath::Field(String::from("key"));
-        let filter = JsonPathIndex::Filter(operand, FilterSign::Exists, empty_operand);
-        let index = JsonPath::Index(filter);
-
-        let chain = vec![root.clone(), key.clone(), index.clone(), field.clone()];
-        let chain = JsonPath::Chain(chain);
+        let index = path!(idx!(?filter!(op!(path!(@, path!("field"))), "exists", op!())));
+        let chain = chain!(path!($),path!("key"), index, path!("field"));
 
         let path_inst = json_path_instance(&chain, &json);
 
@@ -379,6 +394,7 @@ mod tests {
     #[test]
     fn filter_gr_test() {
         let json = json!({
+                "threshold" : 4,
                 "key":[
                     {"field":1},
                     {"field":10},
@@ -387,20 +403,9 @@ mod tests {
                 ]
             });
 
+        let index = path!(idx!(?filter!(op!(path!(@, path!("field"))), ">", op!(chain!(path!($), path!("threshold"))))));
 
-        let field = JsonPath::Field(String::from("field"));
-        let cur = JsonPath::Current(Box::new(field));
-        let operand = Operand::Dynamic(Box::new(cur));
-        let right_operand = Operand::Static(json!(1));
-
-
-        let root = JsonPath::Root;
-        let key = JsonPath::Field(String::from("key"));
-        let filter = JsonPathIndex::Filter(operand, FilterSign::Greater, right_operand);
-        let index = JsonPath::Index(filter);
-
-        let chain = vec![root, key, index];
-        let chain = JsonPath::Chain(chain);
+        let chain = chain!(path!($), path!("key"),index);
 
         let path_inst = json_path_instance(&chain, &json);
 
@@ -422,19 +427,8 @@ mod tests {
             });
 
 
-        let field = JsonPath::Field(String::from("field"));
-        let cur = JsonPath::Current(Box::new(field));
-        let operand = Operand::Dynamic(Box::new(cur));
-        let right_operand = Operand::Static(json!("[a-zA-Z]+[0-9]#[0-9]+"));
-
-
-        let root = JsonPath::Root;
-        let key = JsonPath::Field(String::from("key"));
-        let filter = JsonPathIndex::Filter(operand, FilterSign::Regex, right_operand);
-        let index = JsonPath::Index(filter);
-
-        let chain = vec![root, key, index];
-        let chain = JsonPath::Chain(chain);
+        let index = idx!(?filter!(op!(path!(@,path!("field"))),"~=", op!("[a-zA-Z]+[0-9]#[0-9]+")));
+        let chain = chain!(path!($),path!("key"),path!(index));
 
         let path_inst = json_path_instance(&chain, &json);
 
@@ -455,19 +449,13 @@ mod tests {
             });
 
 
-        let field = JsonPath::Field(String::from("field"));
-        let cur = JsonPath::Current(Box::new(field));
-        let operand = Operand::Dynamic(Box::new(cur));
-        let right_operand = Operand::Static(json!(["a11#","aaa","111"]));
+        let index = idx!(?filter!(
+            op!(path!(@,path!("field"))),
+            "anyOf",
+            op!(s ["a11#","aaa","111"])
+        ));
 
-
-        let root = JsonPath::Root;
-        let key = JsonPath::Field(String::from("key"));
-        let filter = JsonPathIndex::Filter(operand, FilterSign::AnyOf, right_operand);
-        let index = JsonPath::Index(filter);
-
-        let chain = vec![root, key, index];
-        let chain = JsonPath::Chain(chain);
+        let chain = chain!(path!($),JsonPath::Field(String::from("key")),path!(index));
 
         let path_inst = json_path_instance(&chain, &json);
 
@@ -489,26 +477,158 @@ mod tests {
             });
 
 
-        let field = JsonPath::Field(String::from("field"));
-        let cur = JsonPath::Current(Box::new(field));
-        let operand = Operand::Dynamic(Box::new(cur));
-        let right_operand = Operand::Static(json!(4));
-
-
-        let root = JsonPath::Root;
-        let key = JsonPath::Field(String::from("key"));
-        let filter = JsonPathIndex::Filter(operand, FilterSign::Size, right_operand);
-        let index = JsonPath::Index(filter);
-
-        let chain = vec![root, key, index];
-        let chain = JsonPath::Chain(chain);
-
+        let index = idx!(?filter!(op!(path!(@, path!("field"))),"size",op!(4)));
+        let chain = chain!(path!($),path!("key"),path!(index));
         let path_inst = json_path_instance(&chain, &json);
-
         let exp2 = json!( {"field":"aaaa"});
         let exp3 = json!( {"field":"dddd"});
         let exp4 = json!( {"field":[1,1,1,1]});
         let expected_res = vec![&exp2, &exp3, &exp4];
         assert_eq!(path_inst.find(&json), expected_res)
     }
+
+    #[test]
+    fn nested_filter_test() {
+        let json = json!({
+                "obj":{
+                    "id":1,
+                    "not_id": 2,
+                    "more_then_id" :3
+                }
+            });
+        let index = idx!(?filter!(
+            op!(path!(@,path!("not_id"))), "==",op!(2)
+        ));
+        let chain = chain!(path!($),path!("obj"),path!(index));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!({
+                    "id":1,
+                    "not_id": 2,
+                    "more_then_id" :3
+                })])
+    }
+    #[test]
+    fn or_arr_test() {
+        let json = json!({
+                "key":[
+                    {"city":"London","capital":true, "size": "big"},
+                    {"city":"Berlin","capital":true,"size": "big"},
+                    {"city":"Tokyo","capital":true,"size": "big"},
+                    {"city":"Moscow","capital":true,"size": "big"},
+                    {"city":"Athlon","capital":false,"size": "small"},
+                    {"city":"Dortmund","capital":false,"size": "big"},
+                    {"city":"Dublin","capital":true,"size": "small"},
+                ]
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("capital"))), "==", op!(false)),
+            ||,
+            filter!(op!(path!(@,path!("size"))), "==", op!("small"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("city"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!("Athlon"), &json!("Dortmund"), &json!("Dublin")])
+    }
+    #[test]
+    fn or_obj_test() {
+        let json = json!({
+                "key":{
+                 "id":1,
+                 "name":"a",
+                 "another":"b"
+                }
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("name"))), "==", op!("a")),
+            ||,
+            filter!(op!(path!(@,path!("another"))), "==", op!("b"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!(1) ])
+    }
+    #[test]
+    fn or_obj_2_test() {
+        let json = json!({
+                "key":{
+                 "id":1,
+                 "name":"a",
+                 "another":"d"
+                }
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("name"))), "==", op!("c")),
+            ||,
+            filter!(op!(path!(@,path!("another"))), "==", op!("d"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!(1) ])
+    }
+
+    #[test]
+    fn and_arr_test() {
+        let json = json!({
+                "key":[
+                    {"city":"London","capital":true, "size": "big"},
+                    {"city":"Berlin","capital":true,"size": "big"},
+                    {"city":"Tokyo","capital":true,"size": "big"},
+                    {"city":"Moscow","capital":true,"size": "big"},
+                    {"city":"Athlon","capital":false,"size": "small"},
+                    {"city":"Dortmund","capital":false,"size": "big"},
+                    {"city":"Dublin","capital":true,"size": "small"},
+                ]
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("capital"))), "==", op!(false)),
+            &&,
+            filter!(op!(path!(@,path!("size"))), "==", op!("small"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("city"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!("Athlon")])
+    }
+    #[test]
+    fn and_obj_test() {
+        let json = json!({
+                "key":{
+                 "id":1,
+                 "name":"a",
+                 "another":"b"
+                }
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("name"))), "==", op!("a")),
+            &&,
+            filter!(op!(path!(@,path!("another"))), "==", op!("b"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json), vec![&json!(1) ])
+    }
+    #[test]
+    fn and_obj_2_test() {
+        let json = json!({
+                "key":{
+                 "id":1,
+                 "name":"a",
+                 "another":"d"
+                }
+            });
+        let index = idx!(?filter!(
+            filter!(op!(path!(@,path!("name"))), "==", op!("c")),
+            &&,
+            filter!(op!(path!(@,path!("another"))), "==", op!("d"))
+        )
+        );
+        let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.find(&json).is_empty(), true)
+    }
+
 }

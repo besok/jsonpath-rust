@@ -23,16 +23,6 @@ pub enum JsonPath {
     Empty,
 }
 
-#[allow(dead_code)]
-impl JsonPath {
-    pub fn descent(key: &str) -> Self {
-        JsonPath::Descent(String::from(key))
-    }
-    pub fn field(key: &str) -> Self {
-        JsonPath::Field(String::from(key))
-    }
-}
-
 impl JsonPath {
     /// allows to create an JsonPath from string
     pub fn from_str(v: &str) -> Result<JsonPath, String> {
@@ -42,7 +32,7 @@ impl JsonPath {
 
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
-    /// The single element in array
+    /// A single element in array
     Single(Value),
     /// Union represents a several indexes
     UnionIndex(Vec<Value>),
@@ -51,12 +41,26 @@ pub enum JsonPathIndex {
     /// DEfault slice where the items are start/end/step respectively
     Slice(i32, i32, usize),
     /// Filter ?()
-    Filter(Operand, FilterSign, Operand),
+    Filter(FilterExpression),
 }
 
-impl JsonPathIndex {
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterExpression {
+    /// a single expression like a > 2
+    Atom(Operand, FilterSign, Operand),
+    /// and with &&
+    And(Box<FilterExpression>, Box<FilterExpression>),
+    /// or with ||
+    Or(Box<FilterExpression>, Box<FilterExpression>),
+}
+
+impl FilterExpression {
     pub fn exists(op: Operand) -> Self {
-        JsonPathIndex::Filter(op, FilterSign::Exists, Operand::Dynamic(Box::new(JsonPath::Empty)))
+            FilterExpression::Atom(op,
+                                   FilterSign::Exists,
+                                   Operand::Dynamic(Box::new(JsonPath::Empty)),
+            )
+
     }
 }
 
@@ -66,15 +70,10 @@ pub enum Operand {
     Static(Value),
     Dynamic(Box<JsonPath>),
 }
+
 #[allow(dead_code)]
 impl Operand {
-    pub fn str(v: &str) -> Self {
-        Operand::Static(Value::from(v))
-    }
     pub fn val(v: Value) -> Self { Operand::Static(v) }
-    pub fn path(p: JsonPath) -> Self {
-        Operand::Dynamic(Box::new(p))
-    }
 }
 
 /// The operators for filtering functions
@@ -141,8 +140,7 @@ impl PartialEq for JsonPathIndex {
             (JsonPathIndex::Single(el1), JsonPathIndex::Single(el2)) => el1 == el2,
             (JsonPathIndex::UnionIndex(elems1), JsonPathIndex::UnionIndex(elems2)) => elems1 == elems2,
             (JsonPathIndex::UnionKeys(elems1), JsonPathIndex::UnionKeys(elems2)) => elems1 == elems2,
-            (JsonPathIndex::Filter(l1, s1, r1),
-                JsonPathIndex::Filter(l2, s2, r2)) => l1 == l2 && s1 == s2 && r1 == r2,
+            (JsonPathIndex::Filter(left), JsonPathIndex::Filter(right)) => left.eq(right),
             (_, _) => false
         }
     }

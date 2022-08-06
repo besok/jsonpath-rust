@@ -4,4 +4,5 @@
 pub(crate) mod model;
 #[allow(clippy::module_inception)]
 pub(crate) mod parser;
+mod macros;
 
