@@ -1,7 +1,7 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser};
 use serde_json::{Value};
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression};
+use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression, Function};
 use pest::error::{Error};
 use crate::parser::model::FilterExpression::{And, Or};
 
@@ -23,6 +23,7 @@ fn parse_internal(rule: Pair<Rule>) -> JsonPath {
         Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_internal).collect()),
         Rule::root => JsonPath::Root,
         Rule::wildcard => JsonPath::Wildcard,
+        Rule::function => JsonPath::Fn(Function::Size),
         Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
         Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
         Rule::index => JsonPath::Index(parse_index(rule)),
@@ -181,7 +182,8 @@ mod tests {
     use super::*;
     use std::panic;
     use serde_json::{json};
-    use crate::{filter, idx, op, path, chain};
+    use crate::{filter, idx, op, path, chain, function};
+    use crate::JsonPath::Fn;
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
@@ -292,42 +294,42 @@ mod tests {
 
     #[test]
     fn logical_filter_test() {
-        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10)]", vec![
+        test("$.[?(@.verb == 'T' || @.size() > 0 && @.size() < 10)]", vec![
             path!($),
             path!(idx!(?
                 filter!(
                     filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
                     ||,
                     filter!(
-                        filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0)),
+                        filter!(op!(chain!(path!(@,function!(size)))), ">", op!(0)),
                         &&,
-                        filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                        filter!(op!(chain!(path!(@,function!(size)))), "<", op!(10))
                     )
                 )))
         ]);
-        test("$.[?((@.verb == 'T' || @.size > 0) && @.size < 10)]", vec![
+        test("$.[?((@.verb == 'T' || @.size() > 0) && @.size() < 10)]", vec![
             path!($),
             path!(idx!(?
                 filter!(
                     filter!(
                        filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
                         ||,
-                        filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0))
+                        filter!(op!(chain!(path!(@,function!(size)))), ">", op!(0))
                     ),
                     &&,
-                    filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                    filter!(op!(chain!(path!(@,function!(size)))), "<", op!(10))
                 )))
         ]);
-        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10 && @.elem == 0)]", vec![
+        test("$.[?(@.verb == 'T' || @.size() > 0 && @.size() < 10 && @.elem == 0)]", vec![
             path!($),
             path!(idx!(?filter!(
                     filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
                     ||,
                     filter!(
                         filter!(
-                            filter!(op!(chain!(path!(@,path!("size")))), ">", op!(0)),
+                            filter!(op!(chain!(path!(@,function!(size)))), ">", op!(0)),
                             &&,
-                            filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
+                            filter!(op!(chain!(path!(@,function!(size)))), "<", op!(10))
                         ),
                         &&,
                         filter!(op!(chain!(path!(@,path!("elem")))), "==", op!(0))
@@ -382,5 +384,23 @@ mod tests {
         test_failed("[?(@[1] subsetof ['abc','abc'])]");
         test_failed("[?(@ >< ['abc','abc'])]");
         test_failed("[?(@ in {\"abc\":1})]");
+    }
+    #[test]
+    fn fn_size_test() {
+        test("$.k.size()",
+             vec![
+                 path!($),
+                 path!("k"),
+                function!(size)
+             ]);
+
+        test("$.k.size.field",
+             vec![
+                 path!($),
+                 path!("k"),
+                 path!("size"),
+                 path!("field"),
+             ])
+
     }
 }

@@ -15,8 +15,9 @@ char = _{
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 root = {"$"}
-sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
-key_lim = {(word | ASCII_DIGIT | specs)+}
+
+sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "noneOf" | "anyOf" | "subsetOf"}
+key_lim = {!"size()" ~ (word | ASCII_DIGIT | specs)+}
 key_unlim = {"[" ~ string_qt ~ "]"}
 key = ${key_lim | key_unlim}
 
@@ -24,7 +25,7 @@ descent = {dot ~ dot ~ key}
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain?}
 field = ${dot? ~ key_unlim | dot ~ key_lim }
-
+function = { dot ~ "size" ~ "(" ~ ")"}
 unsigned = {("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
 signed = {min? ~ unsigned}
 start_slice = {signed}
@@ -44,6 +45,8 @@ atom = {chain | string_qt | number }
 
 index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter ) ~ "]" }
 
-chain = {(root | descent | wildcard | current | field | index)+}
+
+
+chain = {(root | descent | wildcard | current | field | index | function)+}
 
 path = {SOI ~ chain ~ EOI }

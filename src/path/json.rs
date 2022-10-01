@@ -1,26 +1,6 @@
 use serde_json::Value;
 use regex::Regex;
 
-/// compare sizes of json elements
-/// The method expects to get a number on the right side and array or string or object on the left
-/// where the number of characters, elements or fields will be compared respectively.
-pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
-    if let Some(Value::Number(n)) = right.get(0) {
-        if let Some(sz) = n.as_f64() {
-            for el in left.iter() {
-                match el {
-                    Value::String(v) if v.len() == sz as usize => true,
-                    Value::Array(elems) if elems.len() == sz as usize => true,
-                    Value::Object(fields) if fields.len() == sz as usize => true,
-                    _ => return false
-                };
-            }
-            return true;
-        }
-    }
-    false
-}
-
 /// ensure the array on the left side is a subset of the array on the right side.
 //todo change the naive impl to sets
 pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
@@ -171,7 +151,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Value};
-    use crate::path::json::{eq, less, regex, any_of, sub_set_of, size};
+    use crate::path::json::{eq, less, regex, any_of, sub_set_of};
 
     #[test]
     fn value_eq_test() {
@@ -266,14 +246,4 @@ mod tests {
         assert!(!sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone(), left40.clone()])], vec![&right]));
     }
 
-    #[test]
-    fn size_test() {
-        let left1 = json!("abc");
-        let left2 = json!([1,2,3]);
-        let left3 = json!([1,2,3,4]);
-        let right = json!(3);
-        assert!(size(vec![&left1], vec![&right]));
-        assert!(size(vec![&left2], vec![&right]));
-        assert!(!size(vec![&left3], vec![&right]));
-    }
 }

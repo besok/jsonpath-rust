@@ -547,7 +547,7 @@ mod tests {
     #[test]
     fn find_slice_test() {
         let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
-        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title")
+        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author.size() == 10)].title")
             .expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
 

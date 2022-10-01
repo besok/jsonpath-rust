@@ -19,6 +19,8 @@ pub enum JsonPath {
     Current(Box<JsonPath>),
     /// The * operator
     Wildcard,
+    /// Functions that can calculate some expressions
+    Fn(Function),
     /// The item uses to define the unresolved state
     Empty,
 }
@@ -28,6 +30,11 @@ impl JsonPath {
     pub fn from_str(v: &str) -> Result<JsonPath, String> {
         parse_json_path(v).map_err(|e| e.to_string())
     }
+}
+#[derive(Debug,PartialEq, Clone)]
+pub enum Function {
+    /// size()
+    Size,
 }
 
 #[derive(Debug, Clone)]
@@ -88,7 +95,6 @@ pub enum FilterSign {
     Regex,
     In,
     Nin,
-    Size,
     NoneOf,
     AnyOf,
     SubSetOf,
@@ -107,7 +113,6 @@ impl FilterSign {
             "~=" => FilterSign::Regex,
             "in" => FilterSign::In,
             "nin" => FilterSign::Nin,
-            "size" => FilterSign::Size,
             "noneOf" => FilterSign::NoneOf,
             "anyOf" => FilterSign::AnyOf,
             "subsetOf" => FilterSign::SubSetOf,
@@ -127,6 +132,7 @@ impl PartialEq for JsonPath {
             (JsonPath::Current(jp1), JsonPath::Current(jp2)) => jp1 == jp2,
             (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => ch1 == ch2,
             (JsonPath::Index(idx1), JsonPath::Index(idx2)) => idx1 == idx2,
+            (JsonPath::Fn(fn1), JsonPath::Fn(fn2)) => fn2 == fn1,
             (_, _) => false
         }
     }

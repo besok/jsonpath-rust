@@ -37,20 +37,35 @@ that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
 
 ### The jsonpath description
 
+#### Functions
+
+##### Size
+A function `size()` transforms the output of the filtered expression into a size of this element
+
+| Json element | function size            |
+|--------------|--------------------------|
+| null         | 0                        |
+| numbers      | 1                        |
+| string       | a length of given string |
+| array        | a length of given array  |
+| objects      | a length of set of keys  |
+
+`$.some_field.size()`
+
 #### Operators
 
-| Operator | Description | Where to use |
-| --- | --- | --- |
-| `$` | Pointer to the root of the json. | It is gently advising to start every jsonpath from the root. Also, inside the filters to point out that the path is starting from the root.
-| `@` | Pointer to the current element inside the filter operations. | It is used inside the filter operations to iterate the collection.
-| `*` or `[*]` | Wildcard. It brings to the list all objects and elements regardless their names. | It is analogue a flatmap operation.
-| `<..>`| Descent operation. It brings to the list all objects, children of that objects and etc  | It is analogue a flatmap operation.
-| `.<name>` or `.['<name>']` | the key pointing to the field of the object | It is used to obtain the specific field.
-| `['<name>' (, '<name>')]` | the list of keys | the same usage as for a single key but for list
-| `[<number>]` | the filter getting the element by its index. |
-| `[<number> (, <number>)]` | the list if elements of array according to their indexes representing these numbers. |
-| `[<start>:<end>:<step>]` | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]```
-| `[?(<expression>)]` | the logical expression to filter elements in the list. | It is used with arrays preliminary.
+| Operator                   | Description                                                                                                                                                  | Where to use                                                                                                                                |
+|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `$`                        | Pointer to the root of the json.                                                                                                                             | It is gently advising to start every jsonpath from the root. Also, inside the filters to point out that the path is starting from the root. |
+| `@`                        | Pointer to the current element inside the filter operations.                                                                                                 | It is used inside the filter operations to iterate the collection.                                                                          |
+| `*` or `[*]`               | Wildcard. It brings to the list all objects and elements regardless their names.                                                                             | It is analogue a flatmap operation.                                                                                                         |
+| `<..>`                     | Descent operation. It brings to the list all objects, children of that objects and etc                                                                       | It is analogue a flatmap operation.                                                                                                         |
+| `.<name>` or `.['<name>']` | the key pointing to the field of the object                                                                                                                  | It is used to obtain the specific field.                                                                                                    |
+| `['<name>' (, '<name>')]`  | the list of keys                                                                                                                                             | the same usage as for a single key but for list                                                                                             |
+| `[<number>]`               | the filter getting the element by its index.                                                                                                                 |                                                                                                                                             |
+| `[<number> (, <number>)]`  | the list if elements of array according to their indexes representing these numbers.                                                                         |                                                                                                                                             |
+| `[<start>:<end>:<step>]`   | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]``` |                                                                                                                                             |
+| `[?(<expression>)]`        | the logical expression to filter elements in the list.                                                                                                       | It is used with arrays preliminary.                                                                                                         |
 
 #### Filter expressions
 
@@ -61,22 +76,21 @@ following elements:
   string value `'value'`, array of them or another json path instance.
 - Expression sign, denoting what action can be performed
 
-| Expression sign  | Description | Where to use |
-| --- | --- | --- |
-| `==`| Equal | To compare numbers or string literals
-| `!=`| Unequal| To compare numbers or string literals in opposite way to equals
-| `<` | Less | To compare numbers
-| `>` | Greater | To compare numbers
-| `<=`| Less or equal | To compare numbers
-| `>=`| Greater or equal | To compare numbers
-| `~=`| Regular expression | To find the incoming right side in the left side.
-| `in`| Find left element in the list of right elements. |
-| `nin`| The same one as saying above but carrying the opposite sense. |
-| `size`| The size of array on the left size should be corresponded to the number on the right side. |
-| `noneOf`| The left size has no intersection with right |
-| `anyOf` | The left size has at least one intersection with right |
-| `subsetOf` | The left is a subset of the right side
-|  | Exists operator. | The operator checks the existens of the field depicted on the left side like that `[?(@.key.isActive)]`
+| Expression sign | Description                                                   | Where to use                                                                                            |
+|-----------------|---------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `==`            | Equal                                                         | To compare numbers or string literals                                                                   |
+| `!=`            | Unequal                                                       | To compare numbers or string literals in opposite way to equals                                         |
+| `<`             | Less                                                          | To compare numbers                                                                                      |
+| `>`             | Greater                                                       | To compare numbers                                                                                      |
+| `<=`            | Less or equal                                                 | To compare numbers                                                                                      |
+| `>=`            | Greater or equal                                              | To compare numbers                                                                                      |
+| `~=`            | Regular expression                                            | To find the incoming right side in the left side.                                                       |
+| `in`            | Find left element in the list of right elements.              |                                                                                                         |
+| `nin`           | The same one as saying above but carrying the opposite sense. |                                                                                                         |
+| `noneOf`        | The left side has no intersection with right                  |                                                                                                         |
+| `anyOf`         | The left side has at least one intersection with right        |                                                                                                         |
+| `subsetOf`      | The left is a subset of the right side                        |                                                                                                         |
+|                 | Exists operator.                                              | The operator checks the existens of the field depicted on the left side like that `[?(@.key.isActive)]` |
 
 Filter expressions can be chained using `||` and `&&` (logical or and logical and correspondingly) in the following way:
 ```json
@@ -149,24 +163,24 @@ Given the json
 }
  ```
 
-| JsonPath | Result |
- | :------- | :----- |
-| `$.store.book[*].author`| The authors of all books     |
-| `$..book[?(@.isbn)]`          | All books with an ISBN number         |
-| `$.store.*`                  | All things, both books and bicycles  |
-| `$..author`                   | All authors                         |
-| `$.store..price`             | The price of everything         |
-| `$..book[2]`                 | The third book                      |
-| `$..book[-2]`                 | The second to last book            |
-| `$..book[0,1]`               | The first two books               |
-| `$..book[:2]`                | All books from index 0 (inclusive) until index 2 (exclusive) |
-| `$..book[1:2]`                | All books from index 1 (inclusive) until index 2 (exclusive) |
-| `$..book[-2:]`                | Last two books                   |
-| `$..book[2:]`                | Book number two from tail          |
-| `$.store.book[?(@.price < 10)]` | All books in store cheaper than 10  |
-| `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"  |
-| `$..book[?(@.author ~= /.*REES/i)]` | All books matching regex (ignore case)  |
-| `$..*`                        | Give me every thing
+| JsonPath                             | Result                                                       |
+|:-------------------------------------|:-------------------------------------------------------------|
+| `$.store.book[*].author`             | The authors of all books                                     |
+| `$..book[?(@.isbn)]`                 | All books with an ISBN number                                |
+| `$.store.*`                          | All things, both books and bicycles                          |
+| `$..author`                          | All authors                                                  |
+| `$.store..price`                     | The price of everything                                      |
+| `$..book[2]`                         | The third book                                               |
+| `$..book[-2]`                        | The second to last book                                      |
+| `$..book[0,1]`                       | The first two books                                          |
+| `$..book[:2]`                        | All books from index 0 (inclusive) until index 2 (exclusive) |
+| `$..book[1:2]`                       | All books from index 1 (inclusive) until index 2 (exclusive) |
+| `$..book[-2:]`                       | Last two books                                               |
+| `$..book[2:]`                        | Book number two from tail                                    |
+| `$.store.book[?(@.price < 10)]`      | All books in store cheaper than 10                           |
+| `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"                  |
+| `$..book[?(@.author ~= /.*REES/i)]`  | All books matching regex (ignore case)                       |
+| `$..*`                               | Give me every thing                                          |
 
 ### The library
 
@@ -195,16 +209,16 @@ or with a separate instantiation:
  use std::str::FromStr;
 fn test(){
          let json: Value = serde_json::from_str("{}").unwrap();
-         let v = json.path("$..book[?(@.author size 10)].title").unwrap();
+         let v = json.path("$..book[?(@.author.size() == 10)].title").unwrap();
          assert_eq!(v, json!([]));
 
          let json: Value = serde_json::from_str("{}").unwrap();
-         let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
+         let path = &json.path("$..book[?(@.author.size() == 10)].title").unwrap();
 
          assert_eq!(path, &json!(["Sayings of the Century"]));
 
          let json: Box<Value> = serde_json::from_str("{}").unwrap();
-         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
+         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author.size() == 10)].title").unwrap());
          let finder = JsonPathFinder::new(json, path);
 
          let v = finder.find_slice();
@@ -235,11 +249,11 @@ use jsonpath_rust::JsonPathQuery;
 
 fn test(){
            let json: Value = serde_json::from_str("{}").unwrap();
-           let v = json.path("$..book[?(@.author size 10)].title").unwrap();
+           let v = json.path("$..book[?(@.author.size() == 10)].title").unwrap();
            assert_eq!(v, json!([]));
            
            let json: Value = serde_json::from_str(template_json()).unwrap();
-           let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
+           let path = &json.path("$..book[?(@.author.size() == 10)].title").unwrap();
   
            assert_eq!(path, &json!(["Sayings of the Century"]));
    }
@@ -262,6 +276,8 @@ pub enum JsonPath {
     Current(Box<JsonPath>),
     // <- @
     Wildcard,
+    
+    Fn(Function),
     // <- *
     Empty, // the structure to avoid inconsistency
 }

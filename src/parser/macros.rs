@@ -50,6 +50,11 @@ macro_rules! chain {
 }
 
 #[macro_export]
+macro_rules! function {
+    (size) => {JsonPath::Fn(Function::Size)}
+}
+
+#[macro_export]
 macro_rules! path {
    ( ) => {JsonPath::Empty};
    (*) => {JsonPath::Wildcard};

@@ -1,5 +1,5 @@
-use serde_json::{Value};
-use serde_json::value::Value::{Array, Object};
+use serde_json::{json, Value};
+use serde_json::value::Value::*;
 use crate::path::{PathInstance, Path, json_path_instance};
 use crate::parser::model::*;
 
@@ -53,7 +53,7 @@ impl<'a> Path<'a> for EmptyPath {
 
 /// process $ element
 pub(crate) struct RootPointer<'a, T> {
-    root: &'a T
+    root: &'a T,
 }
 
 impl<'a, T> RootPointer<'a, T> {
@@ -110,13 +110,13 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
         fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
             let mut level: Vec<&Value> = key.find(data);
             match data {
-                Value::Object(elems) => {
+                Object(elems) => {
                     let mut next_levels: Vec<&Value> =
                         elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
                     level
                 }
-                Value::Array(elems) => {
+                Array(elems) => {
                     let mut next_levels: Vec<&Value> =
                         elems.iter().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
@@ -157,6 +157,27 @@ impl<'a> Path<'a> for Chain<'a> {
         self.chain.iter().fold(vec![data], |inter_res, path| {
             inter_res.iter().flat_map(|d| path.find(d)).collect()
         })
+    }
+}
+
+pub(crate) enum FnPath {
+    Size
+}
+
+impl<'a> Path<'a> for FnPath {
+    type Data = Value;
+
+    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+
+        // match data {
+        //     Null => vec![&json!(0)],
+        //     Bool(_) => vec![&json!(1)],
+        //     Number(_) => vec![&json!(1)],
+        //     String(v) => vec![&json!(v.len())],
+        //     Array(v) => vec![&json!(v.len())],
+        //     Object(v) => vec![&json!(v.len())],
+        // }
+        vec![data]
     }
 }
 

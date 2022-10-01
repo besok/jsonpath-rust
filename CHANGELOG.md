@@ -15,3 +15,6 @@
   * add logical OR and logical And to filters
   * fix bugs with objects in filters
   * add internal macros to generate path objects
+* **`1.0.0`**
+  * add functions (size)
+  * change a logical operator `size` into function `size()`

@@ -206,7 +206,6 @@ impl<'a> FilterPath<'a> {
             FilterSign::AnyOf => any_of(left, right),
             FilterSign::SubSetOf => sub_set_of(left, right),
             FilterSign::Exists => !left.is_empty(),
-            FilterSign::Size => size(left, right)
         }
     }
 
@@ -477,7 +476,7 @@ mod tests {
             });
 
 
-        let index = idx!(?filter!(op!(path!(@, path!("field"))),"size",op!(4)));
+        let index = idx!(?filter!(op!(path!(@, path!("field"))),"==",op!(4)));
         let chain = chain!(path!($),path!("key"),path!(index));
         let path_inst = json_path_instance(&chain, &json);
         let exp2 = json!( {"field":"aaaa"});

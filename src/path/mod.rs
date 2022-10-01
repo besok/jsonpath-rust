@@ -6,7 +6,7 @@
 //!
 use serde_json::{Value};
 
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
+use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 use crate::path::top::*;
 
@@ -39,7 +39,8 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathI
         JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
         JsonPath::Current(value) => Box::new(Current::from(&**value, root)),
         JsonPath::Index(index) => process_index(index, root),
-        JsonPath::Empty => Box::new(IdentityPath {})
+        JsonPath::Empty => Box::new(IdentityPath {}),
+        JsonPath::Fn(Function::Size) => Box::new(FnPath::Size)
     }
 }
 
@@ -50,7 +51,7 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
         JsonPathIndex::UnionKeys(elems) => Box::new(UnionIndex::from_keys(elems)),
         JsonPathIndex::UnionIndex(elems) => Box::new(UnionIndex::from_indexes(elems)),
-        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe,root)),
+        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe, root)),
     }
 }
 
