@@ -1,6 +1,6 @@
 use serde_json::{Value};
 use serde_json::value::Value::{Array, Object};
-use crate::path::{PathInstance, Path, json_path_instance};
+use crate::path::{PathInstance, Path, json_path_instance, Path2, PathData};
 use crate::parser::model::*;
 
 /// to process the element [*]
@@ -30,12 +30,44 @@ impl<'a> Path<'a> for Wildcard {
     }
 }
 
+impl<'a> Path2<'a> for Wildcard {
+    type Data = Value;
+
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        data.map_ref(|data| match data {
+            Array(elems) => {
+                let mut res: Vec<&Value> = vec![];
+                for el in elems.iter() {
+                    res.push(el);
+                }
+                res
+            }
+            Object(elems) => {
+                let mut res: Vec<&Value> = vec![];
+                for el in elems.values() {
+                    res.push(el);
+                }
+                res
+            }
+            _ => vec![]
+        })
+    }
+}
+
 /// empty path. Returns incoming data.
 pub(crate) struct IdentityPath {}
 
 impl<'a> Path<'a> for IdentityPath {
     type Data = Value;
     fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
+        vec![data]
+    }
+}
+
+impl<'a> Path2<'a> for IdentityPath {
+    type Data = Value;
+
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
         vec![data]
     }
 }
@@ -51,9 +83,17 @@ impl<'a> Path<'a> for EmptyPath {
     }
 }
 
+impl<'a> Path2<'a> for EmptyPath {
+    type Data = Value;
+
+    fn find2(&self, _data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        vec![]
+    }
+}
+
 /// process $ element
 pub(crate) struct RootPointer<'a, T> {
-    root: &'a T
+    root: &'a T,
 }
 
 impl<'a, T> RootPointer<'a, T> {
@@ -67,6 +107,14 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
 
     fn find(&self, _data: &'a Self::Data) -> Vec<&'a Self::Data> {
         vec![self.root]
+    }
+}
+
+impl<'a> Path2<'a> for RootPointer<'a, Value> {
+    type Data = Value;
+
+    fn find2(&self, _data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        vec![PathData::Ref(self.root)]
     }
 }
 
@@ -98,6 +146,19 @@ impl<'a> Path<'a> for ObjectField<'a> {
     }
 }
 
+impl<'a> Path2<'a> for ObjectField<'a> {
+    type Data = Value;
+
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        data.map_ref(|data|
+            data.as_object()
+                .and_then(|fileds| fileds.get(self.key))
+                .map(|e| vec![e])
+                .unwrap_or_default()
+        )
+    }
+}
+
 /// processes decent object like ..
 pub(crate) struct DescentObjectField<'a> {
     key: &'a str,
@@ -110,13 +171,13 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
         fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
             let mut level: Vec<&Value> = key.find(data);
             match data {
-                Value::Object(elems) => {
+                Object(elems) => {
                     let mut next_levels: Vec<&Value> =
                         elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
                     level
                 }
-                Value::Array(elems) => {
+                Array(elems) => {
                     let mut next_levels: Vec<&Value> =
                         elems.iter().flat_map(|v| deep_path(v, key.clone())).collect();
                     level.append(&mut next_levels);
@@ -127,6 +188,35 @@ impl<'a> Path<'a> for DescentObjectField<'a> {
         }
         let key = ObjectField::new(self.key);
         deep_path(data, key)
+    }
+}
+
+impl<'a> Path2<'a> for DescentObjectField<'a> {
+    type Data = Value;
+
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        data.map_ref(|data| {
+            fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
+                let mut level: Vec<&Value> = key.find(data);
+                match data {
+                    Object(elems) => {
+                        let mut next_levels: Vec<&Value> =
+                            elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
+                        level.append(&mut next_levels);
+                        level
+                    }
+                    Array(elems) => {
+                        let mut next_levels: Vec<&Value> =
+                            elems.iter().flat_map(|v| deep_path(v, key.clone())).collect();
+                        level.append(&mut next_levels);
+                        level
+                    }
+                    _ => level
+                }
+            }
+            let key = ObjectField::new(self.key);
+            deep_path(data, key)
+        })
     }
 }
 
@@ -160,6 +250,18 @@ impl<'a> Path<'a> for Chain<'a> {
     }
 }
 
+impl<'a> Path2<'a> for Chain<'a> {
+    type Data = Value;
+
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+        data.map_ref(|data|
+            self.chain.iter().fold(vec![data], |inter_res, path| {
+                inter_res.iter().flat_map(|d| path.find(d)).collect()
+            })
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::path::top::{Path, ObjectField, RootPointer, json_path_instance};
@@ -167,10 +269,11 @@ mod tests {
     use serde_json::json;
     use crate::parser::model::{JsonPath, JsonPathIndex};
     use crate::{chain, idx, path};
+    use crate::path::{Path2, PathData};
 
     #[test]
     fn object_test() {
-        let res_income = json!({"product": {"key":42}});
+        let res_income = PathData::Ref(&json!({"product": {"key":42}});
 
         let key = String::from("product");
         let mut field = ObjectField::new(&key);
@@ -179,7 +282,7 @@ mod tests {
         let key = String::from("fake");
 
         field.key = &key;
-        assert!(field.find(&res_income).is_empty());
+        assert!(field.find2(&res_income).is_empty());
     }
 
     #[test]

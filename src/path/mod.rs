@@ -4,6 +4,7 @@
 //! - define the json path structure from the parsing [[JsonPath]]
 //! - transform json path into the [[PathInstance]]
 //!
+use std::borrow::Borrow;
 use serde_json::{Value};
 
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
@@ -16,6 +17,33 @@ mod top;
 mod index;
 /// The module is a helper module providing the set of helping funcitons to process a json elements
 mod json;
+
+pub enum PathData<'a, Data> {
+    Ref(&'a Data),
+    Slice(Data),
+}
+
+impl<'a, Data> PathData<'a, Data> {
+    fn map_ref<F>(self, mapper: F) -> Vec<PathData<'a, Data>>
+        where F: FnOnce(&'a Data) -> Vec<&'a Data>
+    {
+        match self {
+            PathData::Ref(r) => {
+                mapper(r)
+                    .into_iter()
+                    .map(PathData::Ref)
+                    .collect()
+            }
+            PathData::Slice(_) => vec![]
+        }
+    }
+}
+
+pub trait Path2<'a> {
+    type Data;
+    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>>;
+}
+
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
@@ -50,7 +78,7 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
         JsonPathIndex::UnionKeys(elems) => Box::new(UnionIndex::from_keys(elems)),
         JsonPathIndex::UnionIndex(elems) => Box::new(UnionIndex::from_indexes(elems)),
-        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe,root)),
+        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe, root)),
     }
 }
 
