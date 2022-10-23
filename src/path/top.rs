@@ -1,6 +1,6 @@
 use serde_json::{Value};
 use serde_json::value::Value::{Array, Object};
-use crate::path::{PathInstance, Path, json_path_instance, Path2, PathData};
+use crate::path::{PathInstance, json_path_instance, Path, PathValue};
 use crate::parser::model::*;
 
 /// to process the element [*]
@@ -9,31 +9,7 @@ pub(crate) struct Wildcard {}
 impl<'a> Path<'a> for Wildcard {
     type Data = Value;
 
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        match data {
-            Array(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.iter() {
-                    res.push(el);
-                }
-                res
-            }
-            Object(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.values() {
-                    res.push(el);
-                }
-                res
-            }
-            _ => vec![]
-        }
-    }
-}
-
-impl<'a> Path2<'a> for Wildcard {
-    type Data = Value;
-
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         data.map_ref(|data| match data {
             Array(elems) => {
                 let mut res: Vec<&Value> = vec![];
@@ -57,17 +33,11 @@ impl<'a> Path2<'a> for Wildcard {
 /// empty path. Returns incoming data.
 pub(crate) struct IdentityPath {}
 
+
 impl<'a> Path<'a> for IdentityPath {
     type Data = Value;
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        vec![data]
-    }
-}
 
-impl<'a> Path2<'a> for IdentityPath {
-    type Data = Value;
-
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         vec![data]
     }
 }
@@ -75,18 +45,11 @@ impl<'a> Path2<'a> for IdentityPath {
 
 pub(crate) struct EmptyPath {}
 
+
 impl<'a> Path<'a> for EmptyPath {
     type Data = Value;
 
-    fn find(&self, _data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        vec![]
-    }
-}
-
-impl<'a> Path2<'a> for EmptyPath {
-    type Data = Value;
-
-    fn find2(&self, _data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, _data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         vec![]
     }
 }
@@ -102,19 +65,12 @@ impl<'a, T> RootPointer<'a, T> {
     }
 }
 
+
 impl<'a> Path<'a> for RootPointer<'a, Value> {
     type Data = Value;
 
-    fn find(&self, _data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        vec![self.root]
-    }
-}
-
-impl<'a> Path2<'a> for RootPointer<'a, Value> {
-    type Data = Value;
-
-    fn find2(&self, _data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
-        vec![PathData::Ref(self.root)]
+    fn find(&self, _data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
+        vec![PathValue::Ref(self.root)]
     }
 }
 
@@ -135,21 +91,11 @@ impl<'a> Clone for ObjectField<'a> {
     }
 }
 
+
 impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
 
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        data.as_object()
-            .and_then(|fileds| fileds.get(self.key))
-            .map(|e| vec![e])
-            .unwrap_or_default()
-    }
-}
-
-impl<'a> Path2<'a> for ObjectField<'a> {
-    type Data = Value;
-
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         data.map_ref(|data|
             data.as_object()
                 .and_then(|fileds| fileds.get(self.key))
@@ -167,37 +113,10 @@ pub(crate) struct DescentObjectField<'a> {
 impl<'a> Path<'a> for DescentObjectField<'a> {
     type Data = Value;
 
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-            let mut level: Vec<&Value> = key.find(data);
-            match data {
-                Object(elems) => {
-                    let mut next_levels: Vec<&Value> =
-                        elems.values().flat_map(|v| deep_path(v, key.clone())).collect();
-                    level.append(&mut next_levels);
-                    level
-                }
-                Array(elems) => {
-                    let mut next_levels: Vec<&Value> =
-                        elems.iter().flat_map(|v| deep_path(v, key.clone())).collect();
-                    level.append(&mut next_levels);
-                    level
-                }
-                _ => level
-            }
-        }
-        let key = ObjectField::new(self.key);
-        deep_path(data, key)
-    }
-}
-
-impl<'a> Path2<'a> for DescentObjectField<'a> {
-    type Data = Value;
-
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         data.map_ref(|data| {
             fn deep_path<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-                let mut level: Vec<&Value> = key.find(data);
+                let mut level: Vec<&Value> = PathValue::ref_into_vec(key.find(data.into()));
                 match data {
                     Object(elems) => {
                         let mut next_levels: Vec<&Value> =
@@ -240,49 +159,48 @@ impl<'a> Chain<'a> {
     }
 }
 
+
 impl<'a> Path<'a> for Chain<'a> {
     type Data = Value;
 
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data> {
-        self.chain.iter().fold(vec![data], |inter_res, path| {
-            inter_res.iter().flat_map(|d| path.find(d)).collect()
-        })
-    }
-}
-
-impl<'a> Path2<'a> for Chain<'a> {
-    type Data = Value;
-
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>> {
+    fn find(&self, data: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
         data.map_ref(|data|
-            self.chain.iter().fold(vec![data], |inter_res, path| {
-                inter_res.iter().flat_map(|d| path.find(d)).collect()
-            })
+            self.chain
+                .iter()
+                .fold(
+                    vec![data],
+                    |inter_res, path| {
+                        PathValue::ref_into_vec(inter_res
+                            .into_iter()
+                            .flat_map(|d| path.find(PathValue::Ref(d)))
+                            .collect())
+                    })
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::path::top::{Path, ObjectField, RootPointer, json_path_instance};
+    use crate::path::top::{ObjectField, RootPointer, json_path_instance};
     use serde_json::Value;
     use serde_json::json;
     use crate::parser::model::{JsonPath, JsonPathIndex};
-    use crate::{chain, idx, path};
-    use crate::path::{Path2, PathData};
+    use crate::{chain, path_value, idx, path};
+    use crate::path::{Path, PathValue};
 
     #[test]
     fn object_test() {
-        let res_income = PathData::Ref(&json!({"product": {"key":42}});
+        let js = json!({"product": {"key":42}});
+        let res_income = path_value!(&js);
 
         let key = String::from("product");
         let mut field = ObjectField::new(&key);
-        assert_eq!(field.find(&res_income), vec![&json!({"key":42})]);
+        let js = json!({"key":42});
+        assert_eq!(field.find(res_income.clone()), vec![path_value!(&js)]);
 
         let key = String::from("fake");
-
         field.key = &key;
-        assert!(field.find2(&res_income).is_empty());
+        assert!(field.find(res_income).is_empty());
     }
 
     #[test]
@@ -291,7 +209,7 @@ mod tests {
 
         let root = RootPointer::<Value>::new(&res_income);
 
-        assert_eq!(root.find(&res_income), vec![&res_income])
+        assert_eq!(root.find(path_value!(&res_income)), vec![path_value!(&res_income)])
     }
 
     #[test]
@@ -305,31 +223,31 @@ mod tests {
 
 
         let path_inst = json_path_instance(&path!($), &json);
-        assert_eq!(path_inst.find(&json), vec![&json]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&json)]);
 
 
         let path_inst = json_path_instance(&field1, &json);
         let exp_json = json!({"k":{"f":42,"array":[0,1,2,3,4,5],"object":{"field1":"val1","field2":"val2"}}});
-        assert_eq!(path_inst.find(&json), vec![&exp_json]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&exp_json)]);
 
 
         let chain = chain!(path!($),field1.clone(), field2.clone(), field3.clone());
 
         let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(42);
-        assert_eq!(path_inst.find(&json), vec![&exp_json]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&exp_json)]);
 
         let chain = chain!(path!($),field1.clone(), field2.clone(), field4.clone(), path!(idx!(3)));
         let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(3);
-        assert_eq!(path_inst.find(&json), vec![&exp_json]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&exp_json)]);
 
         let index = idx!([1;-1;2]);
         let chain = chain!(path!($), field1.clone(), field2.clone(), field4.clone(), path!(index));
         let path_inst = json_path_instance(&chain, &json);
         let one = json!(1);
         let tree = json!(3);
-        assert_eq!(path_inst.find(&json), vec![&one, &tree]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&one), path_value!(&tree)]);
 
 
         let union = idx!(idx 1,2 );
@@ -337,14 +255,14 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
         let tree = json!(1);
         let two = json!(2);
-        assert_eq!(path_inst.find(&json), vec![&tree, &two]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&tree), path_value!(&two)]);
 
         let union = idx!("field1","field2");
         let chain = chain!(path!($), field1.clone(), field2.clone(), field5.clone(), path!(union));
         let path_inst = json_path_instance(&chain, &json);
         let one = json!("val1");
         let two = json!("val2");
-        assert_eq!(path_inst.find(&json), vec![&one, &two]);
+        assert_eq!(path_inst.find(path_value!(&json)), vec![path_value!(&one), path_value!(&two)]);
     }
 
     #[test]
@@ -370,8 +288,8 @@ mod tests {
         let res3 = json!({"key1":0});
         let res4 = json!(0);
 
-        let expected_res = vec![&res1, &res2, &res3, &res4];
-        assert_eq!(path_inst.find(&json), expected_res)
+        let expected_res = vec![path_value!(&res1), path_value!(&res2), path_value!(&res3), path_value!(&res4)];
+        assert_eq!(path_inst.find(path_value!(&json)), expected_res)
     }
 
     #[test]
@@ -390,7 +308,7 @@ mod tests {
         let res2 = json!("key");
         let res3 = json!({});
 
-        let expected_res = vec![&res1, &res2, &res3];
-        assert_eq!(path_inst.find(&json), expected_res)
+        let expected_res = vec![path_value!(&res1), path_value!(&res2), path_value!(&res3)];
+        assert_eq!(path_inst.find(path_value!(&json)), expected_res)
     }
 }

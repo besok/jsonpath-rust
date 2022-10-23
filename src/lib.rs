@@ -111,7 +111,7 @@
 use std::str::FromStr;
 use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
-use crate::path::{json_path_instance, PathInstance};
+use crate::path::{json_path_instance, PathInstance, PathValue};
 use crate::parser::model::JsonPath;
 
 mod parser;
@@ -228,7 +228,8 @@ impl JsonPathFinder {
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
     pub fn find_slice(&self) -> Vec<&Value> {
-        self.instance().find(&self.json)
+        // PathValue::ref_into_vec(self.instance().find((&self.json).into()))
+        vec![]
     }
 
     /// finds a slice of data and wrap it with Value::Array by cloning the data.

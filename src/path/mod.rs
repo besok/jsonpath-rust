@@ -1,10 +1,4 @@
-//! The basic module denotes the strategy of processing jsonpath.
-//! Overall, the escape sequence is the following one:
-//! - define the json root
-//! - define the json path structure from the parsing [[JsonPath]]
-//! - transform json path into the [[PathInstance]]
-//!
-use std::borrow::Borrow;
+
 use serde_json::{Value};
 
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
@@ -18,32 +12,64 @@ mod index;
 /// The module is a helper module providing the set of helping funcitons to process a json elements
 mod json;
 
-pub enum PathData<'a, Data> {
+
+/// just to create a slice of data whether it is slice or ref
+#[macro_export]
+macro_rules! path_value {
+    (&$v:expr) =>{
+        PathValue::Ref(&$v)
+    };
+    ($(&$v:expr),+ $(,)?) =>{
+        {
+        let mut res = Vec::new();
+        $(
+           res.push(path_value!(&$v));
+        )+
+        res
+        }
+    };
+    ($v:expr) =>{
+        PathValue::Slice($v)
+    };
+
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum PathValue<'a, Data> {
     Ref(&'a Data),
     Slice(Data),
 }
 
-impl<'a, Data> PathData<'a, Data> {
-    fn map_ref<F>(self, mapper: F) -> Vec<PathData<'a, Data>>
-        where F: FnOnce(&'a Data) -> Vec<&'a Data>
-    {
-        match self {
-            PathData::Ref(r) => {
-                mapper(r)
-                    .into_iter()
-                    .map(PathData::Ref)
-                    .collect()
-            }
-            PathData::Slice(_) => vec![]
-        }
+impl<'a, Data> From<&'a Data> for PathValue<'a, Data> {
+    fn from(data: &'a Data) -> Self {
+        PathValue::Ref(data)
     }
 }
 
-pub trait Path2<'a> {
-    type Data;
-    fn find2(&self, data: PathData<'a, Self::Data>) -> Vec<PathData<'a, Self::Data>>;
+impl<'a, D> PathValue<'a, D> {
+    fn map_ref<F>(self, mapper: F) -> Vec<PathValue<'a, D>>
+        where F: FnOnce(&'a D) -> Vec<&'a D>
+    {
+        match self {
+            PathValue::Ref(r) => {
+                mapper(r)
+                    .into_iter()
+                    .map(PathValue::Ref)
+                    .collect()
+            }
+            PathValue::Slice(_) => vec![]
+        }
+    }
+    pub fn ref_into_vec(input: Vec<PathValue<'a, D>>) -> Vec<&'a D> {
+        input
+            .into_iter()
+            .filter_map(|v| match v {
+                PathValue::Ref(el) => Some(el),
+                _ => None
+            })
+            .collect()
+    }
 }
-
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
@@ -51,7 +77,7 @@ pub trait Path2<'a> {
 /// It needs in case if in the filter there will be a pointer to the absolute path
 pub trait Path<'a> {
     type Data;
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data>;
+    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>>;
 }
 
 /// The basic type for instances.
