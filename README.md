@@ -36,6 +36,20 @@ And we pursue to find all orders id having the field 'active'. We can construct 
 that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
 
 ### The jsonpath description
+#### Functions
+
+##### Size
+A function `size()` transforms the output of the filtered expression into a size of this element
+
+| Json element | function size            |
+|--------------|--------------------------|
+| null         | 0                        |
+| numbers      | 1                        |
+| string       | a length of given string |
+| array        | a length of given array  |
+| objects      | a length of set of keys  |
+
+`$.some_field.size()`
 
 #### Operators
 

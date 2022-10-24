@@ -15,3 +15,7 @@
   * add logical OR and logical And to filters
   * fix bugs with objects in filters
   * add internal macros to generate path objects
+* **`0.2.0`**
+  * add json path value as a result for the library  
+  * add functions (size)
+  * change a logical operator `size` into function `size()`
