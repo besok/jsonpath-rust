@@ -1,12 +1,7 @@
-//! The basic module denotes the strategy of processing jsonpath.
-//! Overall, the escape sequence is the following one:
-//! - define the json root
-//! - define the json path structure from the parsing [[JsonPath]]
-//! - transform json path into the [[PathInstance]]
-//!
 use serde_json::{Value};
+use crate::JsonPathValue;
 
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
+use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 use crate::path::top::*;
 
@@ -17,13 +12,28 @@ mod index;
 /// The module is a helper module providing the set of helping funcitons to process a json elements
 mod json;
 
+
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
 /// The trait also requires to have a root json to process.
 /// It needs in case if in the filter there will be a pointer to the absolute path
 pub trait Path<'a> {
     type Data;
-    fn find(&self, data: &'a Self::Data) -> Vec<&'a Self::Data>;
+    /// when every element needs to handle independently
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>>{
+        vec![input]
+    }
+    /// when the whole output needs to handle
+    fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        input
+            .into_iter()
+            .flat_map(|d| self.find(d))
+            .collect()
+    }
+    /// defines when we need to invoke `find` or `flat_find`
+    fn needs_all(&self) -> bool {
+        false
+    }
 }
 
 /// The basic type for instances.
@@ -39,7 +49,8 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathI
         JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
         JsonPath::Current(value) => Box::new(Current::from(&**value, root)),
         JsonPath::Index(index) => process_index(index, root),
-        JsonPath::Empty => Box::new(IdentityPath {})
+        JsonPath::Empty => Box::new(IdentityPath {}),
+        JsonPath::Fn(Function::Length) => Box::new(FnPath::Size)
     }
 }
 
@@ -50,7 +61,7 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> Pat
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
         JsonPathIndex::UnionKeys(elems) => Box::new(UnionIndex::from_keys(elems)),
         JsonPathIndex::UnionIndex(elems) => Box::new(UnionIndex::from_indexes(elems)),
-        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe,root)),
+        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe, root)),
     }
 }
 

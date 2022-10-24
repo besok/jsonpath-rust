@@ -82,20 +82,23 @@
 //! # Examples
 //!```
 //! use serde_json::{json,Value};
+//! use jsonpath_rust::json_path_value;
 //! use self::jsonpath_rust::JsonPathFinder;
+//! use self::jsonpath_rust::JsonPathValue;
 //! fn test(){
-//!     let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
-//!     let slice_of_data:Vec<&Value> = finder.find_slice();
-//!     assert_eq!(slice_of_data, vec![&json!({"active":1})]);
+//!     let  finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
+//!     let slice_of_data:Vec<JsonPathValue<Value>> = finder.find_slice();
+//!     let js = json!({"active":1});
+//!     assert_eq!(slice_of_data, json_path_value![&js,]);
 //! }
 //! ```
 //! or even simpler:
 //!
-//! ```
+//!```
 //! use serde_json::{json,Value};
 //! use self::jsonpath_rust::JsonPathFinder;
-//!
-//! fn test(json: &str, path: &str, expected: Vec<&Value>) {
+//! use self::jsonpath_rust::JsonPathValue;
+//! fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
 //!    match JsonPathFinder::from_str(json, path) {
 //!        Ok(finder) => assert_eq!(finder.find_slice(), expected),
 //!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
@@ -108,6 +111,7 @@
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
+use std::fmt::Debug;
 use std::str::FromStr;
 use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
@@ -129,23 +133,25 @@ extern crate core;
 /// ```
 /// use std::str::FromStr;
 /// use serde_json::{json,Value};
-/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst};
+/// use jsonpath_rust::json_path_value;
+/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst,JsonPathValue};
 ///fn test(){
 ///         let json: Value = serde_json::from_str("{}").unwrap();
 ///         let v = json.path("$..book[?(@.author size 10)].title").unwrap();
 ///         assert_eq!(v, json!([]));
 ///
 ///         let json: Value = serde_json::from_str("{}").unwrap();
-///         let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
+///         let path = json.path("$..book[?(@.author size 10)].title").unwrap();
 ///
-///         assert_eq!(path, &json!(["Sayings of the Century"]));
+///         assert_eq!(path, json!(["Sayings of the Century"]));
 ///
 ///         let json: Box<Value> = serde_json::from_str("{}").unwrap();
 ///         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
-///         let finder = JsonPathFinder::new(json, path);
+///         let  finder = JsonPathFinder::new(json, path);
 ///
 ///         let v = finder.find_slice();
-///         assert_eq!(v, vec![&json!("Sayings of the Century")]);
+///         let js = json!("Sayings of the Century");
+///         assert_eq!(v, json_path_value![&js,]);
 ///     }
 ///
 /// ```
@@ -160,7 +166,7 @@ pub struct JsonPathInst {
 }
 
 
-impl FromStr for JsonPathInst{
+impl FromStr for JsonPathInst {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -178,10 +184,114 @@ impl JsonPathQuery for Box<Value> {
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, String> {
         let p = JsonPathInst::from_str(query)?;
-        Ok(JsonPathFinder::new(Box::from(self), Box::new(p)).find())
+        Ok(JsonPathFinder::new(Box::new(self), Box::new(p)).find())
     }
 }
 
+
+/// just to create a json path value of data
+/// Example:
+///  - json_path_value(&json) = `JsonPathValue::Slice(&json)`
+///  - json_path_value(&json,) = `vec![JsonPathValue::Slice(&json)]`
+///  - `json_path_value[&json1,&json1]` = `vec![JsonPathValue::Slice(&json1),JsonPathValue::Slice(&json2)]`
+///  - json_path_value(json) = `JsonPathValue::NewValue(json)`
+/// ```
+/// use std::str::FromStr;
+/// use serde_json::{json,Value};
+/// use jsonpath_rust::json_path_value;
+/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst,JsonPathValue};
+///fn test(){
+///         let json: Box<Value> = serde_json::from_str("{}").unwrap();
+///         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
+///         let  finder = JsonPathFinder::new(json, path);
+///
+///         let v = finder.find_slice();
+///         let js = json!("Sayings of the Century");
+///         assert_eq!(v, json_path_value![&js,]);
+///     }
+/// ```
+#[macro_export]
+macro_rules! json_path_value {
+    (&$v:expr) =>{
+        JsonPathValue::Slice(&$v)
+    };
+
+    ($(&$v:expr),+ $(,)?) =>{
+        {
+        let mut res = Vec::new();
+        $(
+           res.push(json_path_value!(&$v));
+        )+
+        res
+        }
+    };
+    ($v:expr) =>{
+        JsonPathValue::NewValue($v)
+    };
+
+}
+
+
+/// A result of json path
+/// Can be either a slice of initial data or a new generated value(like length of array)
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum JsonPathValue<'a, Data> {
+    Slice(&'a Data),
+    NewValue(Data),
+}
+
+impl<'a, Data: Clone + Debug> JsonPathValue<'a, Data> {
+    /// Transforms given value into data either by moving value out or by cloning
+    pub fn to_data(self) -> Data {
+        match self {
+            JsonPathValue::Slice(r) => r.clone(),
+            JsonPathValue::NewValue(val) => val
+        }
+    }
+
+
+}
+
+impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
+    fn from(data: &'a Data) -> Self {
+        JsonPathValue::Slice(data)
+    }
+}
+
+impl<'a, Data> JsonPathValue<'a, Data> {
+    fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
+        where F: FnOnce(&'a Data) -> Vec<&'a Data>
+    {
+        match self {
+            JsonPathValue::Slice(r) => {
+                mapper(r)
+                    .into_iter()
+                    .map(JsonPathValue::Slice)
+                    .collect()
+            }
+            JsonPathValue::NewValue(_) => vec![]
+        }
+    }
+
+    pub fn slice_into_vec(input: Vec<JsonPathValue<'a, Data>>) -> Vec<&'a Data> {
+        input
+            .into_iter()
+            .filter_map(|v| match v {
+                JsonPathValue::Slice(el) => Some(el),
+                _ => None
+
+            })
+            .collect()
+    }
+
+    /// moves a pointer (from slice) out or provides a default value when the value was generated
+    pub fn slice_or(self, default: &'a Data) -> &'a Data {
+        match self {
+            JsonPathValue::Slice(r) => r,
+            JsonPathValue::NewValue(_) => default
+        }
+    }
+}
 
 /// The base structure stitching the json instance and jsonpath instance
 pub struct JsonPathFinder {
@@ -227,13 +337,13 @@ impl JsonPathFinder {
     }
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
-    pub fn find_slice(&self) -> Vec<&Value> {
-        self.instance().find(&self.json)
+    pub fn find_slice(&self) -> Vec<JsonPathValue<'_, Value>> {
+        self.instance().find((&(*self.json)).into())
     }
 
     /// finds a slice of data and wrap it with Value::Array by cloning the data.
     pub fn find(&self) -> Value {
-        Value::Array(self.find_slice().into_iter().cloned().collect())
+        Value::Array(self.find_slice().into_iter().map(|v| v.to_data()).collect())
     }
 }
 
@@ -242,10 +352,10 @@ impl JsonPathFinder {
 mod tests {
     use std::str::FromStr;
     use serde_json::{json, Value};
-    use crate::{JsonPathFinder, JsonPathInst};
+    use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use crate::JsonPathQuery;
 
-    fn test(json: &str, path: &str, expected: Vec<&Value>) {
+    fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
         match JsonPathFinder::from_str(json, path) {
             Ok(finder) => assert_eq!(finder.find_slice(), expected),
             Err(e) => panic!("error while parsing json or jsonpath: {}", e)
@@ -293,240 +403,288 @@ mod tests {
 
     #[test]
     fn simple_test() {
-        test("[1,2,3]", "$[1]", vec![&json!(2)]);
+        let j1 = json!(2);
+        test("[1,2,3]", "$[1]", json_path_value![&j1,]);
     }
 
     #[test]
     fn root_test() {
-        test(template_json(), "$", vec![&serde_json::from_str(template_json()).unwrap()]);
+        let js = serde_json::from_str(template_json()).unwrap();
+        test(template_json(), "$", json_path_value![&js,]);
     }
 
     #[test]
     fn descent_test() {
+        let v1 = json!("reference");
+        let v2 = json!("fiction");
         test(template_json(), "$..category",
-             vec![
-                 &json!("reference"),
-                 &json!("fiction"),
-                 &json!("fiction"),
-                 &json!("fiction"),
+             json_path_value![
+                 &v1,
+                 &v2,
+                 &v2,
+                 &v2,
              ]);
+        let js1 = json!(19.95);
+        let js2 = json!(8.95);
+        let js3 = json!(12.99);
+        let js4 = json!(8.99);
+        let js5 = json!(22.99);
         test(template_json(),
              "$.store..price",
-             vec![
-                 &json!(19.95),
-                 &json!(8.95),
-                 &json!(12.99),
-                 &json!(8.99),
-                 &json!(22.99),
+             json_path_value![
+                 &js1,
+                 &js2,
+                 &js3,
+                 &js4,
+                 &js5,
              ],
         );
+        let js1 = json!("Nigel Rees");
+        let js2 = json!("Evelyn Waugh");
+        let js3 = json!("Herman Melville");
+        let js4 = json!("J. R. R. Tolkien");
         test(template_json(),
              "$..author",
-             vec![
-                 &json!("Nigel Rees"),
-                 &json!("Evelyn Waugh"),
-                 &json!("Herman Melville"),
-                 &json!("J. R. R. Tolkien"),
+             json_path_value![
+                 &js1,
+                 &js2,
+                 &js3,
+                 &js4,
              ],
         );
     }
 
     #[test]
     fn wildcard_test() {
+        let js1 = json!("reference");
+        let js2 = json!("fiction");
         test(template_json(), "$..book.[*].category",
-             vec![
-                 &json!("reference"),
-                 &json!("fiction"),
-                 &json!("fiction"),
-                 &json!("fiction"),
+             json_path_value![
+                 &js1,
+                 &js2,
+                 &js2,
+                 &js2,
              ]);
+        let js1 = json!("Nigel Rees");
+        let js2 = json!("Evelyn Waugh");
+        let js3 = json!("Herman Melville");
+        let js4 = json!("J. R. R. Tolkien");
         test(template_json(),
              "$.store.book[*].author",
-             vec![
-                 &json!("Nigel Rees"),
-                 &json!("Evelyn Waugh"),
-                 &json!("Herman Melville"),
-                 &json!("J. R. R. Tolkien"),
+             json_path_value![
+                 &js1,
+                 &js2,
+                 &js3,
+                 &js4,
              ],
         );
     }
 
     #[test]
     fn field_test() {
+        let value = json!({"active":1});
         test(r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
              "$.field.field[?(@.active)]",
-             vec![&json!({"active":1})]);
+             json_path_value![&value,]);
     }
 
     #[test]
     fn index_index_test() {
+        let value = json!("0-553-21311-3");
         test(template_json(), "$..book[2].isbn",
-             vec![
-                 &json!("0-553-21311-3"),
+             json_path_value![
+                 &value,
              ]);
     }
 
     #[test]
     fn index_unit_index_test() {
+        let value = json!("0-553-21311-3");
         test(template_json(), "$..book[2,4].isbn",
-             vec![
-                 &json!("0-553-21311-3"),
+             json_path_value![
+                 &value,
              ]);
+        let value1 = json!("0-395-19395-8");
         test(template_json(), "$..book[2,3].isbn",
-             vec![
-                 &json!("0-553-21311-3"),
-                 &json!("0-395-19395-8"),
+             json_path_value![
+                 &value,
+                 &value1,
              ]);
     }
 
     #[test]
     fn index_unit_keys_test() {
+        let js1 = json!("Moby Dick");
+        let js2 = json!(8.99);
+        let js3 = json!("The Lord of the Rings");
+        let js4 = json!(22.99);
         test(template_json(), "$..book[2,3]['title','price']",
-             vec![
-                 &json!("Moby Dick"),
-                 &json!(8.99),
-                 &json!("The Lord of the Rings"),
-                 &json!(22.99),
+             json_path_value![
+                 &js1,
+                 &js2,
+                 &js3,
+                 &js4,
              ]);
     }
 
     #[test]
     fn index_slice_test() {
+        let j0 = json!(0);
+        let j1 = json!(1);
+        let j2 = json!(2);
+        let j3 = json!(3);
+        let j4 = json!(4);
+        let j5 = json!(5);
+        let j6 = json!(6);
+        let j7 = json!(7);
+        let j8 = json!(8);
+        let j9 = json!(9);
         test(template_json(),
              "$.array[:]",
-             vec![
-                 &json!(0),
-                 &json!(1),
-                 &json!(2),
-                 &json!(3),
-                 &json!(4),
-                 &json!(5),
-                 &json!(6),
-                 &json!(7),
-                 &json!(8),
-                 &json!(9),
+             json_path_value![
+                 &j0,
+                 &j1,
+                 &j2,
+                 &j3,
+                 &j4,
+                 &j5,
+                 &j6,
+                 &j7,
+                 &j8,
+                 &j9,
              ]);
         test(template_json(),
              "$.array[1:4:2]",
-             vec![
-                 &json!(1),
-                 &json!(3),
+             json_path_value![
+                 &j1,
+                 &j3,
              ]);
         test(template_json(),
              "$.array[::3]",
-             vec![
-                 &json!(0),
-                 &json!(3),
-                 &json!(6),
-                 &json!(9),
+             json_path_value![
+                 &j0,
+                 &j3,
+                 &j6,
+                 &j9,
              ]);
         test(template_json(),
              "$.array[-1:]",
-             vec![
-                 &json!(9),
+             json_path_value![
+                 &j9,
              ]);
         test(template_json(),
              "$.array[-2:-1]",
-             vec![
-                 &json!(8),
+             json_path_value![
+                 &j8,
              ]);
     }
 
     #[test]
     fn index_filter_test() {
+        let moby = json!("Moby Dick");
+        let rings = json!("The Lord of the Rings");
         test(template_json(),
              "$..book[?(@.isbn)].title",
-             vec![
-                 &json!("Moby Dick"),
-                 &json!("The Lord of the Rings"),
+             json_path_value![
+                 &moby,
+                 &rings,
              ]);
+        let sword = json!("Sword of Honour");
         test(template_json(),
              "$..book[?(@.price != 8.95)].title",
-             vec![
-                 &json!("Sword of Honour"),
-                 &json!("Moby Dick"),
-                 &json!("The Lord of the Rings"),
+             json_path_value![
+                 &sword,
+                 &moby,
+                 &rings,
              ]);
+        let sayings = json!("Sayings of the Century");
         test(template_json(),
              "$..book[?(@.price == 8.95)].title",
-             vec![
-                 &json!("Sayings of the Century"),
+             json_path_value![
+                 &sayings,
              ]);
+        let js895 = json!(8.95);
         test(template_json(),
              "$..book[?(@.author ~= '.*Rees')].price",
-             vec![&json!(8.95)]);
+             json_path_value![&js895,]);
+        let js12 = json!(12.99);
+        let js899 = json!(8.99);
+        let js2299 = json!(22.99);
         test(template_json(),
              "$..book[?(@.price >= 8.99)].price",
-             vec![
-                 &json!(12.99),
-                 &json!(8.99),
-                 &json!(22.99),
+             json_path_value![
+                 &js12,
+                 &js899,
+                 &js2299,
              ]);
         test(template_json(),
              "$..book[?(@.price > 8.99)].price",
-             vec![
-                 &json!(12.99),
-                 &json!(22.99),
+             json_path_value![
+                 &js12,
+                 &js2299,
              ]);
         test(template_json(),
              "$..book[?(@.price < 8.99)].price",
-             vec![
-                 &json!(8.95),
+             json_path_value![
+                 &js895,
              ]);
         test(template_json(),
              "$..book[?(@.price <= 8.99)].price",
-             vec![
-                 &json!(8.95),
-                 &json!(8.99),
+             json_path_value![
+                 &js895,
+                 &js899,
              ]);
         test(template_json(),
              "$..book[?(@.price <= $.expensive)].price",
-             vec![
-                 &json!(8.95),
-                 &json!(8.99),
+             json_path_value![
+                 &js895,
+                 &js899,
              ]);
         test(template_json(),
              "$..book[?(@.price >= $.expensive)].price",
-             vec![
-                 &json!(12.99),
-                 &json!(22.99),
+             json_path_value![
+                 &js12,
+                 &js2299,
              ]);
         test(template_json(),
              "$..book[?(@.title in ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].price",
-             vec![
-                 &json!(8.99),
+             json_path_value![
+                 &js899,
              ]);
         test(template_json(),
              "$..book[?(@.title nin ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].title",
-             vec![
-                 &json!("Sayings of the Century"),
-                 &json!("Sword of Honour"),
-                 &json!("The Lord of the Rings"),
+             json_path_value![
+                 &sayings,
+                 &sword,
+                 &rings,
              ]);
         test(template_json(),
              "$..book[?(@.author size 10)].title",
-             vec![
-                 &json!("Sayings of the Century"),
+             json_path_value![
+                 &sayings,
              ]);
     }
 
     #[test]
     fn index_filter_sets_test() {
+        let j1 = json!(1);
         test(template_json(),
              "$.orders[?(@.ref subsetOf [1,2,3,4])].id",
-             vec![
-                 &json!(1),
+             json_path_value![
+                 &j1,
              ]);
+        let j2 = json!(2);
         test(template_json(),
              "$.orders[?(@.ref anyOf [1,4])].id",
-             vec![
-                 &json!(1),
-                 &json!(2),
+             json_path_value![
+                 &j1,
+                 &j2,
              ]);
+        let j3 = json!(3);
         test(template_json(),
              "$.orders[?(@.ref noneOf [3,6])].id",
-             vec![
-                 &json!(3),
+             json_path_value![
+                 &j3,
              ]);
     }
 
@@ -552,8 +710,10 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find_slice();
-        assert_eq!(v, vec![&json!("Sayings of the Century")]);
+        let js = json!("Sayings of the Century");
+        assert_eq!(v, json_path_value![&js,]);
     }
+
     #[test]
     fn find_in_array_test() {
         let json: Box<Value> = Box::new(json!([{"verb": "TEST"}, {"verb": "RUN"}]));
@@ -563,6 +723,57 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find_slice();
-        assert_eq!(v, vec![&json!({"verb":"TEST"})]);
+        let js = json!({"verb":"TEST"});
+        assert_eq!(v, json_path_value![&js,]);
+    }
+    #[test]
+    fn length_test() {
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([2]);
+        assert_eq!(v, js);
+
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
+
+
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
+
+
+
+        let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([0]));
+
+        let json: Box<Value> = Box::new(json!(1));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([0]));
+
+        let json: Box<Value> = Box::new(json!([[1],[2],[3]]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
     }
 }

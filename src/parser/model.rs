@@ -21,6 +21,8 @@ pub enum JsonPath {
     Wildcard,
     /// The item uses to define the unresolved state
     Empty,
+    /// Functions that can calculate some expressions
+    Fn(Function),
 }
 
 impl JsonPath {
@@ -29,7 +31,11 @@ impl JsonPath {
         parse_json_path(v).map_err(|e| e.to_string())
     }
 }
-
+#[derive(Debug,PartialEq, Clone)]
+pub enum Function {
+    /// length()
+    Length,
+}
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     /// A single element in array
@@ -127,6 +133,7 @@ impl PartialEq for JsonPath {
             (JsonPath::Current(jp1), JsonPath::Current(jp2)) => jp1 == jp2,
             (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => ch1 == ch2,
             (JsonPath::Index(idx1), JsonPath::Index(idx2)) => idx1 == idx2,
+            (JsonPath::Fn(fn1), JsonPath::Fn(fn2)) => fn2 == fn1,
             (_, _) => false
         }
     }
