@@ -66,3 +66,7 @@ macro_rules! path {
    ($e:literal) => {JsonPath::Field($e.to_string())};
    ($e:expr) => {JsonPath::Index($e)};
 }
+#[macro_export]
+macro_rules! function {
+    (length) => {JsonPath::Fn(Function::Length)}
+}

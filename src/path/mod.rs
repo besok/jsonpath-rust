@@ -1,7 +1,7 @@
 use serde_json::{Value};
 use crate::JsonPathValue;
 
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
+use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 use crate::path::top::*;
 
@@ -35,7 +35,8 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathI
         JsonPath::Descent(key) => Box::new(DescentObjectField::new(key)),
         JsonPath::Current(value) => Box::new(Current::from(&**value, root)),
         JsonPath::Index(index) => process_index(index, root),
-        JsonPath::Empty => Box::new(IdentityPath {})
+        JsonPath::Empty => Box::new(IdentityPath {}),
+        JsonPath::Fn(Function::Length) => Box::new(FnPath::Size)
     }
 }
 

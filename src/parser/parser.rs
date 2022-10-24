@@ -1,7 +1,7 @@
 use pest::iterators::{Pair, Pairs};
 use pest::{Parser};
 use serde_json::{Value};
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression};
+use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression, Function};
 use pest::error::{Error};
 use crate::parser::model::FilterExpression::{And, Or};
 
@@ -24,6 +24,7 @@ fn parse_internal(rule: Pair<Rule>) -> JsonPath {
         Rule::root => JsonPath::Root,
         Rule::wildcard => JsonPath::Wildcard,
         Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
+        Rule::function => JsonPath::Fn(Function::Length),
         Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
         Rule::index => JsonPath::Index(parse_index(rule)),
         _ => JsonPath::Empty
@@ -181,7 +182,7 @@ mod tests {
     use super::*;
     use std::panic;
     use serde_json::{json};
-    use crate::{filter, idx, op, path, chain};
+    use crate::{filter, idx, op, path, chain, function};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
@@ -382,5 +383,24 @@ mod tests {
         test_failed("[?(@[1] subsetof ['abc','abc'])]");
         test_failed("[?(@ >< ['abc','abc'])]");
         test_failed("[?(@ in {\"abc\":1})]");
+    }
+
+    #[test]
+    fn fn_size_test() {
+        test("$.k.length()",
+             vec![
+                 path!($),
+                 path!("k"),
+                 function!(length)
+             ]);
+
+        test("$.k.length.field",
+             vec![
+                 path!($),
+                 path!("k"),
+                 path!("length"),
+                 path!("field"),
+             ])
+
     }
 }

@@ -90,7 +90,16 @@ impl<'a> Clone for ObjectField<'a> {
         ObjectField::new(self.key)
     }
 }
+impl<'a> Path<'a> for FnPath {
+    type Data = Value;
 
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        todo!()
+    }
+}
+pub(crate) enum FnPath {
+    Size
+}
 
 impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
