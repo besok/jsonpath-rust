@@ -1,10 +1,9 @@
-use crate::path::{PathInstance, json_path_instance, process_operand, Path, PathValue};
+use crate::path::{PathInstance, json_path_instance, process_operand, Path, JsonPathValue};
 use serde_json::Value;
 use crate::parser::model::{JsonPath, FilterSign, FilterExpression};
 use crate::path::json::*;
 use serde_json::value::Value::{Array};
 use crate::path::top::ObjectField;
-use crate::path_value;
 
 /// process the slice like [start:end:step]
 #[derive(Debug)]
@@ -59,8 +58,8 @@ impl ArraySlice {
 impl<'a> Path<'a> for ArraySlice {
     type Data = Value;
 
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
-        input.map_ref(|data|
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        input.map_slice(|data|
             data.as_array()
                 .map(|elems| self.process(elems))
                 .unwrap_or_default())
@@ -82,8 +81,8 @@ impl ArrayIndex {
 impl<'a> Path<'a> for ArrayIndex {
     type Data = Value;
 
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
-        input.map_ref(|data|
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        input.map_slice(|data|
             data.as_array()
                 .and_then(|elems| elems.get(self.index))
                 .map(|e| vec![e])
@@ -116,7 +115,7 @@ impl<'a> Current<'a> {
 impl<'a> Path<'a> for Current<'a> {
     type Data = Value;
 
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         self.tail.as_ref().map(|p| p.find(input.clone())).unwrap_or_else(|| vec![input])
     }
 }
@@ -154,7 +153,7 @@ impl<'a> UnionIndex<'a> {
 impl<'a> Path<'a> for UnionIndex<'a> {
     type Data = Value;
 
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         self.indexes.iter().flat_map(|e| e.find(input.clone())).collect()
     }
 }
@@ -194,46 +193,46 @@ impl<'a> FilterPath<'a> {
             },
         }
     }
-    fn compound(one: &'a FilterSign, two: &'a FilterSign, left: Vec<PathValue<Value>>, right: Vec<PathValue<Value>>) -> bool {
+    fn compound(one: &'a FilterSign, two: &'a FilterSign, left: Vec<JsonPathValue<Value>>, right: Vec<JsonPathValue<Value>>) -> bool {
         FilterPath::process_atom(one, left.clone(), right.clone())
             || FilterPath::process_atom(two, left, right)
     }
-    fn process_atom(op: &'a FilterSign, left: Vec<PathValue<Value>>, right: Vec<PathValue<Value>>) -> bool {
+    fn process_atom(op: &'a FilterSign, left: Vec<JsonPathValue<Value>>, right: Vec<JsonPathValue<Value>>) -> bool {
         match op {
-            FilterSign::Equal => eq(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
+            FilterSign::Equal => eq(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
             FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
-            FilterSign::Less => less(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
+            FilterSign::Less => less(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
             FilterSign::LeOrEq => FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right),
             FilterSign::Greater => !FilterPath::process_atom(&FilterSign::LeOrEq, left, right),
             FilterSign::GrOrEq => !FilterPath::process_atom(&FilterSign::Less, left, right),
-            FilterSign::Regex => regex(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
-            FilterSign::In => inside(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
+            FilterSign::Regex => regex(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
+            FilterSign::In => inside(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
             FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
             FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
-            FilterSign::AnyOf => any_of(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
-            FilterSign::SubSetOf => sub_set_of(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right)),
+            FilterSign::AnyOf => any_of(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
+            FilterSign::SubSetOf => sub_set_of(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right)),
             FilterSign::Exists => !left.is_empty(),
-            FilterSign::Size => size(PathValue::ref_into_vec(left), PathValue::ref_into_vec(right))
+            FilterSign::Size => size(JsonPathValue::slice_into_vec(left), JsonPathValue::slice_into_vec(right))
         }
     }
 
     fn process(&self, curr_el: &'a Value) -> bool {
         match self {
             FilterPath::Filter { left, right, op } => {
-                FilterPath::process_atom(op, left.find(PathValue::Ref(curr_el)), right.find(PathValue::Ref(curr_el)))
+                FilterPath::process_atom(op, left.find(JsonPathValue::Slice(curr_el)), right.find(JsonPathValue::Slice(curr_el)))
             }
             FilterPath::Or { left, right } => {
-                if !left.find(PathValue::Ref(curr_el)).is_empty() {
+                if !left.find(JsonPathValue::Slice(curr_el)).is_empty() {
                     true
                 } else {
-                    !right.find(PathValue::Ref(curr_el)).is_empty()
+                    !right.find(JsonPathValue::Slice(curr_el)).is_empty()
                 }
             }
             FilterPath::And { left, right } => {
-                if left.find(PathValue::Ref(curr_el)).is_empty() {
+                if left.find(JsonPathValue::Slice(curr_el)).is_empty() {
                     false
                 } else {
-                    !right.find(PathValue::Ref(curr_el)).is_empty()
+                    !right.find(JsonPathValue::Slice(curr_el)).is_empty()
                 }
             }
         }
@@ -243,8 +242,8 @@ impl<'a> FilterPath<'a> {
 impl<'a> Path<'a> for FilterPath<'a> {
     type Data = Value;
 
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>> {
-        input.map_ref(|data| {
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        input.map_slice(|data| {
             let mut res: Vec<&Value> = vec![];
             match data {
                 Array(elems) => {
@@ -268,12 +267,12 @@ impl<'a> Path<'a> for FilterPath<'a> {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
+    use serde_json::{json};
     use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression};
-    use crate::{chain, filter, idx, op, path, path_value};
+    use crate::{chain, filter, idx, op, path, json_path_value};
     use crate::path::index::{ArraySlice, ArrayIndex};
     use crate::path::{json_path_instance, Path};
-    use crate::path::PathValue;
+    use crate::path::JsonPathValue;
 
     #[test]
     fn array_slice_end_start_test() {
@@ -322,12 +321,12 @@ mod tests {
         let j1 = json!(0);
         let j2 = json!(2);
         let j4 = json!(4);
-        assert_eq!(slice.find((&array).into()), path_value![&j1, &j2,&j4]);
+        assert_eq!(slice.find((&array).into()), json_path_value![&j1,&j2,&j4]);
 
         slice.step = 3;
         let j0 = json!(0);
         let j3 = json!(3);
-        assert_eq!(slice.find(path_value!(&array)), path_value![&j0,&j3]);
+        assert_eq!(slice.find(json_path_value!(&array)), json_path_value![&j0,&j3]);
 
         slice.start_index = -1;
         slice.end_index = 1;
@@ -341,7 +340,7 @@ mod tests {
         let j4 = json!(4);
         let j7 = json!(7);
 
-        assert_eq!(slice.find((&array).into()), path_value![&j1, &j4,&j7]);
+        assert_eq!(slice.find((&array).into()), json_path_value![&j1, &j4, &j7]);
     }
 
     #[test]
@@ -351,9 +350,9 @@ mod tests {
         let mut index = ArrayIndex::new(0);
         let j0 = json!(0);
         let j10 = json!(10);
-        assert_eq!(index.find((&array).into()), path_value![&j0,]);
+        assert_eq!(index.find((&array).into()), json_path_value![&j0,]);
         index.index = 10;
-        assert_eq!(index.find((&array).into()), path_value![&j10,]);
+        assert_eq!(index.find((&array).into()), json_path_value![&j10,]);
         index.index = 100;
         assert!(index.find((&array).into()).is_empty());
     }
@@ -379,8 +378,8 @@ mod tests {
                 "field_3":{"a":"b"}
             });
 
-        let expected_res = vec![path_value!(&res)];
-        assert_eq!(path_inst.find(path_value!(&json)), expected_res);
+        let expected_res = vec![json_path_value!(&res)];
+        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res);
 
         let cur = path!(@,path!("field_3"),path!("a"));
         let chain = chain!(path!($),path!("object").clone(), cur.clone() );
@@ -389,7 +388,7 @@ mod tests {
         let res1 = json!("b");
 
         let expected_res = vec![(&res1).into()];
-        assert_eq!(path_inst.find(path_value!(&json)), expected_res);
+        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res);
     }
 
     #[test]
@@ -407,8 +406,8 @@ mod tests {
 
         let exp1 = json!([1,2,3,4,5]);
         let exp2 = json!(42);
-        let expected_res = vec![path_value!(&exp1), path_value!(&exp2)];
-        assert_eq!(path_inst.find(path_value!(&json)), expected_res)
+        let expected_res = vec![json_path_value!(&exp1), json_path_value!(&exp2)];
+        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
     }
 
     #[test]
@@ -431,7 +430,7 @@ mod tests {
 
         let exp1 = json!( {"field":10});
         let exp2 = json!( {"field":5});
-        let expected_res = path_value![&exp1, &exp2];
+        let expected_res = json_path_value![& exp1, & exp2];
         assert_eq!(path_inst.find((&json).into()), expected_res)
     }
 
@@ -453,7 +452,7 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
 
         let exp2 = json!( {"field":"a1#1"});
-        let expected_res = path_value![&exp2,];
+        let expected_res = json_path_value![& exp2,];
         assert_eq!(path_inst.find((&json).into()), expected_res)
     }
 
@@ -480,7 +479,7 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
 
         let exp2 = json!( {"field":"a11#"});
-        let expected_res = path_value![&exp2,];
+        let expected_res = json_path_value![& exp2,];
         assert_eq!(path_inst.find((&json).into()), expected_res)
     }
 
@@ -500,10 +499,12 @@ mod tests {
         let index = idx!(?filter!(op!(path!(@, path!("field"))),"size",op!(4)));
         let chain = chain!(path!($),path!("key"),path!(index));
         let path_inst = json_path_instance(&chain, &json);
-        let exp2 = json!( {"field":"aaaa"});
-        let exp3 = json!( {"field":"dddd"});
-        let exp4 = json!( {"field":[1,1,1,1]});
-        let expected_res = path_value![&exp2, &exp3, &exp4];
+
+        let f1 = json!( {"field":"aaaa"});
+        let f2 = json!( {"field":"dddd"});
+        let f3 = json!( {"field":[1,1,1,1]});
+
+        let expected_res = json_path_value![&f1,&f2,&f3];
         assert_eq!(path_inst.find((&json).into()), expected_res)
     }
 
@@ -526,7 +527,7 @@ mod tests {
                     "not_id": 2,
                     "more_then_id" :3
                 });
-        assert_eq!(path_inst.find((&json).into()), path_value![&js,])
+        assert_eq!(path_inst.find((&json).into()), json_path_value![&js,])
     }
 
     #[test]
@@ -551,9 +552,10 @@ mod tests {
         let chain = chain!(path!($),path!("key"),path!(index),path!("city"));
         let path_inst = json_path_instance(&chain, &json);
         let a = json!("Athlon");
-        let b = json!("Dortmund");
-        let c = json!("Dublin");
-        assert_eq!(path_inst.find((&json).into()), path_value![&a, &b, &c])
+        let d = json!("Dortmund");
+        let dd = json!("Dublin");
+        assert_eq!(path_inst.find((&json).into()),
+                   json_path_value![&a, &d, &dd])
     }
 
     #[test]
@@ -574,7 +576,7 @@ mod tests {
         let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), path_value![&j1,])
+        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
     }
 
     #[test]
@@ -595,7 +597,7 @@ mod tests {
         let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), path_value![&j1,])
+        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
     }
 
     #[test]
@@ -620,7 +622,7 @@ mod tests {
         let chain = chain!(path!($),path!("key"),path!(index),path!("city"));
         let path_inst = json_path_instance(&chain, &json);
         let a = json!("Athlon");
-        assert_eq!(path_inst.find((&json).into()), path_value![&a,])
+        assert_eq!(path_inst.find((&json).into()), json_path_value![& a,])
     }
 
     #[test]
@@ -641,7 +643,7 @@ mod tests {
         let chain = chain!(path!($),path!("key"),path!(index),path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), path_value![&j1,])
+        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
     }
 
     #[test]

@@ -1,5 +1,5 @@
-
 use serde_json::{Value};
+use crate::JsonPathValue;
 
 use crate::parser::model::{JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
@@ -13,71 +13,13 @@ mod index;
 mod json;
 
 
-/// just to create a slice of data whether it is slice or ref
-#[macro_export]
-macro_rules! path_value {
-    (&$v:expr) =>{
-        PathValue::Ref(&$v)
-    };
-    ($(&$v:expr),+ $(,)?) =>{
-        {
-        let mut res = Vec::new();
-        $(
-           res.push(path_value!(&$v));
-        )+
-        res
-        }
-    };
-    ($v:expr) =>{
-        PathValue::Slice($v)
-    };
-
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum PathValue<'a, Data> {
-    Ref(&'a Data),
-    Slice(Data),
-}
-
-impl<'a, Data> From<&'a Data> for PathValue<'a, Data> {
-    fn from(data: &'a Data) -> Self {
-        PathValue::Ref(data)
-    }
-}
-
-impl<'a, D> PathValue<'a, D> {
-    fn map_ref<F>(self, mapper: F) -> Vec<PathValue<'a, D>>
-        where F: FnOnce(&'a D) -> Vec<&'a D>
-    {
-        match self {
-            PathValue::Ref(r) => {
-                mapper(r)
-                    .into_iter()
-                    .map(PathValue::Ref)
-                    .collect()
-            }
-            PathValue::Slice(_) => vec![]
-        }
-    }
-    pub fn ref_into_vec(input: Vec<PathValue<'a, D>>) -> Vec<&'a D> {
-        input
-            .into_iter()
-            .filter_map(|v| match v {
-                PathValue::Ref(el) => Some(el),
-                _ => None
-            })
-            .collect()
-    }
-}
-
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
 /// The trait also requires to have a root json to process.
 /// It needs in case if in the filter there will be a pointer to the absolute path
 pub trait Path<'a> {
     type Data;
-    fn find(&self, input: PathValue<'a, Self::Data>) -> Vec<PathValue<'a, Self::Data>>;
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>>;
 }
 
 /// The basic type for instances.
