@@ -19,7 +19,21 @@ mod json;
 /// It needs in case if in the filter there will be a pointer to the absolute path
 pub trait Path<'a> {
     type Data;
-    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>>;
+    /// when every element needs to handle independently
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>>{
+        vec![input]
+    }
+    /// when the whole output needs to handle
+    fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        input
+            .into_iter()
+            .flat_map(|d| self.find(d))
+            .collect()
+    }
+    /// defines when we need to invoke `find` or `flat_find`
+    fn needs_all(&self) -> bool {
+        false
+    }
 }
 
 /// The basic type for instances.

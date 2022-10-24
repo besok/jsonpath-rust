@@ -39,17 +39,13 @@ that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
 #### Functions
 
 ##### Size
-A function `size()` transforms the output of the filtered expression into a size of this element
+A function `length()` transforms the output of the filtered expression into a size of this element
+It works with arrays, therefore it returns a length of a given array, otherwise 0.
 
-| Json element | function size            |
-|--------------|--------------------------|
-| null         | 0                        |
-| numbers      | 1                        |
-| string       | a length of given string |
-| array        | a length of given array  |
-| objects      | a length of set of keys  |
+`$.some_field.length()`
 
-`$.some_field.size()`
+**To use it** for objects, the operator `[*]` can be used.
+`$.object.[*].length()`
 
 #### Operators
 

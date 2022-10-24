@@ -111,6 +111,7 @@
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 
+use std::fmt::Debug;
 use std::str::FromStr;
 use serde_json::{Value};
 use crate::parser::parser::parse_json_path;
@@ -239,7 +240,7 @@ pub enum JsonPathValue<'a, Data> {
     NewValue(Data),
 }
 
-impl<'a, Data: Clone> JsonPathValue<'a, Data> {
+impl<'a, Data: Clone + Debug> JsonPathValue<'a, Data> {
     /// Transforms given value into data either by moving value out or by cloning
     pub fn to_data(self) -> Data {
         match self {
@@ -278,6 +279,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
             .filter_map(|v| match v {
                 JsonPathValue::Slice(el) => Some(el),
                 _ => None
+
             })
             .collect()
     }
@@ -723,5 +725,55 @@ mod tests {
         let v = finder.find_slice();
         let js = json!({"verb":"TEST"});
         assert_eq!(v, json_path_value![&js,]);
+    }
+    #[test]
+    fn length_test() {
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([2]);
+        assert_eq!(v, js);
+
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
+
+
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
+
+
+
+        let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([0]));
+
+        let json: Box<Value> = Box::new(json!(1));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([0]));
+
+        let json: Box<Value> = Box::new(json!([[1],[2],[3]]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([3]));
     }
 }

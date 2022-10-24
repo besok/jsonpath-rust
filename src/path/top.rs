@@ -1,4 +1,4 @@
-use serde_json::{Value};
+use serde_json::{json, Value};
 use serde_json::value::Value::{Array, Object};
 use crate::path::{PathInstance, json_path_instance, Path, JsonPathValue};
 use crate::parser::model::*;
@@ -90,16 +90,39 @@ impl<'a> Clone for ObjectField<'a> {
         ObjectField::new(self.key)
     }
 }
+
 impl<'a> Path<'a> for FnPath {
     type Data = Value;
 
-    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        todo!()
+
+    fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        let len = if input.len() != 1 {
+            input.len()
+        } else {
+            match input.get(0) {
+                None => 0,
+                Some(v) => {
+                    match v {
+                        JsonPathValue::NewValue(Array(arr))
+                        | JsonPathValue::Slice(Array(arr)) => arr.len(),
+                        _ => 0
+                    }
+                }
+            }
+        };
+
+        vec![JsonPathValue::NewValue(json!(len))]
+    }
+
+    fn needs_all(&self) -> bool {
+        true
     }
 }
+
 pub(crate) enum FnPath {
     Size
 }
+
 
 impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
@@ -173,28 +196,30 @@ impl<'a> Path<'a> for Chain<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data|
-            self.chain
-                .iter()
-                .fold(
-                    vec![data],
-                    |inter_res, path| {
-                        JsonPathValue::slice_into_vec(inter_res
-                            .into_iter()
-                            .flat_map(|d| path.find(JsonPathValue::Slice(d)))
-                            .collect())
-                    })
-        )
+        let mut res = vec![data];
+
+        for inst in self.chain.iter() {
+            if inst.needs_all() {
+                res = inst.flat_find(res)
+            } else {
+                res =
+                    res
+                        .into_iter()
+                        .flat_map(|d| inst.find(d))
+                        .collect()
+            }
+        }
+        res
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::path::top::{ObjectField, RootPointer, json_path_instance};
+    use crate::path::top::{ObjectField, RootPointer, Function, json_path_instance};
     use serde_json::Value;
     use serde_json::json;
     use crate::parser::model::{JsonPath, JsonPathIndex};
-    use crate::{chain, json_path_value, idx, path};
+    use crate::{chain, json_path_value, idx, path, function};
     use crate::path::{Path, JsonPathValue};
 
     #[test]
@@ -297,7 +322,11 @@ mod tests {
         let res3 = json!({"key1":0});
         let res4 = json!(0);
 
-        let expected_res = vec![json_path_value!(&res1), json_path_value!(&res2), json_path_value!(&res3), json_path_value!(&res4)];
+        let expected_res = vec![
+            json_path_value!(&res1),
+            json_path_value!(&res2),
+            json_path_value!(&res3),
+            json_path_value!(&res4)];
         assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
     }
 
@@ -319,5 +348,27 @@ mod tests {
 
         let expected_res = vec![json_path_value!(&res1), json_path_value!(&res2), json_path_value!(&res3)];
         assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+    }
+
+    #[test]
+    fn length_test() {
+        let json =
+            json!({
+            "key1": [1,2,3],
+            "key2": "key",
+            "key3": {}
+        });
+
+        let chain = chain!(path!($),path!(*),function!(length));
+        let path_inst = json_path_instance(&chain, &json);
+
+
+        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)]),
+                   vec![json_path_value!(json!(3))]);
+
+        let chain = chain!(path!($),path!("key1"),function!(length));
+        let path_inst = json_path_instance(&chain, &json);
+        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)]),
+                   vec![json_path_value!(json!(3))]);
     }
 }
