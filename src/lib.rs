@@ -397,7 +397,23 @@ mod tests {
          }
      },
      "array":[0,1,2,3,4,5,6,7,8,9],
-     "orders":[{"ref":[1,2,3],"id":1},{"ref":[4,5,6],"id":2},{"ref":[7,8,9],"id":3}],
+     "orders":[
+         {
+             "ref":[1,2,3],
+             "id":1,
+             "filled": true
+         },
+         {
+             "ref":[4,5,6],
+             "id":2,
+             "filled": false
+         },
+         {
+             "ref":[7,8,9],
+             "id":3,
+             "filled": null
+         }
+      ],
      "expensive": 10 }"#
     }
 
@@ -663,6 +679,18 @@ mod tests {
              json_path_value![
                  &sayings,
              ]);
+        let filled_true = json!(1);
+        test(template_json(),
+             "$.orders[?(@.filled == true)].id",
+             json_path_value![
+                 &filled_true,
+             ]);
+        let filled_null = json!(3);
+        test(template_json(),
+            "$.orders[?(@.filled == null)].id",
+            json_path_value![
+                &filled_null,
+            ]);
     }
 
     #[test]
