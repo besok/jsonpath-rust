@@ -1,5 +1,8 @@
 WHITESPACE = _{ " " | "\t" | "\r\n" | "\n"}
 
+boolean = {"true" | "false"}
+null = {"null"}
+
 min = _{"-"}
 col = _{":"}
 dot =  _{ "." }
@@ -40,7 +43,7 @@ logic = {logic_and ~ ("||" ~ logic_and)*}
 logic_and = {logic_atom ~ ("&&" ~ logic_atom)*}
 logic_atom = {atom ~ (sign ~ atom)? | "(" ~ logic ~ ")"}
 
-atom = {chain | string_qt | number }
+atom = {chain | string_qt | number | boolean | null}
 
 index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter) ~ "]" }
 

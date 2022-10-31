@@ -155,6 +155,7 @@ fn parse_atom(rule: Pair<Rule>) -> Operand {
         Rule::number => Operand::Static(number_to_value(rule.as_str())),
         Rule::string_qt => Operand::Static(Value::from(down(atom).as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)),
+        Rule::boolean => Operand::Static(rule.as_str().parse().unwrap()),
         _ => Operand::Static(Value::Null)
     }
 }
@@ -342,6 +343,8 @@ mod tests {
     fn index_filter_test() {
         test("[?('abc' == 'abc')]", vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))]);
         test("[?('abc' == 1)]", vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))]);
+        test("[?('abc' == true)]", vec![path!(idx!(?filter!( op!("abc"),"==",op!(true))))]);
+        test("[?('abc' == null)]", vec![path!(idx!(?filter!( op!("abc"),"==",Operand::Static(Value::Null))))]);
 
         test("[?(@.abc in ['abc','bcd'])]", vec![
             path!(
