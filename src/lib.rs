@@ -788,14 +788,14 @@ mod tests {
             JsonPathInst::from_str("$.length()").expect("the path is correct")
         );
         let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), json!([0]));
+        assert_eq!(finder.find(), json!([Value::Null]));
 
         let json: Box<Value> = Box::new(json!(1));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.length()").expect("the path is correct")
         );
         let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), json!([0]));
+        assert_eq!(finder.find(), json!([Value::Null]));
 
         let json: Box<Value> = Box::new(json!([[1],[2],[3]]));
         let path: Box<JsonPathInst> = Box::from(
@@ -803,5 +803,12 @@ mod tests {
         );
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
+
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.not.exist.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+        assert_eq!(finder.find(), json!([Value::Null]));
     }
 }
