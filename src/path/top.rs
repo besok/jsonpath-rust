@@ -97,21 +97,26 @@ impl<'a> Path<'a> for FnPath {
 
     fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
         let len = if input.len() != 1 {
-            input.len()
+            if input == vec![] {
+                json!(Value::Null)
+            }
+            else {
+                json!(input.len())
+            }
         } else {
             match input.get(0) {
-                None => 0,
+                None => json!(Value::Null),
                 Some(v) => {
                     match v {
                         JsonPathValue::NewValue(Array(arr))
-                        | JsonPathValue::Slice(Array(arr)) => arr.len(),
-                        _ => 0
+                        | JsonPathValue::Slice(Array(arr)) => json!(arr.len()),
+                        _ => json!(Value::Null)
                     }
                 }
             }
         };
 
-        vec![JsonPathValue::NewValue(json!(len))]
+        vec![JsonPathValue::NewValue(len)]
     }
 
     fn needs_all(&self) -> bool {

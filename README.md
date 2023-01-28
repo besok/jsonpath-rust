@@ -40,7 +40,7 @@ that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
 
 ##### Size
 A function `length()` transforms the output of the filtered expression into a size of this element
-It works with arrays, therefore it returns a length of a given array, otherwise 0.
+It works with arrays, therefore it returns a length of a given array, otherwise null.
 
 `$.some_field.length()`
 
