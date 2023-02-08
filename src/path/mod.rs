@@ -24,7 +24,11 @@ pub trait Path<'a> {
         vec![input]
     }
     /// when the whole output needs to handle
-    fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
+    fn flat_find(
+        &self, 
+        input: Vec<JsonPathValue<'a, Self::Data>>, 
+        _is_search_length: bool
+    ) -> Vec<JsonPathValue<'a, Self::Data>> {
         input
             .into_iter()
             .flat_map(|d| self.find(d))

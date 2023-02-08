@@ -95,14 +95,13 @@ impl<'a> Path<'a> for FnPath {
     type Data = Value;
 
 
-    fn flat_find(&self, input: Vec<JsonPathValue<'a, Self::Data>>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        let len = if input.len() != 1 {
-            if input == vec![] {
-                json!(Value::Null)
-            }
-            else {
-                json!(input.len())
-            }
+    fn flat_find(
+        &self, 
+        input: Vec<JsonPathValue<'a, Self::Data>>,
+        is_search_length: bool,
+    ) -> Vec<JsonPathValue<'a, Self::Data>> {
+        let len = if is_search_length {
+            json!(input.len())   
         } else {
             match input.get(0) {
                 None => json!(Value::Null),
@@ -185,14 +184,59 @@ impl<'a> DescentObjectField<'a> {
 /// the top method of the processing representing the chain of other operators
 pub(crate) struct Chain<'a> {
     chain: Vec<PathInstance<'a>>,
+    is_search_length: bool,
 }
 
 impl<'a> Chain<'a> {
-    pub fn new(chain: Vec<PathInstance<'a>>) -> Self {
-        Chain { chain }
+    pub fn new(chain: Vec<PathInstance<'a>>, is_search_length: bool) -> Self {
+        Chain { 
+            chain,
+            is_search_length, 
+        }
     }
     pub fn from(chain: &'a [JsonPath], root: &'a Value) -> Self {
-        Chain::new(chain.iter().map(|p| json_path_instance(p, root)).collect())
+        let chain_len = chain.len();
+        let is_search_length = if chain_len >2 {
+            let mut res = false;
+            // if the result of the slice ex[eccted to be a slice, union or filter - 
+            // length should return length of resulted array
+            // In all other cases, including single index, we should fetch item from resulting array 
+            // and return length of that item
+            res = match chain.get(chain_len - 1).unwrap() {
+                JsonPath::Fn(Function::Length) => {
+                    for item in chain.iter() {
+                        match (item, res) {
+                            // if we found union, slice, filter or wildcard - set search to true
+                            (
+                                JsonPath::Index(JsonPathIndex::UnionIndex(_))
+                                | JsonPath::Index(JsonPathIndex::UnionKeys(_))
+                                | JsonPath::Index(JsonPathIndex::Slice(_, _, _))
+                                | JsonPath::Index(JsonPathIndex::Filter(_))
+                                | JsonPath::Wildcard,
+                                false
+                            ) => {
+                                res = true;
+                            },
+                            // if we found a fetching of single index - reset search to false
+                            (JsonPath::Index(JsonPathIndex::Single(_)), true) => {
+                                res = false;
+                            }
+                            (_, _) => {}
+                        }
+                    }
+                    res
+                }
+                _ => false
+            };
+            res
+        } else {
+            false
+        };
+        
+        Chain::new(
+            chain.iter().map(|p| json_path_instance(p, root)).collect(),
+            is_search_length,
+        )
     }
 }
 
@@ -205,7 +249,7 @@ impl<'a> Path<'a> for Chain<'a> {
 
         for inst in self.chain.iter() {
             if inst.needs_all() {
-                res = inst.flat_find(res)
+                res = inst.flat_find(res, self.is_search_length)
             } else {
                 res =
                     res
@@ -368,12 +412,12 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
 
 
-        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)]),
+        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)], true),
                    vec![json_path_value!(json!(3))]);
 
         let chain = chain!(path!($),path!("key1"),function!(length));
         let path_inst = json_path_instance(&chain, &json);
-        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)]),
+        assert_eq!(path_inst.flat_find(vec![json_path_value!(&json)], false),
                    vec![json_path_value!(json!(3))]);
     }
 }

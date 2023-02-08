@@ -773,7 +773,7 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
-
+        // length of search following the wildcard returns correct result
         let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()").expect("the path is correct")
@@ -781,8 +781,7 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
-
-
+        // length of object returns 0
         let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.length()").expect("the path is correct")
@@ -790,6 +789,7 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
 
+        // length of integer returns null
         let json: Box<Value> = Box::new(json!(1));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.length()").expect("the path is correct")
@@ -797,6 +797,7 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
 
+        // length of array returns correct result
         let json: Box<Value> = Box::new(json!([[1],[2],[3]]));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.length()").expect("the path is correct")
@@ -804,11 +805,78 @@ mod tests {
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
+        // path does not exist returns length null
         let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.not.exist.length()").expect("the path is correct")
         );
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
+
+        // seraching one value returns correct length
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([1]);
+        assert_eq!(v, js);
+        
+        // searching unexisting value returns length 0
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN1')].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([0]);
+        assert_eq!(v, js);
+
+        // searching correct path following unexisting key returns length 0
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].key123.length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([0]);
+        assert_eq!(v, js);
+
+        // fetching first object returns length null
+        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[0].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([Value::Null]);
+        assert_eq!(v, js);
+
+        // length on fetching the index after search gives length of the object (array)
+        let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.prop)].prop.[0].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([3]);
+        assert_eq!(v, js);
+
+        // length on fetching the index after search gives length of the object (string)
+        let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.prop)].prop.[1].length()").expect("the path is correct")
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find();
+        let js = json!([Value::Null]);
+        assert_eq!(v, js);
     }
 }
