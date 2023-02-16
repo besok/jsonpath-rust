@@ -21,3 +21,5 @@
   * change a logical operator `size` into function `size()`
 * **`0.2.1`**
   * changed the contract for length() function.
+* **`0.2.2`**
+  * add ..*
