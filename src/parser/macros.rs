@@ -9,10 +9,18 @@ macro_rules! filter {
 }
 #[macro_export]
 macro_rules! op {
-   ( ) => {Operand::Dynamic(Box::new(JsonPath::Empty))};
-   ( $s:literal) => {Operand::Static( json!($s) )};
-   ( s $s:expr) => {Operand::Static( json!($s) )};
-   ( $s:expr) => {Operand::Dynamic(Box::new($s))}
+    ( ) => {
+        Operand::Dynamic(Box::new(JsonPath::Empty))
+    };
+    ( $s:literal) => {
+        Operand::Static(json!($s))
+    };
+    ( s $s:expr) => {
+        Operand::Static(json!($s))
+    };
+    ( $s:expr) => {
+        Operand::Dynamic(Box::new($s))
+    };
 }
 
 #[macro_export]
@@ -63,10 +71,13 @@ macro_rules! path {
         JsonPath::Current(Box::new(chain))
    }};
    (..$e:literal) => {JsonPath::Descent($e.to_string())};
+   (..*) => {JsonPath::DescentW};
    ($e:literal) => {JsonPath::Field($e.to_string())};
    ($e:expr) => {JsonPath::Index($e)};
 }
 #[macro_export]
 macro_rules! function {
-    (length) => {JsonPath::Fn(Function::Length)}
+    (length) => {
+        JsonPath::Fn(Function::Length)
+    };
 }

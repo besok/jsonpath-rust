@@ -1,5 +1,5 @@
-use serde_json::Value;
 use crate::parse_json_path;
+use serde_json::Value;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
@@ -13,6 +13,8 @@ pub enum JsonPath {
     Chain(Vec<JsonPath>),
     /// The .. operator
     Descent(String),
+    /// The ..* operator
+    DescentW,
     /// The indexes for array
     Index(JsonPathIndex),
     /// The @ operator
@@ -31,7 +33,7 @@ impl JsonPath {
         parse_json_path(v).map_err(|e| e.to_string())
     }
 }
-#[derive(Debug,PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Function {
     /// length()
     Length,
@@ -62,11 +64,11 @@ pub enum FilterExpression {
 
 impl FilterExpression {
     pub fn exists(op: Operand) -> Self {
-            FilterExpression::Atom(op,
-                                   FilterSign::Exists,
-                                   Operand::Dynamic(Box::new(JsonPath::Empty)),
-            )
-
+        FilterExpression::Atom(
+            op,
+            FilterSign::Exists,
+            Operand::Dynamic(Box::new(JsonPath::Empty)),
+        )
     }
 }
 
@@ -79,7 +81,9 @@ pub enum Operand {
 
 #[allow(dead_code)]
 impl Operand {
-    pub fn val(v: Value) -> Self { Operand::Static(v) }
+    pub fn val(v: Value) -> Self {
+        Operand::Static(v)
+    }
 }
 
 /// The operators for filtering functions
@@ -127,6 +131,7 @@ impl PartialEq for JsonPath {
         match (self, other) {
             (JsonPath::Root, JsonPath::Root) => true,
             (JsonPath::Descent(k1), JsonPath::Descent(k2)) => k1 == k2,
+            (JsonPath::DescentW, JsonPath::DescentW) => true,
             (JsonPath::Field(k1), JsonPath::Field(k2)) => k1 == k2,
             (JsonPath::Wildcard, JsonPath::Wildcard) => true,
             (JsonPath::Empty, JsonPath::Empty) => true,
@@ -134,7 +139,7 @@ impl PartialEq for JsonPath {
             (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => ch1 == ch2,
             (JsonPath::Index(idx1), JsonPath::Index(idx2)) => idx1 == idx2,
             (JsonPath::Fn(fn1), JsonPath::Fn(fn2)) => fn2 == fn1,
-            (_, _) => false
+            (_, _) => false,
         }
     }
 }
@@ -142,13 +147,18 @@ impl PartialEq for JsonPath {
 impl PartialEq for JsonPathIndex {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (JsonPathIndex::Slice(s1, e1, st1),
-                JsonPathIndex::Slice(s2, e2, st2)) => s1 == s2 && e1 == e2 && st1 == st2,
+            (JsonPathIndex::Slice(s1, e1, st1), JsonPathIndex::Slice(s2, e2, st2)) => {
+                s1 == s2 && e1 == e2 && st1 == st2
+            }
             (JsonPathIndex::Single(el1), JsonPathIndex::Single(el2)) => el1 == el2,
-            (JsonPathIndex::UnionIndex(elems1), JsonPathIndex::UnionIndex(elems2)) => elems1 == elems2,
-            (JsonPathIndex::UnionKeys(elems1), JsonPathIndex::UnionKeys(elems2)) => elems1 == elems2,
+            (JsonPathIndex::UnionIndex(elems1), JsonPathIndex::UnionIndex(elems2)) => {
+                elems1 == elems2
+            }
+            (JsonPathIndex::UnionKeys(elems1), JsonPathIndex::UnionKeys(elems2)) => {
+                elems1 == elems2
+            }
             (JsonPathIndex::Filter(left), JsonPathIndex::Filter(right)) => left.eq(right),
-            (_, _) => false
+            (_, _) => false,
         }
     }
 }
@@ -158,8 +168,7 @@ impl PartialEq for Operand {
         match (self, other) {
             (Operand::Static(v1), Operand::Static(v2)) => v1 == v2,
             (Operand::Dynamic(jp1), Operand::Dynamic(jp2)) => jp1 == jp2,
-            (_, _) => false
+            (_, _) => false,
         }
     }
 }
-
