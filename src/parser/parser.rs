@@ -1,9 +1,11 @@
-use pest::iterators::{Pair, Pairs};
-use pest::{Parser};
-use serde_json::{Value};
-use crate::parser::model::{JsonPath, JsonPathIndex, Operand, FilterSign, FilterExpression, Function};
-use pest::error::{Error};
 use crate::parser::model::FilterExpression::{And, Or};
+use crate::parser::model::{
+    FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
+};
+use pest::error::Error;
+use pest::iterators::{Pair, Pairs};
+use pest::Parser;
+use serde_json::Value;
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path.pest"]
@@ -12,34 +14,47 @@ struct JsonPathParser;
 /// the parsing function.
 /// Since the parsing can finish with error the result is [[Result]]
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
-    Ok(parse_internal(JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap()))
+    Ok(parse_internal(
+        JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap(),
+    ))
 }
 
 /// Internal function takes care of the logic by parsing the operators and unrolling the string into the final result.
 fn parse_internal(rule: Pair<Rule>) -> JsonPath {
     match rule.as_rule() {
-        Rule::path => rule.into_inner().next().map(parse_internal).unwrap_or(JsonPath::Empty),
-        Rule::current => JsonPath::Current(Box::new(rule.into_inner().next().map(parse_internal).unwrap_or(JsonPath::Empty))),
+        Rule::path => rule
+            .into_inner()
+            .next()
+            .map(parse_internal)
+            .unwrap_or(JsonPath::Empty),
+        Rule::current => JsonPath::Current(Box::new(
+            rule.into_inner()
+                .next()
+                .map(parse_internal)
+                .unwrap_or(JsonPath::Empty),
+        )),
         Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_internal).collect()),
         Rule::root => JsonPath::Root,
         Rule::wildcard => JsonPath::Wildcard,
-        Rule::descent => parse_key(down(rule)).map(JsonPath::Descent).unwrap_or(JsonPath::Empty),
+        Rule::descent => parse_key(down(rule))
+            .map(JsonPath::Descent)
+            .unwrap_or(JsonPath::Empty),
+        Rule::descent_w => JsonPath::DescentW,
         Rule::function => JsonPath::Fn(Function::Length),
-        Rule::field => parse_key(down(rule)).map(JsonPath::Field).unwrap_or(JsonPath::Empty),
+        Rule::field => parse_key(down(rule))
+            .map(JsonPath::Field)
+            .unwrap_or(JsonPath::Empty),
         Rule::index => JsonPath::Index(parse_index(rule)),
-        _ => JsonPath::Empty
+        _ => JsonPath::Empty,
     }
 }
 
 /// parsing the rule 'key' with the structures either .key or .]'key'[
 fn parse_key(rule: Pair<Rule>) -> Option<String> {
     match rule.as_rule() {
-        Rule::key
-        | Rule::key_unlim
-        | Rule::string_qt => parse_key(down(rule)),
-        Rule::key_lim
-        | Rule::inner => Some(String::from(rule.as_str())),
-        _ => None
+        Rule::key | Rule::key_unlim | Rule::string_qt => parse_key(down(rule)),
+        Rule::key_lim | Rule::inner => Some(String::from(rule.as_str())),
+        _ => None,
     }
 }
 
@@ -53,7 +68,7 @@ fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
             Rule::start_slice => start = in_pair.as_str().parse::<i32>().unwrap_or(start),
             Rule::end_slice => end = in_pair.as_str().parse::<i32>().unwrap_or(end),
             Rule::step_slice => step = down(in_pair).as_str().parse::<usize>().unwrap_or(step),
-            _ => ()
+            _ => (),
         }
     }
     JsonPathIndex::Slice(start, end, step)
@@ -69,7 +84,10 @@ fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
 }
 
 fn number_to_value(number: &str) -> Value {
-    number.parse::<i64>().ok().map(Value::from)
+    number
+        .parse::<i64>()
+        .ok()
+        .map(Value::from)
         .or_else(|| number.parse::<f64>().ok().map(Value::from))
         .unwrap()
 }
@@ -88,21 +106,26 @@ fn parse_chain_in_operand(rule: Pair<Rule>) -> Operand {
         JsonPath::Chain(elems) => {
             if elems.len() == 1 {
                 match elems.first() {
-                    Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => Operand::val(Value::from(keys.clone())),
-                    Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => Operand::val(Value::from(keys.clone())),
-                    Some(JsonPath::Field(f)) => Operand::val(Value::Array(vec![Value::from(f.clone())])),
-                    _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
+                    Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => {
+                        Operand::val(Value::from(keys.clone()))
+                    }
+                    Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => {
+                        Operand::val(Value::from(keys.clone()))
+                    }
+                    Some(JsonPath::Field(f)) => {
+                        Operand::val(Value::Array(vec![Value::from(f.clone())]))
+                    }
+                    _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems))),
                 }
             } else {
                 Operand::Dynamic(Box::new(JsonPath::Chain(elems)))
             }
         }
-        jp => Operand::Dynamic(Box::new(jp))
+        jp => Operand::Dynamic(Box::new(jp)),
     }
 }
 
-
-fn parse_filter_index( pair: Pair<Rule>) -> JsonPathIndex {
+fn parse_filter_index(pair: Pair<Rule>) -> JsonPathIndex {
     JsonPathIndex::Filter(parse_logic(pair.into_inner()))
 }
 
@@ -112,7 +135,7 @@ fn parse_logic(mut pairs: Pairs<Rule>) -> FilterExpression {
         let next_expr = parse_logic_and(pairs.next().unwrap().into_inner());
         match expr {
             None => expr = Some(next_expr),
-            Some(e) => expr = Some(Or(Box::new(e), Box::new(next_expr)))
+            Some(e) => expr = Some(Or(Box::new(e), Box::new(next_expr))),
         }
     }
     expr.unwrap()
@@ -125,7 +148,7 @@ fn parse_logic_and(mut pairs: Pairs<Rule>) -> FilterExpression {
         let next_expr = parse_logic_atom(pairs.next().unwrap().into_inner());
         match expr {
             None => expr = Some(next_expr),
-            Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr)))
+            Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr))),
         }
     }
     expr.unwrap()
@@ -145,7 +168,7 @@ fn parse_logic_atom(mut pairs: Pairs<Rule>) -> FilterExpression {
             }
         }
         Some(x) => panic!("unexpected => {:?}", x),
-        None => panic!("unexpected none")
+        None => panic!("unexpected none"),
     }
 }
 
@@ -156,10 +179,9 @@ fn parse_atom(rule: Pair<Rule>) -> Operand {
         Rule::string_qt => Operand::Static(Value::from(down(atom).as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)),
         Rule::boolean => Operand::Static(rule.as_str().parse().unwrap()),
-        _ => Operand::Static(Value::Null)
+        _ => Operand::Static(Value::Null),
     }
 }
-
 
 fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
     let next = down(rule);
@@ -169,7 +191,7 @@ fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
         Rule::unit_indexes => parse_unit_indexes(next.into_inner()),
         Rule::unit_keys => parse_unit_keys(next.into_inner()),
         Rule::filter => parse_filter_index(down(next)),
-        _ => JsonPathIndex::Single(number_to_value(next.as_str()))
+        _ => JsonPathIndex::Single(number_to_value(next.as_str())),
     }
 }
 
@@ -177,18 +199,17 @@ fn down(rule: Pair<Rule>) -> Pair<Rule> {
     rule.into_inner().next().unwrap()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{chain, filter, function, idx, op, path};
+    use serde_json::json;
     use std::panic;
-    use serde_json::{json};
-    use crate::{filter, idx, op, path, chain, function};
 
     fn test_failed(input: &str) {
         match parse_json_path(input) {
             Ok(elem) => panic!("should be false but got {:?}", elem),
-            Err(e) => println!("{}", e)
+            Err(e) => println!("{}", e),
         }
     }
 
@@ -197,7 +218,7 @@ mod tests {
             Ok(JsonPath::Chain(elems)) => assert_eq!(elems, expected),
             Ok(e) => panic!("unexpected value {:?}", e),
             Err(e) => {
-                panic!("parsing error {}",e);
+                panic!("parsing error {}", e);
             }
         }
     }
@@ -224,7 +245,17 @@ mod tests {
                  path!(idx!([10;10;10])),
                  path!(idx!(?filter!(op!(chain!(path!(@path!()))), "exists", op!(path!())))),
                  path!(idx!(?filter!(op!(chain!(path!(@,path!("abc")))), ">=", op!(10)))),
-             ])
+             ]);
+        test(
+            "$..*[?(@.isbn)].title",
+            vec![
+                // Root, DescentW, Index(Filter(Atom(Dynamic(Chain([Current(Chain([Field("isbn")]))])), Exists, Dynamic(Empty)))), Field("title")
+                path!($),
+                path!(..*),
+                path!(idx!(?filter!(op!(chain!(path!(@,path!("isbn")))), "exists", op!(path!())))),
+                path!("title"),
+            ],
+        )
     }
 
     #[test]
@@ -253,7 +284,7 @@ mod tests {
         test(".abc.*", vec![path!("abc"), path!(*)]);
         test(".abc.[*]", vec![path!("abc"), path!(*)]);
         test(".abc[*]", vec![path!("abc"), path!(*)]);
-        test_failed("..*");
+        test("..*", vec![path!(..*)]);
         test_failed("abc*");
     }
 
@@ -278,25 +309,31 @@ mod tests {
     #[test]
     fn index_union_test() {
         test("[1,2,3]", vec![path!(idx!(idx 1,2,3))]);
-        test("['abc','bcd']", vec![path!(idx!("abc","bcd"))]);
+        test("['abc','bcd']", vec![path!(idx!("abc", "bcd"))]);
         test_failed("[]");
-        test("[-1,-2]", vec![path!(idx!(idx -1, -2))]);
+        test("[-1,-2]", vec![path!(idx!(idx - 1, -2))]);
         test_failed("[abc,bcd]");
         test_failed("[\"abc\",\"bcd\"]");
     }
 
     #[test]
     fn array_start_test() {
-        test("$.[?(@.verb== 'TEST')]", vec![
-            path!($),
-            path!(idx!(?filter!(op!(chain!(path!(@,path!("verb")))),"==",op!("TEST"))))]);
+        test(
+            "$.[?(@.verb== 'TEST')]",
+            vec![
+                path!($),
+                path!(idx!(?filter!(op!(chain!(path!(@,path!("verb")))),"==",op!("TEST")))),
+            ],
+        );
     }
 
     #[test]
     fn logical_filter_test() {
-        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10)]", vec![
-            path!($),
-            path!(idx!(?
+        test(
+            "$.[?(@.verb == 'T' || @.size > 0 && @.size < 10)]",
+            vec![
+                path!($),
+                path!(idx!(?
                 filter!(
                     filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
                     ||,
@@ -305,11 +342,14 @@ mod tests {
                         &&,
                         filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
                     )
-                )))
-        ]);
-        test("$.[?((@.verb == 'T' || @.size > 0) && @.size < 10)]", vec![
-            path!($),
-            path!(idx!(?
+                ))),
+            ],
+        );
+        test(
+            "$.[?((@.verb == 'T' || @.size > 0) && @.size < 10)]",
+            vec![
+                path!($),
+                path!(idx!(?
                 filter!(
                     filter!(
                        filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
@@ -318,11 +358,14 @@ mod tests {
                     ),
                     &&,
                     filter!(op!(chain!(path!(@,path!("size")))), "<", op!(10))
-                )))
-        ]);
-        test("$.[?(@.verb == 'T' || @.size > 0 && @.size < 10 && @.elem == 0)]", vec![
-            path!($),
-            path!(idx!(?filter!(
+                ))),
+            ],
+        );
+        test(
+            "$.[?(@.verb == 'T' || @.size > 0 && @.size < 10 && @.elem == 0)]",
+            vec![
+                path!($),
+                path!(idx!(?filter!(
                     filter!(op!(chain!(path!(@,path!("verb")))), "==", op!("T")),
                     ||,
                     filter!(
@@ -335,53 +378,90 @@ mod tests {
                         filter!(op!(chain!(path!(@,path!("elem")))), "==", op!(0))
                     )
 
-                )))
-        ]);
+                ))),
+            ],
+        );
     }
 
     #[test]
     fn index_filter_test() {
-        test("[?('abc' == 'abc')]", vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))]);
-        test("[?('abc' == 1)]", vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))]);
-        test("[?('abc' == true)]", vec![path!(idx!(?filter!( op!("abc"),"==",op!(true))))]);
-        test("[?('abc' == null)]", vec![path!(idx!(?filter!( op!("abc"),"==",Operand::Static(Value::Null))))]);
+        test(
+            "[?('abc' == 'abc')]",
+            vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
+        );
+        test(
+            "[?('abc' == 1)]",
+            vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))],
+        );
+        test(
+            "[?('abc' == true)]",
+            vec![path!(idx!(?filter!( op!("abc"),"==",op!(true))))],
+        );
+        test(
+            "[?('abc' == null)]",
+            vec![path!(
+                idx!(?filter!( op!("abc"),"==",Operand::Static(Value::Null)))
+            )],
+        );
 
-        test("[?(@.abc in ['abc','bcd'])]", vec![
-            path!(
+        test(
+            "[?(@.abc in ['abc','bcd'])]",
+            vec![path!(
                 idx!(?filter!(op!(chain!(path!(@,path!("abc")))),"in",Operand::val(json!(["abc","bcd"]))))
-            )
-        ]);
+            )],
+        );
 
-        test("[?(@.abc.[*] in ['abc','bcd'])]", vec![path!(idx!(?filter!(
-           op!(chain!(path!(@,path!("abc"), path!(*)))),
-            "in",
-            op!(s json!(["abc","bcd"]))
-        )))]);
-        test("[?(@.[*]..next in ['abc','bcd'])]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@,path!(*), path!(.."next")))),
-            "in",
-            op!(s json!(["abc","bcd"]))
-        )))]);
+        test(
+            "[?(@.abc.[*] in ['abc','bcd'])]",
+            vec![path!(idx!(?filter!(
+               op!(chain!(path!(@,path!("abc"), path!(*)))),
+                "in",
+                op!(s json!(["abc","bcd"]))
+            )))],
+        );
+        test(
+            "[?(@.[*]..next in ['abc','bcd'])]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@,path!(*), path!(.."next")))),
+                "in",
+                op!(s json!(["abc","bcd"]))
+            )))],
+        );
 
-        test("[?(@[1] in ['abc','bcd'])]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@,path!(idx!(1))))),
-            "in",
-            op!(s json!(["abc","bcd"]))
-        )))]);
-        test("[?(@ == 'abc')]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@path!()))),"==",op!("abc")
-        )))]);
-        test("[?(@ subsetOf ['abc'])]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@path!()))),"subsetOf",op!(s json!(["abc"]))
-        )))]);
-        test("[?(@[1] subsetOf ['abc','abc'])]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@,path!(idx!(1))))),
-            "subsetOf",
-            op!(s json!(["abc","abc"]))
-        )))]);
-        test("[?(@ subsetOf [1,2,3])]", vec![path!(idx!(?filter!(
-            op!(chain!(path!(@path!()))),"subsetOf",op!(s json!([1,2,3]))
-        )))]);
+        test(
+            "[?(@[1] in ['abc','bcd'])]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@,path!(idx!(1))))),
+                "in",
+                op!(s json!(["abc","bcd"]))
+            )))],
+        );
+        test(
+            "[?(@ == 'abc')]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@path!()))),"==",op!("abc")
+            )))],
+        );
+        test(
+            "[?(@ subsetOf ['abc'])]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@path!()))),"subsetOf",op!(s json!(["abc"]))
+            )))],
+        );
+        test(
+            "[?(@[1] subsetOf ['abc','abc'])]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@,path!(idx!(1))))),
+                "subsetOf",
+                op!(s json!(["abc","abc"]))
+            )))],
+        );
+        test(
+            "[?(@ subsetOf [1,2,3])]",
+            vec![path!(idx!(?filter!(
+                op!(chain!(path!(@path!()))),"subsetOf",op!(s json!([1,2,3]))
+            )))],
+        );
 
         test_failed("[?(@[1] subsetof ['abc','abc'])]");
         test_failed("[?(@ >< ['abc','abc'])]");
@@ -390,20 +470,14 @@ mod tests {
 
     #[test]
     fn fn_size_test() {
-        test("$.k.length()",
-             vec![
-                 path!($),
-                 path!("k"),
-                 function!(length)
-             ]);
+        test(
+            "$.k.length()",
+            vec![path!($), path!("k"), function!(length)],
+        );
 
-        test("$.k.length.field",
-             vec![
-                 path!($),
-                 path!("k"),
-                 path!("length"),
-                 path!("field"),
-             ])
-
+        test(
+            "$.k.length.field",
+            vec![path!($), path!("k"), path!("length"), path!("field")],
+        )
     }
 }

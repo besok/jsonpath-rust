@@ -110,22 +110,20 @@
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
-
-use std::fmt::Debug;
-use std::str::FromStr;
-use serde_json::{Value};
+use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
-use crate::parser::model::JsonPath;
+use serde_json::Value;
+use std::fmt::Debug;
+use std::str::FromStr;
 
 mod parser;
 mod path;
 
-
 #[macro_use]
 extern crate pest_derive;
-extern crate pest;
 extern crate core;
+extern crate pest;
 
 /// the trait allows to mix the method path to the value of [Value]
 /// and thus the using can be shortened to the following one:
@@ -165,7 +163,6 @@ pub struct JsonPathInst {
     inner: JsonPath,
 }
 
-
 impl FromStr for JsonPathInst {
     type Err = String;
 
@@ -187,7 +184,6 @@ impl JsonPathQuery for Value {
         Ok(JsonPathFinder::new(Box::new(self), Box::new(p)).find())
     }
 }
-
 
 /// just to create a json path value of data
 /// Example:
@@ -231,7 +227,6 @@ macro_rules! json_path_value {
 
 }
 
-
 /// A result of json path
 /// Can be either a slice of initial data or a new generated value(like length of array)
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -245,11 +240,9 @@ impl<'a, Data: Clone + Debug> JsonPathValue<'a, Data> {
     pub fn to_data(self) -> Data {
         match self {
             JsonPathValue::Slice(r) => r.clone(),
-            JsonPathValue::NewValue(val) => val
+            JsonPathValue::NewValue(val) => val,
         }
     }
-
-
 }
 
 impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
@@ -260,16 +253,12 @@ impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
 
 impl<'a, Data> JsonPathValue<'a, Data> {
     fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-        where F: FnOnce(&'a Data) -> Vec<&'a Data>
+    where
+        F: FnOnce(&'a Data) -> Vec<&'a Data>,
     {
         match self {
-            JsonPathValue::Slice(r) => {
-                mapper(r)
-                    .into_iter()
-                    .map(JsonPathValue::Slice)
-                    .collect()
-            }
-            JsonPathValue::NewValue(_) => vec![]
+            JsonPathValue::Slice(r) => mapper(r).into_iter().map(JsonPathValue::Slice).collect(),
+            JsonPathValue::NewValue(_) => vec![],
         }
     }
 
@@ -278,8 +267,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
             .into_iter()
             .filter_map(|v| match v {
                 JsonPathValue::Slice(el) => Some(el),
-                _ => None
-
+                _ => None,
             })
             .collect()
     }
@@ -288,7 +276,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     pub fn slice_or(self, default: &'a Data) -> &'a Data {
         match self {
             JsonPathValue::Slice(r) => r,
-            JsonPathValue::NewValue(_) => default
+            JsonPathValue::NewValue(_) => default,
         }
     }
 }
@@ -347,18 +335,17 @@ impl JsonPathFinder {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use serde_json::{json, Value};
-    use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use crate::JsonPathQuery;
+    use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
+    use serde_json::{json, Value};
+    use std::str::FromStr;
 
     fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
         match JsonPathFinder::from_str(json, path) {
             Ok(finder) => assert_eq!(finder.find_slice(), expected),
-            Err(e) => panic!("error while parsing json or jsonpath: {}", e)
+            Err(e) => panic!("error while parsing json or jsonpath: {}", e),
         }
     }
 
@@ -433,40 +420,29 @@ mod tests {
     fn descent_test() {
         let v1 = json!("reference");
         let v2 = json!("fiction");
-        test(template_json(), "$..category",
-             json_path_value![
-                 &v1,
-                 &v2,
-                 &v2,
-                 &v2,
-             ]);
+        test(
+            template_json(),
+            "$..category",
+            json_path_value![&v1, &v2, &v2, &v2,],
+        );
         let js1 = json!(19.95);
         let js2 = json!(8.95);
         let js3 = json!(12.99);
         let js4 = json!(8.99);
         let js5 = json!(22.99);
-        test(template_json(),
-             "$.store..price",
-             json_path_value![
-                 &js1,
-                 &js2,
-                 &js3,
-                 &js4,
-                 &js5,
-             ],
+        test(
+            template_json(),
+            "$.store..price",
+            json_path_value![&js1, &js2, &js3, &js4, &js5,],
         );
         let js1 = json!("Nigel Rees");
         let js2 = json!("Evelyn Waugh");
         let js3 = json!("Herman Melville");
         let js4 = json!("J. R. R. Tolkien");
-        test(template_json(),
-             "$..author",
-             json_path_value![
-                 &js1,
-                 &js2,
-                 &js3,
-                 &js4,
-             ],
+        test(
+            template_json(),
+            "$..author",
+            json_path_value![&js1, &js2, &js3, &js4,],
         );
     }
 
@@ -474,58 +450,67 @@ mod tests {
     fn wildcard_test() {
         let js1 = json!("reference");
         let js2 = json!("fiction");
-        test(template_json(), "$..book.[*].category",
-             json_path_value![
-                 &js1,
-                 &js2,
-                 &js2,
-                 &js2,
-             ]);
+        test(
+            template_json(),
+            "$..book.[*].category",
+            json_path_value![&js1, &js2, &js2, &js2,],
+        );
         let js1 = json!("Nigel Rees");
         let js2 = json!("Evelyn Waugh");
         let js3 = json!("Herman Melville");
         let js4 = json!("J. R. R. Tolkien");
-        test(template_json(),
-             "$.store.book[*].author",
-             json_path_value![
-                 &js1,
-                 &js2,
-                 &js3,
-                 &js4,
-             ],
+        test(
+            template_json(),
+            "$.store.book[*].author",
+            json_path_value![&js1, &js2, &js3, &js4,],
+        );
+    }
+
+    #[test]
+    fn descendent_wildcard_test() {
+        let js1 = json!("Moby Dick");
+        let js2 = json!("The Lord of the Rings");
+        test(
+            template_json(),
+            "$..*.[?(@.isbn)].title",
+            json_path_value![&js1, &js2,&js1, &js2],
         );
     }
 
     #[test]
     fn field_test() {
         let value = json!({"active":1});
-        test(r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
-             "$.field.field[?(@.active)]",
-             json_path_value![&value,]);
+        test(
+            r#"{"field":{"field":[{"active":1},{"passive":1}]}}"#,
+            "$.field.field[?(@.active)]",
+            json_path_value![&value,],
+        );
     }
 
     #[test]
     fn index_index_test() {
         let value = json!("0-553-21311-3");
-        test(template_json(), "$..book[2].isbn",
-             json_path_value![
-                 &value,
-             ]);
+        test(
+            template_json(),
+            "$..book[2].isbn",
+            json_path_value![&value,],
+        );
     }
 
     #[test]
     fn index_unit_index_test() {
         let value = json!("0-553-21311-3");
-        test(template_json(), "$..book[2,4].isbn",
-             json_path_value![
-                 &value,
-             ]);
+        test(
+            template_json(),
+            "$..book[2,4].isbn",
+            json_path_value![&value,],
+        );
         let value1 = json!("0-395-19395-8");
-        test(template_json(), "$..book[2,3].isbn",
-             json_path_value![
-                 &value,
-                 &value1,
-             ]);
+        test(
+            template_json(),
+            "$..book[2,3].isbn",
+            json_path_value![&value, &value1,],
+        );
     }
 
     #[test]
@@ -534,13 +519,11 @@ mod tests {
         let js2 = json!(8.99);
         let js3 = json!("The Lord of the Rings");
         let js4 = json!(22.99);
-        test(template_json(), "$..book[2,3]['title','price']",
-             json_path_value![
-                 &js1,
-                 &js2,
-                 &js3,
-                 &js4,
-             ]);
+        test(
+            template_json(),
+            "$..book[2,3]['title','price']",
+            json_path_value![&js1, &js2, &js3, &js4,],
+        );
     }
 
     #[test]
@@ -555,176 +538,147 @@ mod tests {
         let j7 = json!(7);
         let j8 = json!(8);
         let j9 = json!(9);
-        test(template_json(),
-             "$.array[:]",
-             json_path_value![
-                 &j0,
-                 &j1,
-                 &j2,
-                 &j3,
-                 &j4,
-                 &j5,
-                 &j6,
-                 &j7,
-                 &j8,
-                 &j9,
-             ]);
-        test(template_json(),
-             "$.array[1:4:2]",
-             json_path_value![
-                 &j1,
-                 &j3,
-             ]);
-        test(template_json(),
-             "$.array[::3]",
-             json_path_value![
-                 &j0,
-                 &j3,
-                 &j6,
-                 &j9,
-             ]);
-        test(template_json(),
-             "$.array[-1:]",
-             json_path_value![
-                 &j9,
-             ]);
-        test(template_json(),
-             "$.array[-2:-1]",
-             json_path_value![
-                 &j8,
-             ]);
+        test(
+            template_json(),
+            "$.array[:]",
+            json_path_value![&j0, &j1, &j2, &j3, &j4, &j5, &j6, &j7, &j8, &j9,],
+        );
+        test(
+            template_json(),
+            "$.array[1:4:2]",
+            json_path_value![&j1, &j3,],
+        );
+        test(
+            template_json(),
+            "$.array[::3]",
+            json_path_value![&j0, &j3, &j6, &j9,],
+        );
+        test(template_json(), "$.array[-1:]", json_path_value![&j9,]);
+        test(template_json(), "$.array[-2:-1]", json_path_value![&j8,]);
     }
 
     #[test]
     fn index_filter_test() {
         let moby = json!("Moby Dick");
         let rings = json!("The Lord of the Rings");
-        test(template_json(),
-             "$..book[?(@.isbn)].title",
-             json_path_value![
-                 &moby,
-                 &rings,
-             ]);
+        test(
+            template_json(),
+            "$..book[?(@.isbn)].title",
+            json_path_value![&moby, &rings,],
+        );
         let sword = json!("Sword of Honour");
-        test(template_json(),
-             "$..book[?(@.price != 8.95)].title",
-             json_path_value![
-                 &sword,
-                 &moby,
-                 &rings,
-             ]);
+        test(
+            template_json(),
+            "$..book[?(@.price != 8.95)].title",
+            json_path_value![&sword, &moby, &rings,],
+        );
         let sayings = json!("Sayings of the Century");
-        test(template_json(),
-             "$..book[?(@.price == 8.95)].title",
-             json_path_value![
-                 &sayings,
-             ]);
+        test(
+            template_json(),
+            "$..book[?(@.price == 8.95)].title",
+            json_path_value![&sayings,],
+        );
         let js895 = json!(8.95);
-        test(template_json(),
-             "$..book[?(@.author ~= '.*Rees')].price",
-             json_path_value![&js895,]);
+        test(
+            template_json(),
+            "$..book[?(@.author ~= '.*Rees')].price",
+            json_path_value![&js895,],
+        );
         let js12 = json!(12.99);
         let js899 = json!(8.99);
         let js2299 = json!(22.99);
-        test(template_json(),
-             "$..book[?(@.price >= 8.99)].price",
-             json_path_value![
-                 &js12,
-                 &js899,
-                 &js2299,
-             ]);
-        test(template_json(),
-             "$..book[?(@.price > 8.99)].price",
-             json_path_value![
-                 &js12,
-                 &js2299,
-             ]);
-        test(template_json(),
-             "$..book[?(@.price < 8.99)].price",
-             json_path_value![
-                 &js895,
-             ]);
-        test(template_json(),
-             "$..book[?(@.price <= 8.99)].price",
-             json_path_value![
-                 &js895,
-                 &js899,
-             ]);
-        test(template_json(),
-             "$..book[?(@.price <= $.expensive)].price",
-             json_path_value![
-                 &js895,
-                 &js899,
-             ]);
-        test(template_json(),
-             "$..book[?(@.price >= $.expensive)].price",
-             json_path_value![
-                 &js12,
-                 &js2299,
-             ]);
-        test(template_json(),
-             "$..book[?(@.title in ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].price",
-             json_path_value![
-                 &js899,
-             ]);
-        test(template_json(),
-             "$..book[?(@.title nin ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].title",
-             json_path_value![
-                 &sayings,
-                 &sword,
-                 &rings,
-             ]);
-        test(template_json(),
-             "$..book[?(@.author size 10)].title",
-             json_path_value![
-                 &sayings,
-             ]);
+        test(
+            template_json(),
+            "$..book[?(@.price >= 8.99)].price",
+            json_path_value![&js12, &js899, &js2299,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.price > 8.99)].price",
+            json_path_value![&js12, &js2299,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.price < 8.99)].price",
+            json_path_value![&js895,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.price <= 8.99)].price",
+            json_path_value![&js895, &js899,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.price <= $.expensive)].price",
+            json_path_value![&js895, &js899,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.price >= $.expensive)].price",
+            json_path_value![&js12, &js2299,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.title in ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].price",
+            json_path_value![&js899,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.title nin ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].title",
+            json_path_value![&sayings, &sword, &rings,],
+        );
+        test(
+            template_json(),
+            "$..book[?(@.author size 10)].title",
+            json_path_value![&sayings,],
+        );
         let filled_true = json!(1);
-        test(template_json(),
-             "$.orders[?(@.filled == true)].id",
-             json_path_value![
-                 &filled_true,
-             ]);
+        test(
+            template_json(),
+            "$.orders[?(@.filled == true)].id",
+            json_path_value![&filled_true,],
+        );
         let filled_null = json!(3);
-        test(template_json(),
+        test(
+            template_json(),
             "$.orders[?(@.filled == null)].id",
-            json_path_value![
-                &filled_null,
-            ]);
+            json_path_value![&filled_null,],
+        );
     }
 
     #[test]
     fn index_filter_sets_test() {
         let j1 = json!(1);
-        test(template_json(),
-             "$.orders[?(@.ref subsetOf [1,2,3,4])].id",
-             json_path_value![
-                 &j1,
-             ]);
+        test(
+            template_json(),
+            "$.orders[?(@.ref subsetOf [1,2,3,4])].id",
+            json_path_value![&j1,],
+        );
         let j2 = json!(2);
-        test(template_json(),
-             "$.orders[?(@.ref anyOf [1,4])].id",
-             json_path_value![
-                 &j1,
-                 &j2,
-             ]);
+        test(
+            template_json(),
+            "$.orders[?(@.ref anyOf [1,4])].id",
+            json_path_value![&j1, &j2,],
+        );
         let j3 = json!(3);
-        test(template_json(),
-             "$.orders[?(@.ref noneOf [3,6])].id",
-             json_path_value![
-                 &j3,
-             ]);
+        test(
+            template_json(),
+            "$.orders[?(@.ref noneOf [3,6])].id",
+            json_path_value![&j3,],
+        );
     }
 
     #[test]
     fn query_test() {
         let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
-        let v = json.path("$..book[?(@.author size 10)].title")
+        let v = json
+            .path("$..book[?(@.author size 10)].title")
             .expect("the path is correct");
         assert_eq!(v, json!(["Sayings of the Century"]));
 
         let json: Value = serde_json::from_str(template_json()).expect("to get json");
-        let path = &json.path("$..book[?(@.author size 10)].title")
+        let path = &json
+            .path("$..book[?(@.author size 10)].title")
             .expect("the path is correct");
 
         assert_eq!(path, &json!(["Sayings of the Century"]));
@@ -733,8 +687,10 @@ mod tests {
     #[test]
     fn find_slice_test() {
         let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
-        let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title")
-            .expect("the path is correct"));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$..book[?(@.author size 10)].title")
+                .expect("the path is correct"),
+        );
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find_slice();
@@ -746,7 +702,7 @@ mod tests {
     fn find_in_array_test() {
         let json: Box<Value> = Box::new(json!([{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'TEST')]").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')]").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
@@ -756,9 +712,11 @@ mod tests {
     }
     #[test]
     fn length_test() {
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].length()")
+                .expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
@@ -766,68 +724,70 @@ mod tests {
         let js = json!([2]);
         assert_eq!(v, js);
 
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.length()").expect("the path is correct")
-        );
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
         // length of search following the wildcard returns correct result
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()")
+                .expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
         // length of object returns 0
         let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.length()").expect("the path is correct")
-        );
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
 
         // length of integer returns null
         let json: Box<Value> = Box::new(json!(1));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.length()").expect("the path is correct")
-        );
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
 
         // length of array returns correct result
-        let json: Box<Value> = Box::new(json!([[1],[2],[3]]));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.length()").expect("the path is correct")
-        );
+        let json: Box<Value> = Box::new(json!([[1], [2], [3]]));
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([3]));
 
         // path does not exist returns length null
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.not.exist.length()").expect("the path is correct")
-        );
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.not.exist.length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
         assert_eq!(finder.find(), json!([Value::Null]));
 
         // seraching one value returns correct length
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].length()").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find();
         let js = json!([1]);
         assert_eq!(v, js);
-        
+
         // searching unexisting value returns length 0
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'RUN1')].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN1')].length()")
+                .expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
@@ -836,9 +796,11 @@ mod tests {
         assert_eq!(v, js);
 
         // searching correct path following unexisting key returns length 0
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].key123.length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.verb == 'RUN')].key123.length()")
+                .expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
@@ -847,10 +809,10 @@ mod tests {
         assert_eq!(v, js);
 
         // fetching first object returns length null
-        let json: Box<Value> = Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[0].length()").expect("the path is correct")
-        );
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> =
+            Box::from(JsonPathInst::from_str("$.[0].length()").expect("the path is correct"));
         let finder = JsonPathFinder::new(json, path);
 
         let v = finder.find();
@@ -860,7 +822,7 @@ mod tests {
         // length on fetching the index after search gives length of the object (array)
         let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.prop)].prop.[0].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.prop)].prop.[0].length()").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
@@ -871,7 +833,7 @@ mod tests {
         // length on fetching the index after search gives length of the object (string)
         let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.prop)].prop.[1].length()").expect("the path is correct")
+            JsonPathInst::from_str("$.[?(@.prop)].prop.[1].length()").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 

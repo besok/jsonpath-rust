@@ -24,6 +24,7 @@ key_unlim = {"[" ~ string_qt ~ "]"}
 key = ${key_lim | key_unlim}
 
 descent = {dot ~ dot ~ key}
+descent_w = {dot ~ dot ~ "*"} // refactor afterwards 
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain?}
 field = ${dot? ~ key_unlim | dot ~ key_lim }
@@ -47,6 +48,6 @@ atom = {chain | string_qt | number | boolean | null}
 
 index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter) ~ "]" }
 
-chain = {(root | descent | wildcard | current | field | index | function)+}
+chain = {(root | descent | descent_w | wildcard | current | field | index | function)+}
 
 path = {SOI ~ chain ~ EOI }
