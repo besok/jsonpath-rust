@@ -13,6 +13,7 @@ struct JsonPathParser;
 
 /// the parsing function.
 /// Since the parsing can finish with error the result is [[Result]]
+#[allow(clippy::result_large_err)]
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
     Ok(parse_internal(
         JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap(),

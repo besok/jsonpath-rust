@@ -1,5 +1,5 @@
-use serde_json::Value;
 use regex::Regex;
+use serde_json::Value;
 
 /// compare sizes of json elements
 /// The method expects to get a number on the right side and array or string or object on the left
@@ -12,7 +12,7 @@ pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
                     Value::String(v) if v.len() == sz as usize => true,
                     Value::Array(elems) if elems.len() == sz as usize => true,
                     Value::Object(fields) if fields.len() == sz as usize => true,
-                    _ => return false
+                    _ => return false,
                 };
             }
             return true;
@@ -45,7 +45,9 @@ pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
                         res = true
                     }
                 }
-                if !res { return false; }
+                if !res {
+                    return false;
+                }
             }
             return true;
         }
@@ -109,7 +111,7 @@ pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
             }
             false
         }
-        _ => false
+        _ => false,
     }
 }
 
@@ -138,7 +140,7 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
             }
             false
         }
-        _ => false
+        _ => false,
     }
 }
 
@@ -146,9 +148,11 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.len() == 1 && right.len() == 1 {
         match (left.get(0), right.get(0)) {
-            (Some(Value::Number(l)), Some(Value::Number(r))) =>
-                l.as_f64().and_then(|v1| r.as_f64().map(|v2| v1 < v2)).unwrap_or(false),
-            _ => false
+            (Some(Value::Number(l)), Some(Value::Number(r))) => l
+                .as_f64()
+                .and_then(|v1| r.as_f64().map(|v2| v1 < v2))
+                .unwrap_or(false),
+            _ => false,
         }
     } else {
         false
@@ -160,18 +164,14 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.len() != right.len() {
         false
     } else {
-        left.iter()
-            .zip(right)
-            .map(|(a, b)| a.eq(&b))
-            .all(|a| a)
+        left.iter().zip(right).map(|(a, b)| a.eq(&b)).all(|a| a)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::path::json::{any_of, eq, less, regex, size, sub_set_of};
     use serde_json::{json, Value};
-    use crate::path::json::{eq, less, regex, any_of, sub_set_of, size};
 
     #[test]
     fn value_eq_test() {
@@ -187,12 +187,12 @@ mod tests {
     fn vec_value_test() {
         let left = json!({"value":42});
         let left1 = json!(42);
-        let left2 = json!([1,2,3]);
+        let left2 = json!([1, 2, 3]);
         let left3 = json!({"value2":[42],"value":[42]});
 
         let right = json!({"value":42});
         let right1 = json!(42);
-        let right2 = json!([1,2,3]);
+        let right2 = json!([1, 2, 3]);
         let right3 = json!({"value":[42],"value2":[42]});
 
         assert!(eq(vec![&left], vec![&right]));
@@ -200,9 +200,15 @@ mod tests {
         assert!(!eq(vec![], vec![&right]));
         assert!(!eq(vec![&right], vec![]));
 
-        assert!(eq(vec![&left, &left1, &left2, &left3], vec![&right, &right1, &right2, &right3]));
+        assert!(eq(
+            vec![&left, &left1, &left2, &left3],
+            vec![&right, &right1, &right2, &right3]
+        ));
 
-        assert!(!eq(vec![&left1, &left, &left2, &left3], vec![&right, &right1, &right2, &right3]));
+        assert!(!eq(
+            vec![&left1, &left, &left2, &left3],
+            vec![&right, &right1, &right2, &right3]
+        ));
     }
 
     #[test]
@@ -243,11 +249,11 @@ mod tests {
 
     #[test]
     fn any_of_test() {
-        let right = json!([1,2,3,4,5,6]);
-        let left = json!([1,100,101]);
+        let right = json!([1, 2, 3, 4, 5, 6]);
+        let left = json!([1, 100, 101]);
         assert!(any_of(vec![&left], vec![&right]));
 
-        let left = json!([11,100,101]);
+        let left = json!([11, 100, 101]);
         assert!(!any_of(vec![&left], vec![&right]));
 
         let left1 = json!(1);
@@ -261,16 +267,26 @@ mod tests {
         let left2 = json!(2);
         let left3 = json!(3);
         let left40 = json!(40);
-        let right = json!([1,2,3,4,5,6]);
-        assert!(sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone()])], vec![&right]));
-        assert!(!sub_set_of(vec![&Value::Array(vec![left1.clone(), left2.clone(), left3.clone(), left40.clone()])], vec![&right]));
+        let right = json!([1, 2, 3, 4, 5, 6]);
+        assert!(sub_set_of(
+            vec![&Value::Array(vec![
+                left1.clone(),
+                left2.clone(),
+                left3.clone()
+            ])],
+            vec![&right]
+        ));
+        assert!(!sub_set_of(
+            vec![&Value::Array(vec![left1, left2, left3, left40])],
+            vec![&right]
+        ));
     }
 
     #[test]
     fn size_test() {
         let left1 = json!("abc");
-        let left2 = json!([1,2,3]);
-        let left3 = json!([1,2,3,4]);
+        let left2 = json!([1, 2, 3]);
+        let left3 = json!([1, 2, 3, 4]);
         let right = json!(3);
         assert!(size(vec![&left1], vec![&right]));
         assert!(size(vec![&left2], vec![&right]));
