@@ -138,12 +138,12 @@ impl<'a> Path<'a> for DescentWildcard {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| deep_flatten(data))
+        data.map_slice(deep_flatten)
     }
 }
 
 // todo rewrite to tail rec
-fn deep_flatten<'a>(data: &'a Value) -> Vec<&'a Value> {
+fn deep_flatten(data: &Value) -> Vec<&Value> {
     let mut acc = vec![];
     match data {
         Object(elems) => {
@@ -291,8 +291,6 @@ mod tests {
     use serde_json::json;
     use serde_json::Value;
 
-    use super::deep_path_by_key;
-
     #[test]
     fn object_test() {
         let js = json!({"product": {"key":42}});
@@ -343,7 +341,7 @@ mod tests {
             vec![json_path_value!(&exp_json)]
         );
 
-        let chain = chain!(path!($), field1.clone(), field2.clone(), field3.clone());
+        let chain = chain!(path!($), field1.clone(), field2.clone(), field3);
 
         let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(42);
@@ -387,7 +385,7 @@ mod tests {
             path!($),
             field1.clone(),
             field2.clone(),
-            field4.clone(),
+            field4,
             path!(union)
         );
         let path_inst = json_path_instance(&chain, &json);
@@ -399,13 +397,7 @@ mod tests {
         );
 
         let union = idx!("field1", "field2");
-        let chain = chain!(
-            path!($),
-            field1.clone(),
-            field2.clone(),
-            field5.clone(),
-            path!(union)
-        );
+        let chain = chain!(path!($), field1.clone(), field2, field5, path!(union));
         let path_inst = json_path_instance(&chain, &json);
         let one = json!("val1");
         let two = json!("val2");

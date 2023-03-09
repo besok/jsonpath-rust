@@ -110,6 +110,8 @@
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
+#![allow(clippy::vec_init_then_push)]
+
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
@@ -473,7 +475,7 @@ mod tests {
         test(
             template_json(),
             "$..*.[?(@.isbn)].title",
-            json_path_value![&js1, &js2,&js1, &js2],
+            json_path_value![&js1, &js2, &js1, &js2],
         );
     }
 
