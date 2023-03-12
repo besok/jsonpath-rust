@@ -1,11 +1,15 @@
-### Introduction to JsonPath
+# jsonpath-rust
+
+[![Crates.io](https://img.shields.io/crates/v/jsonpath-rust)](https://crates.io/crates/jsonpath-rust)
+[![docs.rs](https://img.shields.io/docsrs/jsonpath-rust)](https://docs.rs/jsonpath-rust/latest/jsonpath_rust)
+[![Rust CI](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml)
 
 The library provides the basic functionality to find the set of the data according to the filtering query. The idea
 comes from XPath for XML structures. The details can be found [there](https://goessner.net/articles/JsonPath/)
 Therefore JsonPath is a query language for JSON, similar to XPath for XML. The JsonPath query is a set of assertions to
 specify the JSON fields that need to be verified.
 
-### Simple examples
+## Simple examples
 
 Let's suppose we have a following json:
 
@@ -35,11 +39,11 @@ Let's suppose we have a following json:
 And we pursue to find all orders id having the field 'active'. We can construct the jsonpath instance like
 that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
 
-### The jsonpath description
+## The jsonpath description
 
-#### Functions
+### Functions
 
-##### Size
+#### Size
 
 A function `length()` transforms the output of the filtered expression into a size of this element
 It works with arrays, therefore it returns a length of a given array, otherwise null.
@@ -49,7 +53,7 @@ It works with arrays, therefore it returns a length of a given array, otherwise 
 **To use it** for objects, the operator `[*]` can be used.
 `$.object.[*].length()`
 
-#### Operators
+### Operators
 
 | Operator                   | Description                                                                                                                                                  | Where to use                                                                                                                                |
 |----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
@@ -64,7 +68,7 @@ It works with arrays, therefore it returns a length of a given array, otherwise 
 | `[<start>:<end>:<step>]`   | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]``` |                                                                                                                                             |
 | `[?(<expression>)]`        | the logical expression to filter elements in the list.                                                                                                       | It is used with arrays preliminary.                                                                                                         |
 
-#### Filter expressions
+### Filter expressions
 
 The expressions appear in the filter operator like that `[?(@.len > 0)]`. The expression in general consists of the
 following elements:
@@ -156,7 +160,7 @@ By default, the operators have the different priority so `&&` has a higher prior
 used.
 ``` $.[?((@.f == 0 || @.f == 1) && ($.x == 15))].city ```
 
-### Examples
+## Examples
 
 Given the json
 
@@ -201,7 +205,7 @@ Given the json
  ```
 
 | JsonPath | Result |
---------------------------------------| :------- | :----- |
+--------------------------------------| :------- |
 | `$.store.book[*].author`             | The authors of all books |
 | `$..book[?(@.isbn)]`                 | All books with an ISBN number |
 | `$.store.*`                          | All things, both books and bicycles |
@@ -219,7 +223,7 @@ Given the json
 | `$..book[?(@.author ~= /.*REES/i)]`  | All books matching regex (ignore case)  |
 | `$..*`                               | Give me every thing|
 
-### The library
+## The library
 
 The library intends to provide the basic functionality for ability to find the slices of data using the syntax, saying
 above. The dependency can be found as following:
@@ -314,14 +318,14 @@ fn test() {
 }
 ```
 
-#### The structure
+### The structure
 
 ```rust
 pub enum JsonPath {
     Root,
     // <- $
     Field(String),
-    // <- field of the object 
+    // <- field of the object
     Chain(Vec<JsonPath>),
     // <- the whole jsonpath
     Descent(String),
@@ -349,6 +353,6 @@ pub enum JsonPathIndex {
 
 ```
 
-#### How to contribute
+### How to contribute
 
 TBD
