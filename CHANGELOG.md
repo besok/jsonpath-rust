@@ -23,5 +23,5 @@
   * changed the contract for length() function.
 * **`0.2.2`**
   * add ..*
-* **`0.2.3`**
+* **`0.2.5`**
   * build for tags  
