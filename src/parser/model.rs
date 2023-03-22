@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use crate::parse_json_path;
 use serde_json::Value;
 
@@ -27,12 +28,14 @@ pub enum JsonPath {
     Fn(Function),
 }
 
-impl JsonPath {
-    /// allows to create an JsonPath from string
-    pub fn from_str(v: &str) -> Result<JsonPath, String> {
-        parse_json_path(v).map_err(|e| e.to_string())
+impl TryFrom<&str> for JsonPath{
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        parse_json_path(value).map_err(|e| e.to_string())
     }
 }
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Function {
     /// length()
