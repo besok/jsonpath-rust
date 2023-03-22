@@ -25,3 +25,5 @@
   * add ..*
 * **`0.2.5`**
   * build for tags  
+* **`0.2.6`**
+  * make parser mod public  
