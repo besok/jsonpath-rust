@@ -112,11 +112,11 @@
 
 #![allow(clippy::vec_init_then_push)]
 
-use std::convert::TryInto;
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
+use std::convert::TryInto;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -170,7 +170,9 @@ impl FromStr for JsonPathInst {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(JsonPathInst { inner: s.try_into()? })
+        Ok(JsonPathInst {
+            inner: s.try_into()?,
+        })
     }
 }
 
