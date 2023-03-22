@@ -2,6 +2,6 @@
 //! The module grammar denotes the structure of the parsing grammar
 
 mod macros;
-pub(crate) mod model;
+pub mod model;
 #[allow(clippy::module_inception)]
-pub(crate) mod parser;
+pub mod parser;

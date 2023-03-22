@@ -119,8 +119,8 @@ use serde_json::Value;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-mod parser;
-mod path;
+pub mod parser;
+pub mod path;
 
 #[macro_use]
 extern crate pest_derive;
