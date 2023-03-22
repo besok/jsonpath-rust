@@ -1,6 +1,6 @@
-use std::convert::TryFrom;
 use crate::parse_json_path;
 use serde_json::Value;
+use std::convert::TryFrom;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
@@ -28,7 +28,7 @@ pub enum JsonPath {
     Fn(Function),
 }
 
-impl TryFrom<&str> for JsonPath{
+impl TryFrom<&str> for JsonPath {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
