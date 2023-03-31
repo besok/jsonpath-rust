@@ -1,5 +1,7 @@
+use crate::json_path_value;
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
+use crate::JsonPathValue::{NewValue, NoValue, Slice};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
 
@@ -95,21 +97,24 @@ impl<'a> Path<'a> for FnPath {
         input: Vec<JsonPathValue<'a, Self::Data>>,
         is_search_length: bool,
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
-        let len = if is_search_length {
-            json!(input.len())
+        let res = if is_search_length {
+            NewValue(json!(input.iter().filter(|v| v.has_value()).count()))
         } else {
+            let take_len = |v: &Value| match v {
+                Array(elems) => NewValue(json!(elems.len())),
+                _ => NoValue,
+            };
+
             match input.get(0) {
-                None => json!(Value::Null),
                 Some(v) => match v {
-                    JsonPathValue::NewValue(Array(arr)) | JsonPathValue::Slice(Array(arr)) => {
-                        json!(arr.len())
-                    }
-                    _ => json!(Value::Null),
+                    NewValue(d) => take_len(d),
+                    Slice(s) => take_len(s),
+                    NoValue => NoValue,
                 },
+                None => NoValue,
             }
         };
-
-        vec![JsonPathValue::NewValue(len)]
+        vec![res]
     }
 
     fn needs_all(&self) -> bool {
@@ -125,13 +130,19 @@ impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| match data {
-            Object(fields) => fields.get(self.key).map(|e| vec![e]).unwrap_or_default(),
-            _ => vec![],
-        })
+        let take_field = |v: &'a Value| match v {
+            Object(fields) => fields.get(self.key),
+            _ => None,
+        };
+
+        let res = match data {
+            Slice(js) => take_field(js).map(Slice).unwrap_or_else(|| NoValue),
+            _ => NoValue, // TODO it will become wrong if other functions arrives. It states for NewValue
+        };
+        vec![res]
     }
 }
-/// the top method of the processing ..=
+/// the top method of the processing ..*
 pub(crate) struct DescentWildcard;
 
 impl<'a> Path<'a> for DescentWildcard {

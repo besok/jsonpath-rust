@@ -119,6 +119,7 @@ use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::str::FromStr;
+use JsonPathValue::{NewValue, NoValue, Slice};
 
 pub mod parser;
 pub mod path;
@@ -236,8 +237,11 @@ macro_rules! json_path_value {
 /// Can be either a slice of initial data or a new generated value(like length of array)
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum JsonPathValue<'a, Data> {
+    /// The slice of the initial json data
     Slice(&'a Data),
+    /// The new data that was generated from the input data (like length operator)
     NewValue(Data),
+    /// The absent value that indicates the input data is not matched to the given json path (like the absent fields)
     NoValue,
 }
 
@@ -245,16 +249,16 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
     /// Transforms given value into data either by moving value out or by cloning
     pub fn to_data(self) -> Data {
         match self {
-            JsonPathValue::Slice(r) => r.clone(),
-            JsonPathValue::NewValue(val) => val,
-            JsonPathValue::NoValue => Data::default(),
+            Slice(r) => r.clone(),
+            NewValue(val) => val,
+            NoValue => Data::default(),
         }
     }
 }
 
 impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
     fn from(data: &'a Data) -> Self {
-        JsonPathValue::Slice(data)
+        Slice(data)
     }
 }
 
@@ -264,9 +268,16 @@ impl<'a, Data> JsonPathValue<'a, Data> {
         F: FnOnce(&'a Data) -> Vec<&'a Data>,
     {
         match self {
-            JsonPathValue::Slice(r) => mapper(r).into_iter().map(JsonPathValue::Slice).collect(),
-            JsonPathValue::NewValue(_) => vec![],
+            Slice(r) => mapper(r).into_iter().map(Slice).collect(),
+            NewValue(_) => vec![],
             no_v => vec![no_v],
+        }
+    }
+
+    pub fn has_value(&self) -> bool {
+        match self {
+            NoValue => false,
+            _ => true,
         }
     }
 
@@ -274,7 +285,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
         input
             .into_iter()
             .filter_map(|v| match v {
-                JsonPathValue::Slice(el) => Some(el),
+                Slice(el) => Some(el),
                 _ => None,
             })
             .collect()
@@ -283,8 +294,8 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     /// moves a pointer (from slice) out or provides a default value when the value was generated
     pub fn slice_or(self, default: &'a Data) -> &'a Data {
         match self {
-            JsonPathValue::Slice(r) => r,
-            JsonPathValue::NewValue(_) | JsonPathValue::NoValue => default,
+            Slice(r) => r,
+            NewValue(_) | NoValue => default,
         }
     }
 }
@@ -346,6 +357,7 @@ impl JsonPathFinder {
 #[cfg(test)]
 mod tests {
     use crate::JsonPathQuery;
+    use crate::JsonPathValue::{NewValue, NoValue, Slice};
     use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::str::FromStr;
@@ -851,42 +863,86 @@ mod tests {
     }
 
     #[test]
-    fn non_existing_result_test() {
+    fn no_value_index_filter_test() {
         let json: Box<Value> = Box::new(json!({
-            "field":[1,2,3],
-            "deep_field":{
-                "test_field":"red"
-            },
-            "array_field":[
-                {"array_field":1}
-            ]
+            "field":[{"f":1},{"f":0}],
+        }));
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.field[?(@.f_ == 0)]").expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(v, vec![]);
+    }
+
+    #[test]
+    fn no_value_decent_test() {
+        let json: Box<Value> = Box::new(json!({
+            "field":[{"f":1},{"f":{"f_":1}}],
         }));
 
         let path: Box<JsonPathInst> =
-            Box::from(JsonPathInst::from_str("$.field_").expect("the path is correct"));
+            Box::from(JsonPathInst::from_str("$..f_").expect("the path is correct"));
         let finder = JsonPathFinder::new(json.clone(), path);
         let v = finder.find_slice();
-        assert_eq!(v, vec![JsonPathValue::NoValue]);
+        assert_eq!(v, vec![Slice(&json!(1))]);
+    }
 
-        let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.deep_field.test_field_").expect("the path is correct"),
-        );
-        let finder = JsonPathFinder::new(json.clone(), path);
-        let v = finder.find_slice();
-        assert_eq!(v, vec![JsonPathValue::NoValue]);
+    #[test]
+    fn no_value_chain_test() {
+        let json: Box<Value> = Box::new(json!({
+            "field":{"field":[1]},
+        }));
 
         let path: Box<JsonPathInst> =
-            Box::from(JsonPathInst::from_str("$.field[?(@ < 0)]").expect("the path is correct"));
+            Box::from(JsonPathInst::from_str("$.field_.field").expect("the path is correct"));
         let finder = JsonPathFinder::new(json.clone(), path);
         let v = finder.find_slice();
-        assert_eq!(v, vec![]);
+        assert_eq!(v, vec![NoValue]);
 
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.array_field[?(@.array_field_ == 1)]")
-                .expect("the path is correct"),
+            JsonPathInst::from_str("$.field_.field[?(@ == 1)]").expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(v, vec![NoValue]);
+    }
+
+    #[test]
+    fn no_value_len_test() {
+        let json: Box<Value> = Box::new(json!({
+            "field":{"field":1},
+        }));
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.field.field.length()").expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(v, vec![NoValue]);
+
+        let json: Box<Value> = Box::new(json!({
+            "field":[{"a":1},{"a":1}],
+        }));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.field[?(@.a == 0)].f.length()").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json.clone(), path);
         let v = finder.find_slice();
         assert_eq!(v, vec![]);
+    }
+    #[test]
+    fn no_value_len_field_test() {
+        let json: Box<Value> =
+            Box::new(json!([{"verb": "TEST","a":[1,2,3]},{"verb": "TEST"}, {"verb": "RUN"}]));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.verb == 'TEST')].a.length()")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find_slice();
+        assert_eq!(v, vec![NewValue(json!(1))]);
     }
 }
