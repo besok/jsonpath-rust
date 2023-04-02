@@ -12,22 +12,30 @@ impl<'a> Path<'a> for Wildcard {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| match data {
-            Array(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.iter() {
-                    res.push(el);
+        data.flat_map_slice(|data| {
+            let res = match data {
+                Array(elems) => {
+                    let mut res = vec![];
+                    for el in elems.iter() {
+                        res.push(Slice(el));
+                    }
+
+                    res
                 }
+                Object(elems) => {
+                    let mut res = vec![];
+                    for el in elems.values() {
+                        res.push(Slice(el));
+                    }
+                    res
+                }
+                _ => vec![],
+            };
+            if res.is_empty() {
+                vec![NoValue]
+            } else {
                 res
             }
-            Object(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.values() {
-                    res.push(el);
-                }
-                res
-            }
-            _ => vec![],
         })
     }
 }
@@ -68,7 +76,7 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
     type Data = Value;
 
     fn find(&self, _data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        vec![JsonPathValue::Slice(self.root)]
+        vec![Slice(self.root)]
     }
 }
 
@@ -137,7 +145,7 @@ impl<'a> Path<'a> for ObjectField<'a> {
 
         let res = match data {
             Slice(js) => take_field(js).map(Slice).unwrap_or_else(|| NoValue),
-            _ => NoValue, // TODO it will become wrong if other functions arrives. It states for NewValue
+            _ => NoValue,
         };
         vec![res]
     }
@@ -176,7 +184,7 @@ fn deep_flatten(data: &Value) -> Vec<&Value> {
 
 // todo rewrite to tail rec
 fn deep_path_by_key<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-    let mut level: Vec<&Value> = JsonPathValue::slice_into_vec(key.find(data.into()));
+    let mut level: Vec<&Value> = JsonPathValue::into_data(key.find(data.into()));
     match data {
         Object(elems) => {
             let mut next_levels: Vec<&Value> = elems
@@ -207,7 +215,14 @@ impl<'a> Path<'a> for DescentObject<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| deep_path_by_key(data, ObjectField::new(self.key)))
+        data.flat_map_slice(|data| {
+            let res_col = deep_path_by_key(data, ObjectField::new(self.key));
+            if res_col.is_empty() {
+                vec![NoValue]
+            } else {
+                JsonPathValue::map_vec(res_col)
+            }
+        })
     }
 }
 
@@ -298,6 +313,7 @@ mod tests {
     use crate::parser::model::{JsonPath, JsonPathIndex};
     use crate::path::top::{deep_flatten, json_path_instance, Function, ObjectField, RootPointer};
     use crate::path::{JsonPathValue, Path};
+    use crate::JsonPathValue::NoValue;
     use crate::{chain, function, idx, json_path_value, path};
     use serde_json::json;
     use serde_json::Value;
@@ -314,7 +330,7 @@ mod tests {
 
         let key = String::from("fake");
         field.key = &key;
-        assert!(field.find(res_income).is_empty());
+        assert!(field.find(res_income) == vec![NoValue]);
     }
 
     #[test]

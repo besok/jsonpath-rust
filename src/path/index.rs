@@ -2,6 +2,7 @@ use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 use crate::path::json::*;
 use crate::path::top::ObjectField;
 use crate::path::{json_path_instance, process_operand, JsonPathValue, Path, PathInstance};
+use crate::JsonPathValue::{NoValue, Slice};
 use serde_json::value::Value::Array;
 use serde_json::Value;
 
@@ -76,10 +77,17 @@ impl<'a> Path<'a> for ArraySlice {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.map_slice(|data| {
+        input.flat_map_slice(|data| {
             data.as_array()
                 .map(|elems| self.process(elems))
-                .unwrap_or_default()
+                .and_then(|v| {
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(JsonPathValue::map_vec(v))
+                    }
+                })
+                .unwrap_or_else(|| vec![NoValue])
         })
     }
 }
@@ -99,11 +107,11 @@ impl<'a> Path<'a> for ArrayIndex {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.map_slice(|data| {
+        input.flat_map_slice(|data| {
             data.as_array()
                 .and_then(|elems| elems.get(self.index))
-                .map(|e| vec![e])
-                .unwrap_or_default()
+                .map(|e| vec![e.into()])
+                .unwrap_or_else(|| vec![NoValue])
         })
     }
 }
@@ -231,13 +239,13 @@ impl<'a> FilterPath<'a> {
     ) -> bool {
         match op {
             FilterSign::Equal => eq(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
             FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
             FilterSign::Less => less(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
             FilterSign::LeOrEq => {
                 FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right)
@@ -245,50 +253,48 @@ impl<'a> FilterPath<'a> {
             FilterSign::Greater => !FilterPath::process_atom(&FilterSign::LeOrEq, left, right),
             FilterSign::GrOrEq => !FilterPath::process_atom(&FilterSign::Less, left, right),
             FilterSign::Regex => regex(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
             FilterSign::In => inside(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
             FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
             FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
             FilterSign::AnyOf => any_of(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
             FilterSign::SubSetOf => sub_set_of(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
-            FilterSign::Exists => !left.is_empty(),
+            FilterSign::Exists => !JsonPathValue::into_data(left).is_empty(),
             FilterSign::Size => size(
-                JsonPathValue::slice_into_vec(left),
-                JsonPathValue::slice_into_vec(right),
+                JsonPathValue::into_data(left),
+                JsonPathValue::into_data(right),
             ),
         }
     }
 
     fn process(&self, curr_el: &'a Value) -> bool {
         match self {
-            FilterPath::Filter { left, right, op } => FilterPath::process_atom(
-                op,
-                left.find(JsonPathValue::Slice(curr_el)),
-                right.find(JsonPathValue::Slice(curr_el)),
-            ),
+            FilterPath::Filter { left, right, op } => {
+                FilterPath::process_atom(op, left.find(Slice(curr_el)), right.find(Slice(curr_el)))
+            }
             FilterPath::Or { left, right } => {
-                if !left.find(JsonPathValue::Slice(curr_el)).is_empty() {
+                if !JsonPathValue::into_data(left.find(Slice(curr_el))).is_empty() {
                     true
                 } else {
-                    !right.find(JsonPathValue::Slice(curr_el)).is_empty()
+                    !JsonPathValue::into_data(right.find(Slice(curr_el))).is_empty()
                 }
             }
             FilterPath::And { left, right } => {
-                if left.find(JsonPathValue::Slice(curr_el)).is_empty() {
+                if JsonPathValue::into_data(left.find(Slice(curr_el))).is_empty() {
                     false
                 } else {
-                    !right.find(JsonPathValue::Slice(curr_el)).is_empty()
+                    !JsonPathValue::into_data(right.find(Slice(curr_el))).is_empty()
                 }
             }
         }
@@ -299,23 +305,26 @@ impl<'a> Path<'a> for FilterPath<'a> {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.map_slice(|data| {
-            let mut res: Vec<&Value> = vec![];
+        input.flat_map_slice(|data| {
+            let mut res = vec![];
             match data {
                 Array(elems) => {
                     for el in elems.iter() {
                         if self.process(el) {
-                            res.push(el)
+                            res.push(Slice(el))
                         }
                     }
-                    res
                 }
                 el => {
                     if self.process(el) {
-                        res.push(el)
+                        res.push(Slice(el))
                     }
-                    res
                 }
+            }
+            if res.is_empty() {
+                vec![NoValue]
+            } else {
+                res
             }
         })
     }
@@ -327,6 +336,7 @@ mod tests {
     use crate::path::index::{ArrayIndex, ArraySlice};
     use crate::path::JsonPathValue;
     use crate::path::{json_path_instance, Path};
+    use crate::JsonPathValue::NoValue;
     use crate::{chain, filter, idx, json_path_value, op, path};
     use serde_json::json;
 
@@ -390,7 +400,7 @@ mod tests {
         slice.start_index = -1;
         slice.end_index = 1;
 
-        assert!(slice.find((&array).into()).is_empty());
+        assert_eq!(slice.find((&array).into()), vec![NoValue]);
 
         slice.start_index = -10;
         slice.end_index = 10;
@@ -413,7 +423,7 @@ mod tests {
         index.index = 10;
         assert_eq!(index.find((&array).into()), json_path_value![&j10,]);
         index.index = 100;
-        assert!(index.find((&array).into()).is_empty());
+        assert_eq!(index.find((&array).into()), vec![NoValue]);
     }
 
     #[test]
@@ -722,6 +732,6 @@ mod tests {
         );
         let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
-        assert!(path_inst.find((&json).into()).is_empty())
+        assert_eq!(path_inst.find((&json).into()), vec![NoValue])
     }
 }
