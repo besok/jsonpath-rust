@@ -204,30 +204,30 @@ Given the json
 }
  ```
 
-| JsonPath | Result |
---------------------------------------| :------- |
-| `$.store.book[*].author`             | The authors of all books |
-| `$..book[?(@.isbn)]`                 | All books with an ISBN number |
-| `$.store.*`                          | All things, both books and bicycles |
-| `$..author`                          | All authors |
-| `$.store..price`                     | The price of everything |
-| `$..book[2]`                         | The third book |
-| `$..book[-2]`                        | The second to last book |
-| `$..book[0,1]`                       | The first two books |
+| JsonPath                             | Result                                                       |
+|--------------------------------------|:-------------------------------------------------------------|
+| `$.store.book[*].author`             | The authors of all books                                     |
+| `$..book[?(@.isbn)]`                 | All books with an ISBN number                                |
+| `$.store.*`                          | All things, both books and bicycles                          |
+| `$..author`                          | All authors                                                  |
+| `$.store..price`                     | The price of everything                                      |
+| `$..book[2]`                         | The third book                                               |
+| `$..book[-2]`                        | The second to last book                                      |
+| `$..book[0,1]`                       | The first two books                                          |
 | `$..book[:2]`                        | All books from index 0 (inclusive) until index 2 (exclusive) |
 | `$..book[1:2]`                       | All books from index 1 (inclusive) until index 2 (exclusive) |
-| `$..book[-2:]`                       | Last two books |
-| `$..book[2:]`                        | Book number two from tail |
-| `$.store.book[?(@.price < 10)]`      | All books in store cheaper than 10 |
-| `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"  |
-| `$..book[?(@.author ~= /.*REES/i)]`  | All books matching regex (ignore case)  |
-| `$..*`                               | Give me every thing|
+| `$..book[-2:]`                       | Last two books                                               |
+| `$..book[2:]`                        | Book number two from tail                                    |
+| `$.store.book[?(@.price < 10)]`      | All books in store cheaper than 10                           |
+| `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"                  |
+| `$..book[?(@.author ~= /.*REES/i)]`  | All books matching regex (ignore case)                       |
+| `$..*`                               | Give me every thing                                          |
 
 ## The library
 
 The library intends to provide the basic functionality for ability to find the slices of data using the syntax, saying
 above. The dependency can be found as following:
-``` jsonpath-rust = 0.1.5 ```
+``` jsonpath-rust = 0.3.0```
 
 The basic example is the following one:
 
@@ -236,6 +236,7 @@ This is enum type which represents:
 
 - `Slice` - a point to the passed original json
 - `NewValue` - a new json data that has been generated during the path( for instance length operator)
+- `NoValue` - indicates there is no match between given json and jsonpath in the most cases due to absent fields or inconsistent data.
 
 To extract data there are two methods, provided on the `value`:
 
@@ -284,6 +285,18 @@ fn test() {
     assert_eq!(v, vec![JsonPathValue::Slice(&js)]);
 }
 
+```
+In case, if there is no match `find_slice` will return `vec![NoValue]` and `find` return `json!(null)`
+
+```rust
+use jsonpath_rust::JsonPathFinder;
+use serde_json::{json, Value, JsonPathValue};
+
+fn main() {
+    let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.no_field").unwrap();
+    let res_js = finder.find();
+    assert_eq!(res_js, json!(null));
+}
 ```
 
 also, it will work with the instances of [[Value]] as well.

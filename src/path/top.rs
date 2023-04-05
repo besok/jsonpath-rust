@@ -1,4 +1,4 @@
-use crate::json_path_value;
+
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
@@ -105,6 +105,11 @@ impl<'a> Path<'a> for FnPath {
         input: Vec<JsonPathValue<'a, Self::Data>>,
         is_search_length: bool,
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
+        // todo rewrite
+        if JsonPathValue::only_no_value(&input){
+            return vec![NoValue]
+        }
+
         let res = if is_search_length {
             NewValue(json!(input.iter().filter(|v| v.has_value()).count()))
         } else {
@@ -249,11 +254,11 @@ impl<'a> Chain<'a> {
         let chain_len = chain.len();
         let is_search_length = if chain_len > 2 {
             let mut res = false;
-            // if the result of the slice ex[eccted to be a slice, union or filter -
+            // if the result of the slice expected to be a slice, union or filter -
             // length should return length of resulted array
             // In all other cases, including single index, we should fetch item from resulting array
             // and return length of that item
-            res = match chain.get(chain_len - 1).unwrap() {
+            res = match chain.get(chain_len - 1).expect("chain element disappeared") {
                 JsonPath::Fn(Function::Length) => {
                     for item in chain.iter() {
                         match (item, res) {
