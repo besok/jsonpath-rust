@@ -1,4 +1,3 @@
-
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
@@ -106,8 +105,8 @@ impl<'a> Path<'a> for FnPath {
         is_search_length: bool,
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
         // todo rewrite
-        if JsonPathValue::only_no_value(&input){
-            return vec![NoValue]
+        if JsonPathValue::only_no_value(&input) {
+            return vec![NoValue];
         }
 
         let res = if is_search_length {
