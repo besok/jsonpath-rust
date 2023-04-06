@@ -1,5 +1,6 @@
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
+use crate::JsonPathValue::{NewValue, NoValue, Slice};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
 
@@ -10,22 +11,30 @@ impl<'a> Path<'a> for Wildcard {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| match data {
-            Array(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.iter() {
-                    res.push(el);
+        data.flat_map_slice(|data| {
+            let res = match data {
+                Array(elems) => {
+                    let mut res = vec![];
+                    for el in elems.iter() {
+                        res.push(Slice(el));
+                    }
+
+                    res
                 }
+                Object(elems) => {
+                    let mut res = vec![];
+                    for el in elems.values() {
+                        res.push(Slice(el));
+                    }
+                    res
+                }
+                _ => vec![],
+            };
+            if res.is_empty() {
+                vec![NoValue]
+            } else {
                 res
             }
-            Object(elems) => {
-                let mut res: Vec<&Value> = vec![];
-                for el in elems.values() {
-                    res.push(el);
-                }
-                res
-            }
-            _ => vec![],
         })
     }
 }
@@ -66,7 +75,7 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
     type Data = Value;
 
     fn find(&self, _data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        vec![JsonPathValue::Slice(self.root)]
+        vec![Slice(self.root)]
     }
 }
 
@@ -95,21 +104,29 @@ impl<'a> Path<'a> for FnPath {
         input: Vec<JsonPathValue<'a, Self::Data>>,
         is_search_length: bool,
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
-        let len = if is_search_length {
-            json!(input.len())
+        // todo rewrite
+        if JsonPathValue::only_no_value(&input) {
+            return vec![NoValue];
+        }
+
+        let res = if is_search_length {
+            NewValue(json!(input.iter().filter(|v| v.has_value()).count()))
         } else {
+            let take_len = |v: &Value| match v {
+                Array(elems) => NewValue(json!(elems.len())),
+                _ => NoValue,
+            };
+
             match input.get(0) {
-                None => json!(Value::Null),
                 Some(v) => match v {
-                    JsonPathValue::NewValue(Array(arr)) | JsonPathValue::Slice(Array(arr)) => {
-                        json!(arr.len())
-                    }
-                    _ => json!(Value::Null),
+                    NewValue(d) => take_len(d),
+                    Slice(s) => take_len(s),
+                    NoValue => NoValue,
                 },
+                None => NoValue,
             }
         };
-
-        vec![JsonPathValue::NewValue(len)]
+        vec![res]
     }
 
     fn needs_all(&self) -> bool {
@@ -125,13 +142,19 @@ impl<'a> Path<'a> for ObjectField<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| match data {
-            Object(fields) => fields.get(self.key).map(|e| vec![e]).unwrap_or_default(),
-            _ => vec![],
-        })
+        let take_field = |v: &'a Value| match v {
+            Object(fields) => fields.get(self.key),
+            _ => None,
+        };
+
+        let res = match data {
+            Slice(js) => take_field(js).map(Slice).unwrap_or_else(|| NoValue),
+            _ => NoValue,
+        };
+        vec![res]
     }
 }
-/// the top method of the processing ..=
+/// the top method of the processing ..*
 pub(crate) struct DescentWildcard;
 
 impl<'a> Path<'a> for DescentWildcard {
@@ -165,7 +188,7 @@ fn deep_flatten(data: &Value) -> Vec<&Value> {
 
 // todo rewrite to tail rec
 fn deep_path_by_key<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-    let mut level: Vec<&Value> = JsonPathValue::slice_into_vec(key.find(data.into()));
+    let mut level: Vec<&Value> = JsonPathValue::into_data(key.find(data.into()));
     match data {
         Object(elems) => {
             let mut next_levels: Vec<&Value> = elems
@@ -196,7 +219,14 @@ impl<'a> Path<'a> for DescentObject<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(|data| deep_path_by_key(data, ObjectField::new(self.key)))
+        data.flat_map_slice(|data| {
+            let res_col = deep_path_by_key(data, ObjectField::new(self.key));
+            if res_col.is_empty() {
+                vec![NoValue]
+            } else {
+                JsonPathValue::map_vec(res_col)
+            }
+        })
     }
 }
 
@@ -223,11 +253,11 @@ impl<'a> Chain<'a> {
         let chain_len = chain.len();
         let is_search_length = if chain_len > 2 {
             let mut res = false;
-            // if the result of the slice ex[eccted to be a slice, union or filter -
+            // if the result of the slice expected to be a slice, union or filter -
             // length should return length of resulted array
             // In all other cases, including single index, we should fetch item from resulting array
             // and return length of that item
-            res = match chain.get(chain_len - 1).unwrap() {
+            res = match chain.get(chain_len - 1).expect("chain element disappeared") {
                 JsonPath::Fn(Function::Length) => {
                     for item in chain.iter() {
                         match (item, res) {
@@ -287,6 +317,7 @@ mod tests {
     use crate::parser::model::{JsonPath, JsonPathIndex};
     use crate::path::top::{deep_flatten, json_path_instance, Function, ObjectField, RootPointer};
     use crate::path::{JsonPathValue, Path};
+    use crate::JsonPathValue::NoValue;
     use crate::{chain, function, idx, json_path_value, path};
     use serde_json::json;
     use serde_json::Value;
@@ -303,7 +334,7 @@ mod tests {
 
         let key = String::from("fake");
         field.key = &key;
-        assert!(field.find(res_income).is_empty());
+        assert!(field.find(res_income) == vec![NoValue]);
     }
 
     #[test]

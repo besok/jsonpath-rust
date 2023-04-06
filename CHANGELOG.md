@@ -27,3 +27,5 @@
   * build for tags  
 * **`0.2.6`**
   * make parser mod public  
+* **`0.3.0`**
+  * introduce the different behaviour for empty results and non-existing result
