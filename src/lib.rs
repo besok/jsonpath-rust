@@ -119,6 +119,7 @@ use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::str::FromStr;
 use JsonPathValue::{NewValue, NoValue, Slice};
 
@@ -177,6 +178,44 @@ impl FromStr for JsonPathInst {
         })
     }
 }
+
+
+impl JsonPathInst {
+    pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
+        json_path_instance(&self.inner, value)
+            .find((&(*value)).into())
+            .into_iter()
+            .filter(|v| v.has_value())
+            .map(|v| match v {
+                JsonPathValue::Slice(v) => JsonPtr::Slice(v),
+                JsonPathValue::NewValue(v) => JsonPtr::NewValue(v),
+                JsonPathValue::NoValue => unreachable!("has_value was already checked"),
+            })
+            .collect()
+    }
+}
+
+/// Json paths may return either pointers to the original json or new data. This custom pointer type allows us to handle both cases.
+/// Unlike JsonPathValue, this type does not represent NoValue to allow the implementation of Deref.
+pub enum JsonPtr<'a, Data> {
+    /// The slice of the initial json data
+    Slice(&'a Data),
+    /// The new data that was generated from the input data (like length operator)
+    NewValue(Data),
+}
+
+/// Allow deref from json pointer to value.
+impl<'a> Deref for JsonPtr<'a, Value> {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            JsonPtr::Slice(v) => *v,
+            JsonPtr::NewValue(v) => v,
+        }
+    }
+}
+
 
 impl JsonPathQuery for Box<Value> {
     fn path(self, query: &str) -> Result<Value, String> {
@@ -396,6 +435,7 @@ impl JsonPathFinder {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
@@ -1011,6 +1051,28 @@ mod tests {
         let v = finder.find_slice();
         assert_eq!(v, vec![NoValue]);
     }
+
+    #[test]
+    fn no_clone_api_test() {
+        fn test_coercion(value: &Value) -> Value {
+            value.clone()
+        }
+
+        let json: Value = serde_json::from_str(template_json()).expect("to get json");
+        let query = JsonPathInst::from_str("$..book[?(@.author size 10)].title")
+            .expect("the path is correct");
+
+        let results = query.find_slice(&json);
+        let v = results.get(0).expect("to get value");
+
+        // V can be implicitly converted to &Value
+        test_coercion(&v);
+
+        // To explicitly convert to &Value, use deref()
+        assert_eq!(v.deref(), &json!("Sayings of the Century"));
+
+    }
+
 
     // #[test]
     // fn no_value_len_field_test() {
