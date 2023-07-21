@@ -179,7 +179,6 @@ impl FromStr for JsonPathInst {
     }
 }
 
-
 impl JsonPathInst {
     pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
         json_path_instance(&self.inner, value)
@@ -215,7 +214,6 @@ impl<'a> Deref for JsonPtr<'a, Value> {
         }
     }
 }
-
 
 impl JsonPathQuery for Box<Value> {
     fn path(self, query: &str) -> Result<Value, String> {
@@ -435,11 +433,11 @@ impl JsonPathFinder {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
+    use std::ops::Deref;
     use std::str::FromStr;
 
     fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
@@ -1070,9 +1068,7 @@ mod tests {
 
         // To explicitly convert to &Value, use deref()
         assert_eq!(v.deref(), &json!("Sayings of the Century"));
-
     }
-
 
     // #[test]
     // fn no_value_len_field_test() {
