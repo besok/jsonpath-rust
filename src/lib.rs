@@ -1064,7 +1064,7 @@ mod tests {
         let v = results.get(0).expect("to get value");
 
         // V can be implicitly converted to &Value
-        test_coercion(&v);
+        test_coercion(v);
 
         // To explicitly convert to &Value, use deref()
         assert_eq!(v.deref(), &json!("Sayings of the Century"));
