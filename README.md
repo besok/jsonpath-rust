@@ -383,3 +383,11 @@ pub enum JsonPathIndex {
 ### How to contribute
 
 TBD
+
+### How to publish to crates.
+Since all PRs have been merged, the new tag needs to be created. 
+The tag should start from `v` like `v0.3.1`
+```shell
+git tag v0.3.1
+git push origin --tags
+```
