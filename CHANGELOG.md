@@ -29,3 +29,5 @@
   * make parser mod public  
 * **`0.3.0`**
   * introduce the different behaviour for empty results and non-existing result
+* **`0.3.1`**
+  * Add api to avoid cloning the result.
