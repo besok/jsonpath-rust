@@ -331,6 +331,20 @@ fn test() {
 }
 ```
 
+also, `JsonPathInst` can be used to query the data without cloning.
+```rust
+use serde_json::{json, Value};
+use crate::jsonpath_rust::{JsonPathInst};
+
+fn test() {
+    let json: Value = serde_json::from_str("{}").expect("to get json");
+    let query = JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap();
+
+    // To convert to &Value, use deref()
+    assert_eq!(query.find_slice(&json).get(0).expect("to get value").deref(), &json!("Sayings of the Century"));
+}
+```
+
 ### The structure
 
 ```rust
