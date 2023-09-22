@@ -165,6 +165,7 @@ pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
 
+#[derive(Clone)]
 pub struct JsonPathInst {
     inner: JsonPath,
 }
