@@ -30,4 +30,4 @@
 * **`0.3.0`**
   * introduce the different behaviour for empty results and non-existing result
 * **`0.3.2`**
-  * make jsonpath inst cloneable 
+  * make jsonpath inst cloneable.

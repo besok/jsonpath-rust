@@ -383,3 +383,8 @@ pub enum JsonPathIndex {
 ### How to contribute
 
 TBD
+
+### How to update version
+ - update files
+ - add tag `git tag -a v<Version> -m "message"`
+ - git push origin <tag_name>
