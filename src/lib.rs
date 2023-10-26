@@ -435,7 +435,7 @@ impl JsonPathFinder {
 #[cfg(test)]
 mod tests {
     use crate::JsonPathQuery;
-    use crate::JsonPathValue::{NoValue, Slice};
+    use crate::JsonPathValue::{NewValue, NoValue, Slice};
     use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
@@ -1069,6 +1069,31 @@ mod tests {
 
         // To explicitly convert to &Value, use deref()
         assert_eq!(v.deref(), &json!("Sayings of the Century"));
+    }
+
+    #[test]
+    fn logical_exp_test() {
+        let json: Box<Value> =
+            Box::new(json!({"first":{"second":[{"active":1},{"passive":1}]}}));
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(@.does_not_exist && @.does_not_exist >= 1.0)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+
+        let v = finder.find_slice();
+        assert_eq!(v, vec![NoValue]);
+
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(@.does_not_exist >= 1.0)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json, path);
+
+        let v = finder.find_slice();
+        assert_eq!(v, vec![NoValue]);
     }
 
     // #[test]
