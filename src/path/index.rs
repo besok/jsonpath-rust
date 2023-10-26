@@ -254,7 +254,9 @@ impl<'a> FilterPath<'a> {
                 JsonPathValue::into_data(right),
                 JsonPathValue::into_data(left),
             ),
-            FilterSign::GrOrEq => FilterPath::compound(&FilterSign::Greater, &FilterSign::Equal, left, right),
+            FilterSign::GrOrEq => {
+                FilterPath::compound(&FilterSign::Greater, &FilterSign::Equal, left, right)
+            }
             FilterSign::Regex => regex(
                 JsonPathValue::into_data(left),
                 JsonPathValue::into_data(right),
@@ -498,7 +500,6 @@ mod tests {
         let exp3 = json!( {"field":4});
         let exp4 = json!( {"field":1});
 
-
         let index = path!(
             idx!(?filter!(op!(path!(@, path!("field"))), ">", op!(chain!(path!($), path!("threshold")))))
         );
@@ -506,7 +507,6 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
         let expected_res = json_path_value![&exp1, &exp2];
         assert_eq!(path_inst.find((&json).into()), expected_res);
-
 
         let index = path!(
             idx!(?filter!(op!(path!(@, path!("field"))), ">=", op!(chain!(path!($), path!("threshold")))))
@@ -524,13 +524,12 @@ mod tests {
         let expected_res = json_path_value![&exp4, &exp4];
         assert_eq!(path_inst.find((&json).into()), expected_res);
 
-
         let index = path!(
             idx!(?filter!(op!(path!(@, path!("field"))), "<=", op!(chain!(path!($), path!("threshold")))))
         );
         let chain = chain!(path!($), path!("key"), index);
         let path_inst = json_path_instance(&chain, &json);
-        let expected_res = json_path_value![&exp4,&exp3, &exp4];
+        let expected_res = json_path_value![&exp4, &exp3, &exp4];
         assert_eq!(path_inst.find((&json).into()), expected_res);
     }
 

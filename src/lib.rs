@@ -435,7 +435,7 @@ impl JsonPathFinder {
 #[cfg(test)]
 mod tests {
     use crate::JsonPathQuery;
-    use crate::JsonPathValue::{NewValue, NoValue, Slice};
+    use crate::JsonPathValue::{NoValue, Slice};
     use crate::{json_path_value, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
@@ -1073,8 +1073,7 @@ mod tests {
 
     #[test]
     fn logical_exp_test() {
-        let json: Box<Value> =
-            Box::new(json!({"first":{"second":[{"active":1},{"passive":1}]}}));
+        let json: Box<Value> = Box::new(json!({"first":{"second":[{"active":1},{"passive":1}]}}));
 
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.first[?(@.does_not_exist && @.does_not_exist >= 1.0)]")
@@ -1084,7 +1083,6 @@ mod tests {
 
         let v = finder.find_slice();
         assert_eq!(v, vec![NoValue]);
-
 
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.first[?(@.does_not_exist >= 1.0)]")

@@ -31,3 +31,5 @@
   * introduce the different behaviour for empty results and non-existing result
 * **`0.3.2`**
   * make jsonpath inst cloneable.
+* **`0.3.3`**
+  * fix a bug with the logical operators
