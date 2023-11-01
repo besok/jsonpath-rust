@@ -215,7 +215,11 @@ impl JsonPathQuery for Value {
 #[macro_export]
 macro_rules! json_path_value {
     (&$v:expr) =>{
-        JsonPathValue::Slice(&$v)
+        JsonPathValue::Slice(&$v, String::new())
+    };
+
+     (&$v:expr ; $s:expr) =>{
+        JsonPathValue::Slice(&$v, $s.to_string())
     };
 
     ($(&$v:expr),+ $(,)?) =>{
@@ -227,18 +231,29 @@ macro_rules! json_path_value {
         res
         }
     };
+
+     ($(&$v:expr),+ ; $s:expr ) =>{
+        {
+        let mut res = Vec::new();
+        $(
+           res.push(json_path_value!(&$v as $s));
+        )+
+        res
+        }
+    };
+
     ($v:expr) =>{
         JsonPathValue::NewValue($v)
     };
 
 }
-
+type JsPathStr = String;
 /// A result of json path
 /// Can be either a slice of initial data or a new generated value(like length of array)
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum JsonPathValue<'a, Data> {
     /// The slice of the initial json data
-    Slice(&'a Data),
+    Slice(&'a Data, JsPathStr),
     /// The new data that was generated from the input data (like length operator)
     NewValue(Data),
     /// The absent value that indicates the input data is not matched to the given json path (like the absent fields)
@@ -249,30 +264,54 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
     /// Transforms given value into data either by moving value out or by cloning
     pub fn to_data(self) -> Data {
         match self {
-            Slice(r) => r.clone(),
+            Slice(r, _) => r.clone(),
             NewValue(val) => val,
             NoValue => Data::default(),
         }
     }
-}
 
-impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
-    fn from(data: &'a Data) -> Self {
-        Slice(data)
+    /// Transforms given value into path
+    pub fn to_path(self) -> Option<JsPathStr> {
+        match self {
+            Slice(_, path) => Some(path),
+            _ => None,
+        }
+    }
+
+    pub fn from_root(data: &'a Data) -> Self {
+        Slice(data, String::from("$"))
+    }
+    pub fn new_slice(data: &'a Data, path: String) -> Self {
+        Slice(data, path.to_string())
     }
 }
 
+// impl<'a, Data> From<&'a Data> for JsonPathValue<'a, Data> {
+//     fn from(data: &'a Data) -> Self {
+//         Slice(data)
+//     }
+// }
+
 impl<'a, Data> JsonPathValue<'a, Data> {
-    fn map_vec(data: Vec<&'a Data>) -> Vec<JsonPathValue<'a, Data>> {
-        data.into_iter().map(|v| v.into()).collect()
+    fn map_vec(data: Vec<&'a Data>, prefix: JsPathStr) -> Vec<JsonPathValue<'a, Data>> {
+        let js_str = |idx: usize| format!("{}[{}]", prefix, idx);
+
+        data.into_iter()
+            .enumerate()
+            .map(|(idx, data)| Slice(data, js_str(idx)))
+            .collect()
     }
 
     fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
-        F: FnOnce(&'a Data) -> Vec<&'a Data>,
+        F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
     {
         match self {
-            Slice(r) => mapper(r).into_iter().map(Slice).collect(),
+            Slice(r, pref) => mapper(r, pref)
+                .into_iter()
+                .map(|(d, s)| Slice(d, s))
+                .collect(),
+
             NewValue(_) => vec![],
             no_v => vec![no_v],
         }
@@ -280,10 +319,10 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
     fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
-        F: FnOnce(&'a Data) -> Vec<JsonPathValue<'a, Data>>,
+        F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
     {
         match self {
-            Slice(r) => mapper(r),
+            Slice(r, pref) => mapper(r, pref),
             _ => vec![NoValue],
         }
     }
@@ -295,22 +334,14 @@ impl<'a, Data> JsonPathValue<'a, Data> {
         }
     }
 
-    pub fn into_data(input: Vec<JsonPathValue<'a, Data>>) -> Vec<&'a Data> {
+    pub fn vec_as_data(input: Vec<JsonPathValue<'a, Data>>) -> Vec<&'a Data> {
         input
             .into_iter()
             .filter_map(|v| match v {
-                Slice(el) => Some(el),
+                Slice(el, _) => Some(el),
                 _ => None,
             })
             .collect()
-    }
-
-    /// moves a pointer (from slice) out or provides a default value when the value was generated
-    pub fn slice_or(self, default: &'a Data) -> &'a Data {
-        match self {
-            Slice(r) => r,
-            NewValue(_) | NoValue => default,
-        }
     }
 }
 
@@ -359,7 +390,7 @@ impl JsonPathFinder {
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
     pub fn find_slice(&self) -> Vec<JsonPathValue<'_, Value>> {
-        let res = self.instance().find((&(*self.json)).into());
+        let res = self.instance().find(JsonPathValue::from_root(&self.json));
         let has_v: Vec<JsonPathValue<'_, Value>> =
             res.into_iter().filter(|v| v.has_value()).collect();
 
@@ -373,6 +404,16 @@ impl JsonPathFinder {
     /// finds a slice of data and wrap it with Value::Array by cloning the data.
     pub fn find(&self) -> Value {
         Value::Array(self.find_slice().into_iter().map(|v| v.to_data()).collect())
+    }
+    /// finds a path of the values.
+    pub fn find_path(&self) -> Value {
+        Value::Array(
+            self.find_slice()
+                .into_iter()
+                .flat_map(|v| v.to_path())
+                .map(|v| v.into())
+                .collect(),
+        )
     }
 }
 
@@ -942,7 +983,7 @@ mod tests {
             Box::from(JsonPathInst::from_str("$..f_").expect("the path is correct"));
         let finder = JsonPathFinder::new(json.clone(), path);
         let v = finder.find_slice();
-        assert_eq!(v, vec![Slice(&json!(1))]);
+        assert_eq!(v, vec![Slice(&json!(1), "$.field[1].f.f_".to_string())]);
     }
 
     #[test]

@@ -77,7 +77,7 @@ impl<'a> Path<'a> for ArraySlice {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.flat_map_slice(|data| {
+        input.flat_map_slice(|data, pref| {
             data.as_array()
                 .map(|elems| self.process(elems))
                 .and_then(|v| {
@@ -107,10 +107,15 @@ impl<'a> Path<'a> for ArrayIndex {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.flat_map_slice(|data| {
+        input.flat_map_slice(|data, pref| {
             data.as_array()
                 .and_then(|elems| elems.get(self.index))
-                .map(|e| vec![e.into()])
+                .map(|e| {
+                    vec![JsonPathValue::new_slice(
+                        e,
+                        format!("{pref}[{}]", self.index),
+                    )]
+                })
                 .unwrap_or_else(|| vec![NoValue])
         })
     }
@@ -239,13 +244,13 @@ impl<'a> FilterPath<'a> {
     ) -> bool {
         match op {
             FilterSign::Equal => eq(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
             FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
             FilterSign::Less => less(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
             FilterSign::LeOrEq => {
                 FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right)
@@ -253,27 +258,27 @@ impl<'a> FilterPath<'a> {
             FilterSign::Greater => !FilterPath::process_atom(&FilterSign::LeOrEq, left, right),
             FilterSign::GrOrEq => !FilterPath::process_atom(&FilterSign::Less, left, right),
             FilterSign::Regex => regex(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
             FilterSign::In => inside(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
             FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
             FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
             FilterSign::AnyOf => any_of(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
             FilterSign::SubSetOf => sub_set_of(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
-            FilterSign::Exists => !JsonPathValue::into_data(left).is_empty(),
+            FilterSign::Exists => !JsonPathValue::vec_as_data(left).is_empty(),
             FilterSign::Size => size(
-                JsonPathValue::into_data(left),
-                JsonPathValue::into_data(right),
+                JsonPathValue::vec_as_data(left),
+                JsonPathValue::vec_as_data(right),
             ),
         }
     }
@@ -284,17 +289,17 @@ impl<'a> FilterPath<'a> {
                 FilterPath::process_atom(op, left.find(Slice(curr_el)), right.find(Slice(curr_el)))
             }
             FilterPath::Or { left, right } => {
-                if !JsonPathValue::into_data(left.find(Slice(curr_el))).is_empty() {
+                if !JsonPathValue::vec_as_data(left.find(Slice(curr_el))).is_empty() {
                     true
                 } else {
-                    !JsonPathValue::into_data(right.find(Slice(curr_el))).is_empty()
+                    !JsonPathValue::vec_as_data(right.find(Slice(curr_el))).is_empty()
                 }
             }
             FilterPath::And { left, right } => {
-                if JsonPathValue::into_data(left.find(Slice(curr_el))).is_empty() {
+                if JsonPathValue::vec_as_data(left.find(Slice(curr_el))).is_empty() {
                     false
                 } else {
-                    !JsonPathValue::into_data(right.find(Slice(curr_el))).is_empty()
+                    !JsonPathValue::vec_as_data(right.find(Slice(curr_el))).is_empty()
                 }
             }
         }
@@ -305,7 +310,7 @@ impl<'a> Path<'a> for FilterPath<'a> {
     type Data = Value;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.flat_map_slice(|data| {
+        input.flat_map_slice(|data, pref| {
             let mut res = vec![];
             match data {
                 Array(elems) => {
@@ -387,7 +392,10 @@ mod tests {
         let j1 = json!(0);
         let j2 = json!(2);
         let j4 = json!(4);
-        assert_eq!(slice.find((&array).into()), json_path_value![&j1, &j2, &j4]);
+        assert_eq!(
+            slice.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            json_path_value![&j1, &j2, &j4]
+        );
 
         slice.step = 3;
         let j0 = json!(0);
@@ -400,7 +408,10 @@ mod tests {
         slice.start_index = -1;
         slice.end_index = 1;
 
-        assert_eq!(slice.find((&array).into()), vec![NoValue]);
+        assert_eq!(
+            slice.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            vec![NoValue]
+        );
 
         slice.start_index = -10;
         slice.end_index = 10;
@@ -409,7 +420,10 @@ mod tests {
         let j4 = json!(4);
         let j7 = json!(7);
 
-        assert_eq!(slice.find((&array).into()), json_path_value![&j1, &j4, &j7]);
+        assert_eq!(
+            slice.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            json_path_value![&j1, &j4, &j7]
+        );
     }
 
     #[test]
@@ -419,11 +433,20 @@ mod tests {
         let mut index = ArrayIndex::new(0);
         let j0 = json!(0);
         let j10 = json!(10);
-        assert_eq!(index.find((&array).into()), json_path_value![&j0,]);
+        assert_eq!(
+            index.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            json_path_value![&j0,]
+        );
         index.index = 10;
-        assert_eq!(index.find((&array).into()), json_path_value![&j10,]);
+        assert_eq!(
+            index.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            json_path_value![&j10,]
+        );
         index.index = 100;
-        assert_eq!(index.find((&array).into()), vec![NoValue]);
+        assert_eq!(
+            index.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            vec![NoValue]
+        );
     }
 
     #[test]
@@ -456,7 +479,7 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
         let res1 = json!("b");
 
-        let expected_res = vec![(&res1).into()];
+        let expected_res = vec![JsonPathValue::new_slice(&res1, "a".to_string())];
         assert_eq!(path_inst.find(json_path_value!(&json)), expected_res);
     }
 
@@ -501,7 +524,10 @@ mod tests {
         let exp1 = json!( {"field":10});
         let exp2 = json!( {"field":5});
         let expected_res = json_path_value![&exp1, &exp2];
-        assert_eq!(path_inst.find((&json).into()), expected_res)
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            expected_res
+        )
     }
 
     #[test]
@@ -522,7 +548,10 @@ mod tests {
 
         let exp2 = json!( {"field":"a1#1"});
         let expected_res = json_path_value![&exp2,];
-        assert_eq!(path_inst.find((&json).into()), expected_res)
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            expected_res
+        )
     }
 
     #[test]
@@ -548,7 +577,10 @@ mod tests {
 
         let exp2 = json!( {"field":"a11#"});
         let expected_res = json_path_value![&exp2,];
-        assert_eq!(path_inst.find((&json).into()), expected_res)
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            expected_res
+        )
     }
 
     #[test]
@@ -572,7 +604,10 @@ mod tests {
         let f3 = json!( {"field":[1,1,1,1]});
 
         let expected_res = json_path_value![&f1, &f2, &f3];
-        assert_eq!(path_inst.find((&json).into()), expected_res)
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            expected_res
+        )
     }
 
     #[test]
@@ -594,7 +629,10 @@ mod tests {
             "not_id": 2,
             "more_then_id" :3
         });
-        assert_eq!(path_inst.find((&json).into()), json_path_value![&js,])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            json_path_value![&js,]
+        )
     }
 
     #[test]
@@ -622,7 +660,7 @@ mod tests {
         let d = json!("Dortmund");
         let dd = json!("Dublin");
         assert_eq!(
-            path_inst.find((&json).into()),
+            path_inst.find(JsonPathValue::from_root(&json)),
             json_path_value![&a, &d, &dd]
         )
     }
@@ -645,7 +683,10 @@ mod tests {
         let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            json_path_value![&j1,]
+        )
     }
 
     #[test]
@@ -666,7 +707,10 @@ mod tests {
         let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            json_path_value![&j1,]
+        )
     }
 
     #[test]
@@ -691,7 +735,10 @@ mod tests {
         let chain = chain!(path!($), path!("key"), path!(index), path!("city"));
         let path_inst = json_path_instance(&chain, &json);
         let a = json!("Athlon");
-        assert_eq!(path_inst.find((&json).into()), json_path_value![&a,])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            json_path_value![&a,]
+        )
     }
 
     #[test]
@@ -712,7 +759,10 @@ mod tests {
         let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
-        assert_eq!(path_inst.find((&json).into()), json_path_value![&j1,])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            json_path_value![&j1,]
+        )
     }
 
     #[test]
@@ -732,6 +782,9 @@ mod tests {
         );
         let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
-        assert_eq!(path_inst.find((&json).into()), vec![NoValue])
+        assert_eq!(
+            path_inst.find(JsonPathValue::from_root(&json)),
+            vec![NoValue]
+        )
     }
 }

@@ -1,6 +1,6 @@
-use crate::json_path_value;
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
+use crate::JsPathStr;
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
@@ -12,20 +12,20 @@ impl<'a> Path<'a> for Wildcard {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.flat_map_slice(|data| {
+        data.flat_map_slice(|data, pref| {
             let res = match data {
                 Array(elems) => {
                     let mut res = vec![];
-                    for el in elems.iter() {
-                        res.push(Slice(el));
+                    for (idx, el) in elems.iter().enumerate() {
+                        res.push(Slice(el, format!("{}[{}]", pref, idx)));
                     }
 
                     res
                 }
                 Object(elems) => {
                     let mut res = vec![];
-                    for el in elems.values() {
-                        res.push(Slice(el));
+                    for (key, el) in elems.into_iter() {
+                        res.push(Slice(el, format!("{}['{}']", pref, key)));
                     }
                     res
                 }
@@ -76,7 +76,7 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
     type Data = Value;
 
     fn find(&self, _data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        vec![Slice(self.root)]
+        vec![JsonPathValue::from_root(self.root)]
     }
 }
 
@@ -144,7 +144,9 @@ impl<'a> Path<'a> for ObjectField<'a> {
         };
 
         let res = match data {
-            Slice(js) => take_field(js).map(Slice).unwrap_or_else(|| NoValue),
+            Slice(js, p) => take_field(js)
+                .map(|v| JsonPathValue::new_slice(v, format!("{p}['{}']", self.key)))
+                .unwrap_or_else(|| NoValue),
             _ => NoValue,
         };
         vec![res]
@@ -162,19 +164,21 @@ impl<'a> Path<'a> for DescentWildcard {
 }
 
 // todo rewrite to tail rec
-fn deep_flatten(data: &Value) -> Vec<&Value> {
+fn deep_flatten(data: &Value, pref: JsPathStr) -> Vec<(&Value, JsPathStr)> {
     let mut acc = vec![];
     match data {
         Object(elems) => {
-            for v in elems.values() {
-                acc.push(v);
-                acc.append(&mut deep_flatten(v));
+            for (f, v) in elems.into_iter() {
+                let pref = format!("{}['{}']", pref, f);
+                acc.push((v, pref.clone()));
+                acc.append(&mut deep_flatten(v, pref));
             }
         }
         Array(elems) => {
-            for v in elems.iter() {
-                acc.push(v);
-                acc.append(&mut deep_flatten(v));
+            for (i, v) in elems.iter().enumerate() {
+                let pref = format!("{}[{}]", pref, i);
+                acc.push((v, pref.clone()));
+                acc.append(&mut deep_flatten(v, pref));
             }
         }
         _ => (),
@@ -184,7 +188,8 @@ fn deep_flatten(data: &Value) -> Vec<&Value> {
 
 // todo rewrite to tail rec
 fn deep_path_by_key<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-    let mut level: Vec<&Value> = JsonPathValue::into_data(key.find(data.into()));
+    let mut level: Vec<&Value> =
+        JsonPathValue::vec_as_data(key.find(JsonPathValue::new_slice(&data)));
     match data {
         Object(elems) => {
             let mut next_levels: Vec<&Value> = elems
@@ -215,7 +220,7 @@ impl<'a> Path<'a> for DescentObject<'a> {
     type Data = Value;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.flat_map_slice(|data| {
+        data.flat_map_slice(|data, pref| {
             let res_col = deep_path_by_key(data, ObjectField::new(self.key));
             if res_col.is_empty() {
                 vec![NoValue]
