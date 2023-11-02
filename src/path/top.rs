@@ -105,7 +105,10 @@ impl<'a> Path<'a> for FnPath {
         input: Vec<JsonPathValue<'a, Self::Data>>,
         is_search_length: bool,
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
-        println!("flat_find, {is_search_length}, input: {:?},", input);
+        // todo rewrite
+        if JsonPathValue::only_no_value(&input) {
+            return vec![NoValue];
+        }
         let res = if is_search_length {
             NewValue(json!(input.iter().filter(|v| v.has_value()).count()))
         } else {
