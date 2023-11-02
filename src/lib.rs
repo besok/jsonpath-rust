@@ -407,8 +407,10 @@ impl JsonPathFinder {
     /// The result is a vector of references to the incoming structure.
     pub fn find_slice(&self) -> Vec<JsonPathValue<'_, Value>> {
         let res = self.instance().find(JsonPathValue::from_root(&self.json));
+        println!("{:?}",res);
         let has_v: Vec<JsonPathValue<'_, Value>> =
-            res.into_iter().filter(|v| v.has_value()).collect();
+            res.into_iter().filter(|v| v.has_value())
+                .collect();
 
         if has_v.is_empty() {
             vec![NoValue]
@@ -520,7 +522,15 @@ mod tests {
     fn descent_test() {
         let v1 = json!("reference");
         let v2 = json!("fiction");
-        test(template_json(), "$..category", jp_v![&v1, &v2, &v2, &v2,]);
+        test(
+            template_json(),
+            "$..category",
+            jp_v![
+                 &v1;"$.['store'].['book'][0].['category']", 
+                 &v2;"$.['store'].['book'][1].['category']", 
+                 &v2;"$.['store'].['book'][2].['category']", 
+                 &v2;"$.['store'].['book'][3].['category']",],
+        );
         let js1 = json!(19.95);
         let js2 = json!(8.95);
         let js3 = json!(12.99);
@@ -529,13 +539,27 @@ mod tests {
         test(
             template_json(),
             "$.store..price",
-            jp_v![&js1, &js2, &js3, &js4, &js5,],
+            jp_v![
+                &js1;"$.['store'].['bicycle'].['price']",
+                &js2;"$.['store'].['book'][0].['price']",
+                &js3;"$.['store'].['book'][1].['price']",
+                &js4;"$.['store'].['book'][2].['price']",
+                &js5;"$.['store'].['book'][3].['price']",
+            ],
         );
         let js1 = json!("Nigel Rees");
         let js2 = json!("Evelyn Waugh");
         let js3 = json!("Herman Melville");
         let js4 = json!("J. R. R. Tolkien");
-        test(template_json(), "$..author", jp_v![&js1, &js2, &js3, &js4,]);
+        test(
+            template_json(),
+            "$..author",
+            jp_v![
+            &js1;"$.['store'].['book'][0].['author']", 
+            &js2;"$.['store'].['book'][1].['author']", 
+            &js3;"$.['store'].['book'][2].['author']", 
+            &js4;"$.['store'].['book'][3].['author']",],
+        );
     }
 
     #[test]
@@ -545,7 +569,11 @@ mod tests {
         test(
             template_json(),
             "$..book.[*].category",
-            jp_v![&js1, &js2, &js2, &js2,],
+            jp_v![
+                &js1;"$.['store'].['book'][0].['category']", 
+                &js2;"$.['store'].['book'][1].['category']", 
+                &js2;"$.['store'].['book'][2].['category']", 
+                &js2;"$.['store'].['book'][3].['category']",],
         );
         let js1 = json!("Nigel Rees");
         let js2 = json!("Evelyn Waugh");
@@ -554,7 +582,11 @@ mod tests {
         test(
             template_json(),
             "$.store.book[*].author",
-            jp_v![&js1, &js2, &js3, &js4,],
+            jp_v![
+                &js1;"$.['store'].['book'][0].['author']",
+                &js2;"$.['store'].['book'][1].['author']",
+                &js3;"$.['store'].['book'][2].['author']", 
+                &js4;"$.['store'].['book'][3].['author']",],
         );
     }
 
@@ -586,18 +618,22 @@ mod tests {
     #[test]
     fn index_index_test() {
         let value = json!("0-553-21311-3");
-        test(template_json(), "$..book[2].isbn", jp_v![&value,]);
+        test(template_json(), "$..book[2].isbn", jp_v![&value;"$.['store'].['book'][2].['isbn']",]);
     }
 
     #[test]
     fn index_unit_index_test() {
         let value = json!("0-553-21311-3");
-        test(template_json(), "$..book[2,4].isbn", jp_v![&value,]);
+        test(
+            template_json(),
+            "$..book[2,4].isbn",
+            jp_v![&value;"$.['store'].['book'][2].['isbn']",],
+        );
         let value1 = json!("0-395-19395-8");
         test(
             template_json(),
             "$..book[2,3].isbn",
-            jp_v![&value, &value1,],
+            jp_v![&value;"$.['store'].['book'][2].['isbn']", &value1;"$.['store'].['book'][3].['isbn']",],
         );
     }
 
@@ -610,12 +646,27 @@ mod tests {
         test(
             template_json(),
             "$..book[2,3]['title','price']",
-            jp_v![&js1, &js2, &js3, &js4,],
+            jp_v![
+                &js1;"$.['store'].['book'][2].['title']", 
+                &js2;"$.['store'].['book'][2].['price']",
+                &js3;"$.['store'].['book'][3].['title']", 
+                &js4;"$.['store'].['book'][3].['price']",],
         );
     }
 
     #[test]
     fn index_slice_test() {
+        let i0 = "$.['array'][0]";
+        let i1 = "$.['array'][1]";
+        let i2 = "$.['array'][2]";
+        let i3 = "$.['array'][3]";
+        let i4 = "$.['array'][4]";
+        let i5 = "$.['array'][5]";
+        let i6 = "$.['array'][6]";
+        let i7 = "$.['array'][7]";
+        let i8 = "$.['array'][8]";
+        let i9 = "$.['array'][9]";
+
         let j0 = json!(0);
         let j1 = json!(1);
         let j2 = json!(2);
@@ -629,12 +680,26 @@ mod tests {
         test(
             template_json(),
             "$.array[:]",
-            jp_v![&j0, &j1, &j2, &j3, &j4, &j5, &j6, &j7, &j8, &j9,],
+            jp_v![
+                &j0;&i0, 
+                &j1;&i1, 
+                &j2;&i2, 
+                &j3;&i3, 
+                &j4;&i4,
+                &j5;&i5, 
+                &j6;&i6, 
+                &j7;&i7, 
+                &j8;&i8, 
+                &j9;&i9,],
         );
-        test(template_json(), "$.array[1:4:2]", jp_v![&j1, &j3,]);
-        test(template_json(), "$.array[::3]", jp_v![&j0, &j3, &j6, &j9,]);
-        test(template_json(), "$.array[-1:]", jp_v![&j9,]);
-        test(template_json(), "$.array[-2:-1]", jp_v![&j8,]);
+        test(template_json(), "$.array[1:4:2]", jp_v![&j1;&i1, &j3;&i3,]);
+        test(
+            template_json(),
+            "$.array[::3]",
+            jp_v![&j0;&i0, &j3;&i3, &j6;&i6, &j9;&i9,],
+        );
+        test(template_json(), "$.array[-1:]", jp_v![&j9;&i9,]);
+        test(template_json(), "$.array[-2:-1]", jp_v![&j8;&i8,]);
     }
 
     #[test]
@@ -644,25 +709,30 @@ mod tests {
         test(
             template_json(),
             "$..book[?(@.isbn)].title",
-            jp_v![&moby, &rings,],
+            jp_v![
+                &moby;"$.['store'].['book'][2].['title']",
+                &rings;"$.['store'].['book'][3].['title']",],
         );
         let sword = json!("Sword of Honour");
         test(
             template_json(),
             "$..book[?(@.price != 8.95)].title",
-            jp_v![&sword, &moby, &rings,],
+            jp_v![
+                &sword;"$.['store'].['book'][1].['title']",
+                &moby;"$.['store'].['book'][2].['title']",
+                &rings;"$.['store'].['book'][3].['title']",],
         );
         let sayings = json!("Sayings of the Century");
         test(
             template_json(),
             "$..book[?(@.price == 8.95)].title",
-            jp_v![&sayings,],
+            jp_v![&sayings;"$.['store'].['book'][0].['title']",],
         );
         let js895 = json!(8.95);
         test(
             template_json(),
             "$..book[?(@.author ~= '.*Rees')].price",
-            jp_v![&js895,],
+            jp_v![&js895;"$.['store'].['book'][0].['price']",],
         );
         let js12 = json!(12.99);
         let js899 = json!(8.99);
@@ -670,59 +740,77 @@ mod tests {
         test(
             template_json(),
             "$..book[?(@.price >= 8.99)].price",
-            jp_v![&js12, &js899, &js2299,],
+            jp_v![
+                &js12;"$.['store'].['book'][1].['price']",
+                &js899;"$.['store'].['book'][2].['price']",
+                &js2299;"$.['store'].['book'][3].['price']",
+            ],
         );
         test(
             template_json(),
             "$..book[?(@.price > 8.99)].price",
-            jp_v![&js12, &js2299,],
+            jp_v![
+                &js12;"$.['store'].['book'][1].['price']",
+                &js2299;"$.['store'].['book'][3].['price']",],
         );
         test(
             template_json(),
             "$..book[?(@.price < 8.99)].price",
-            jp_v![&js895,],
+            jp_v![&js895;"$.['store'].['book'][0].['price']",],
         );
         test(
             template_json(),
             "$..book[?(@.price <= 8.99)].price",
-            jp_v![&js895, &js899,],
+            jp_v![
+                &js895;"$.['store'].['book'][0].['price']",
+                &js899;"$.['store'].['book'][2].['price']",
+            ],
         );
         test(
             template_json(),
             "$..book[?(@.price <= $.expensive)].price",
-            jp_v![&js895, &js899,],
+            jp_v![
+                &js895;"$.['store'].['book'][0].['price']",
+                &js899;"$.['store'].['book'][2].['price']",
+            ],
         );
         test(
             template_json(),
             "$..book[?(@.price >= $.expensive)].price",
-            jp_v![&js12, &js2299,],
+            jp_v![
+                &js12;"$.['store'].['book'][1].['price']",
+                &js2299;"$.['store'].['book'][3].['price']",
+            ],
         );
         test(
             template_json(),
             "$..book[?(@.title in ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].price",
-            jp_v![&js899,],
+            jp_v![&js899;"$.['store'].['book'][2].['price']",],
         );
         test(
             template_json(),
             "$..book[?(@.title nin ['Moby Dick','Shmoby Dick','Big Dick','Dicks'])].title",
-            jp_v![&sayings, &sword, &rings,],
+            jp_v![
+                &sayings;"$.['store'].['book'][0].['title']",
+                &sword;"$.['store'].['book'][1].['title']",
+                &rings;"$.['store'].['book'][3].['title']",],
         );
         test(
             template_json(),
             "$..book[?(@.author size 10)].title",
-            jp_v![&sayings,],
+            jp_v![&sayings;"$.['store'].['book'][0].['title']",],
         );
         let filled_true = json!(1);
         test(
             template_json(),
             "$.orders[?(@.filled == true)].id",
-            jp_v![&filled_true,],
+            jp_v![&filled_true;"$.['orders'][0].['id']",],
         );
         let filled_null = json!(3);
         test(
             template_json(),
             "$.orders[?(@.filled == null)].id",
-            jp_v![&filled_null,],
+            jp_v![&filled_null;"$.['orders'][2].['id']",],
         );
     }
 
@@ -732,19 +820,19 @@ mod tests {
         test(
             template_json(),
             "$.orders[?(@.ref subsetOf [1,2,3,4])].id",
-            jp_v![&j1,],
+            jp_v![&j1;"$.['orders'][0].['id']",],
         );
         let j2 = json!(2);
         test(
             template_json(),
             "$.orders[?(@.ref anyOf [1,4])].id",
-            jp_v![&j1, &j2,],
+            jp_v![&j1;"$.['orders'][0].['id']", &j2;"$.['orders'][1].['id']",],
         );
         let j3 = json!(3);
         test(
             template_json(),
             "$.orders[?(@.ref noneOf [3,6])].id",
-            jp_v![&j3,],
+            jp_v![&j3;"$.['orders'][2].['id']",],
         );
     }
 
@@ -775,7 +863,7 @@ mod tests {
 
         let v = finder.find_slice();
         let js = json!("Sayings of the Century");
-        assert_eq!(v, jp_v![&js,]);
+        assert_eq!(v, jp_v![&js;"$.['store'].['book'][0].['title']",]);
     }
 
     #[test]
@@ -980,7 +1068,10 @@ mod tests {
             Box::from(JsonPathInst::from_str("$..f_").expect("the path is correct"));
         let finder = JsonPathFinder::new(json.clone(), path);
         let v = finder.find_slice();
-        assert_eq!(v, vec![Slice(&json!(1), "$.field[1].f.f_".to_string())]);
+        assert_eq!(
+            v,
+            vec![Slice(&json!(1), "$.['field'][1].['f'].['f_']".to_string())]
+        );
     }
 
     #[test]
