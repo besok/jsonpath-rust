@@ -1,7 +1,7 @@
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
-use crate::JsPathStr;
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
+use crate::{jsp_idx, jsp_obj, JsPathStr};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
 
@@ -17,7 +17,7 @@ impl<'a> Path<'a> for Wildcard {
                 Array(elems) => {
                     let mut res = vec![];
                     for (idx, el) in elems.iter().enumerate() {
-                        res.push(Slice(el, format!("{}[{}]", pref, idx)));
+                        res.push(Slice(el, jsp_idx(&pref, idx)));
                     }
 
                     res
@@ -25,7 +25,7 @@ impl<'a> Path<'a> for Wildcard {
                 Object(elems) => {
                     let mut res = vec![];
                     for (key, el) in elems.into_iter() {
-                        res.push(Slice(el, format!("{}['{}']", pref, key)));
+                        res.push(Slice(el, jsp_obj(&pref, &key)));
                     }
                     res
                 }
@@ -116,7 +116,7 @@ impl<'a> Path<'a> for FnPath {
             match input.get(0) {
                 Some(v) => match v {
                     NewValue(d) => take_len(d),
-                    Slice(s) => take_len(s),
+                    Slice(s, _) => take_len(s),
                     NoValue => NoValue,
                 },
                 None => NoValue,
@@ -145,7 +145,7 @@ impl<'a> Path<'a> for ObjectField<'a> {
 
         let res = match data {
             Slice(js, p) => take_field(js)
-                .map(|v| JsonPathValue::new_slice(v, format!("{p}['{}']", self.key)))
+                .map(|v| JsonPathValue::new_slice(v, jsp_obj(&p, self.key)))
                 .unwrap_or_else(|| NoValue),
             _ => NoValue,
         };
@@ -169,14 +169,14 @@ fn deep_flatten(data: &Value, pref: JsPathStr) -> Vec<(&Value, JsPathStr)> {
     match data {
         Object(elems) => {
             for (f, v) in elems.into_iter() {
-                let pref = format!("{}['{}']", pref, f);
+                let pref = jsp_obj(&pref, f);
                 acc.push((v, pref.clone()));
                 acc.append(&mut deep_flatten(v, pref));
             }
         }
         Array(elems) => {
             for (i, v) in elems.iter().enumerate() {
-                let pref = format!("{}[{}]", pref, i);
+                let pref = jsp_idx(&pref, i);
                 acc.push((v, pref.clone()));
                 acc.append(&mut deep_flatten(v, pref));
             }
@@ -187,27 +187,33 @@ fn deep_flatten(data: &Value, pref: JsPathStr) -> Vec<(&Value, JsPathStr)> {
 }
 
 // todo rewrite to tail rec
-fn deep_path_by_key<'a>(data: &'a Value, key: ObjectField<'a>) -> Vec<&'a Value> {
-    let mut level: Vec<&Value> =
-        JsonPathValue::vec_as_data(key.find(JsonPathValue::new_slice(&data)));
+fn deep_path_by_key<'a>(
+    data: &'a Value,
+    key: ObjectField<'a>,
+    pref: JsPathStr,
+) -> Vec<(&'a Value, JsPathStr)> {
+    let mut result: Vec<(&'a Value, JsPathStr)> = JsonPathValue::vec_as_pair(
+        key.find(JsonPathValue::new_slice(&data, jsp_obj(&pref, key.key))),
+    );
     match data {
         Object(elems) => {
-            let mut next_levels: Vec<&Value> = elems
-                .values()
-                .flat_map(|v| deep_path_by_key(v, key.clone()))
+            let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
+                .into_iter()
+                .flat_map(|(k, v)| deep_path_by_key(v, key.clone(), jsp_obj(&pref, key.key)))
                 .collect();
-            level.append(&mut next_levels);
-            level
+            result.append(&mut next_levels);
+            result
         }
         Array(elems) => {
-            let mut next_levels: Vec<&Value> = elems
+            let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
                 .iter()
-                .flat_map(|v| deep_path_by_key(v, key.clone()))
+                .enumerate()
+                .flat_map(|(i, v)| deep_path_by_key(v, key.clone(), jsp_idx(&pref, i)))
                 .collect();
-            level.append(&mut next_levels);
-            level
+            result.append(&mut next_levels);
+            result
         }
-        _ => level,
+        _ => result,
     }
 }
 
@@ -221,7 +227,7 @@ impl<'a> Path<'a> for DescentObject<'a> {
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         data.flat_map_slice(|data, pref| {
-            let res_col = deep_path_by_key(data, ObjectField::new(self.key));
+            let res_col = deep_path_by_key(data, ObjectField::new(self.key), pref.clone());
             if res_col.is_empty() {
                 vec![NoValue]
             } else {
@@ -319,23 +325,26 @@ mod tests {
     use crate::path::top::{deep_flatten, json_path_instance, Function, ObjectField, RootPointer};
     use crate::path::{JsonPathValue, Path};
     use crate::JsonPathValue::NoValue;
-    use crate::{chain, function, idx, json_path_value, path};
+    use crate::{chain, function, idx, jp_v, path};
     use serde_json::json;
     use serde_json::Value;
 
     #[test]
     fn object_test() {
         let js = json!({"product": {"key":42}});
-        let res_income = json_path_value!(&js);
+        let res_income = jp_v!(&js);
 
         let key = String::from("product");
         let mut field = ObjectField::new(&key);
         let js = json!({"key":42});
-        assert_eq!(field.find(res_income.clone()), vec![json_path_value!(&js)]);
+        assert_eq!(
+            field.find(res_income.clone()),
+            vec![jp_v!(&js;".['product']")]
+        );
 
         let key = String::from("fake");
         field.key = &key;
-        assert!(field.find(res_income) == vec![NoValue]);
+        assert_eq!(field.find(res_income), vec![NoValue]);
     }
 
     #[test]
@@ -344,10 +353,7 @@ mod tests {
 
         let root = RootPointer::<Value>::new(&res_income);
 
-        assert_eq!(
-            root.find(json_path_value!(&res_income)),
-            vec![json_path_value!(&res_income)]
-        )
+        assert_eq!(root.find(jp_v!(&res_income)), vec![jp_v!(&res_income)])
     }
 
     #[test]
@@ -360,27 +366,18 @@ mod tests {
         let field5 = path!("object");
 
         let path_inst = json_path_instance(&path!($), &json);
-        assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&json)]
-        );
+        assert_eq!(path_inst.find(jp_v!(&json)), vec![jp_v!(&json)]);
 
         let path_inst = json_path_instance(&field1, &json);
         let exp_json =
             json!({"k":{"f":42,"array":[0,1,2,3,4,5],"object":{"field1":"val1","field2":"val2"}}});
-        assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&exp_json)]
-        );
+        assert_eq!(path_inst.find(jp_v!(&json)), vec![jp_v!(&exp_json)]);
 
         let chain = chain!(path!($), field1.clone(), field2.clone(), field3);
 
         let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(42);
-        assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&exp_json)]
-        );
+        assert_eq!(path_inst.find(jp_v!(&json)), vec![jp_v!(&exp_json)]);
 
         let chain = chain!(
             path!($),
@@ -391,10 +388,7 @@ mod tests {
         );
         let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(3);
-        assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&exp_json)]
-        );
+        assert_eq!(path_inst.find(jp_v!(&json)), vec![jp_v!(&exp_json)]);
 
         let index = idx!([1;-1;2]);
         let chain = chain!(
@@ -408,8 +402,8 @@ mod tests {
         let one = json!(1);
         let tree = json!(3);
         assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&one), json_path_value!(&tree)]
+            path_inst.find(jp_v!(&json)),
+            vec![jp_v!(&one), jp_v!(&tree)]
         );
 
         let union = idx!(idx 1,2 );
@@ -424,8 +418,8 @@ mod tests {
         let tree = json!(1);
         let two = json!(2);
         assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&tree), json_path_value!(&two)]
+            path_inst.find(jp_v!(&json)),
+            vec![jp_v!(&tree), jp_v!(&two)]
         );
 
         let union = idx!("field1", "field2");
@@ -433,10 +427,7 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
         let one = json!("val1");
         let two = json!("val2");
-        assert_eq!(
-            path_inst.find(json_path_value!(&json)),
-            vec![json_path_value!(&one), json_path_value!(&two)]
-        );
+        assert_eq!(path_inst.find(jp_v!(&json)), vec![jp_v!(&one), jp_v!(&two)]);
     }
     #[test]
     fn path_descent_arr_test() {
@@ -445,14 +436,14 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
 
         let one = json!(1);
-        let expected_res = vec![json_path_value!(&one)];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        let expected_res = vec![jp_v!(&one)];
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
     #[test]
     fn deep_path_test() {
         let value = json!([1]);
-        let r = deep_flatten(&value);
-        assert_eq!(r, vec![&json!(1)])
+        let r = deep_flatten(&value, "".to_string());
+        assert_eq!(r, vec![(&json!(1), "[0]".to_string())])
     }
 
     #[test]
@@ -467,8 +458,8 @@ mod tests {
         let arr = json!([1]);
         let one = json!(1);
 
-        let expected_res = vec![json_path_value!(&arr), json_path_value!(&one)];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        let expected_res = vec![jp_v!(&arr), jp_v!(&one)];
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
     #[test]
     fn path_descent_w_nested_array_test() {
@@ -485,13 +476,8 @@ mod tests {
 
         let one = json!(1);
 
-        let expected_res = vec![
-            json_path_value!(&arr2),
-            json_path_value!(&obj),
-            json_path_value!(&one),
-            json_path_value!(&empty),
-        ];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        let expected_res = vec![jp_v!(&arr2), jp_v!(&obj), jp_v!(&one), jp_v!(&empty)];
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
 
     #[test]
@@ -536,16 +522,16 @@ mod tests {
         });
 
         let expected_res = vec![
-            json_path_value!(&key1),
-            json_path_value!(&one),
-            json_path_value!(&key),
-            json_path_value!(&key_3),
-            json_path_value!(&key1_s),
-            json_path_value!(&key_sec),
-            json_path_value!(&key_th),
-            json_path_value!(&zero),
+            jp_v!(&key1),
+            jp_v!(&one),
+            jp_v!(&key),
+            jp_v!(&key_3),
+            jp_v!(&key1_s),
+            jp_v!(&key_sec),
+            jp_v!(&key_th),
+            jp_v!(&zero),
         ];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
     #[test]
     fn path_descent_test() {
@@ -570,13 +556,8 @@ mod tests {
         let res3 = json!({"key1":0});
         let res4 = json!(0);
 
-        let expected_res = vec![
-            json_path_value!(&res1),
-            json_path_value!(&res2),
-            json_path_value!(&res3),
-            json_path_value!(&res4),
-        ];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        let expected_res = vec![jp_v!(&res1), jp_v!(&res2), jp_v!(&res3), jp_v!(&res4)];
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
 
     #[test]
@@ -594,12 +575,8 @@ mod tests {
         let res2 = json!("key");
         let res3 = json!({});
 
-        let expected_res = vec![
-            json_path_value!(&res1),
-            json_path_value!(&res2),
-            json_path_value!(&res3),
-        ];
-        assert_eq!(path_inst.find(json_path_value!(&json)), expected_res)
+        let expected_res = vec![jp_v!(&res1), jp_v!(&res2), jp_v!(&res3)];
+        assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
 
     #[test]
@@ -614,15 +591,15 @@ mod tests {
         let path_inst = json_path_instance(&chain, &json);
 
         assert_eq!(
-            path_inst.flat_find(vec![json_path_value!(&json)], true),
-            vec![json_path_value!(json!(3))]
+            path_inst.flat_find(vec![jp_v!(&json)], true),
+            vec![jp_v!(json!(3))]
         );
 
         let chain = chain!(path!($), path!("key1"), function!(length));
         let path_inst = json_path_instance(&chain, &json);
         assert_eq!(
-            path_inst.flat_find(vec![json_path_value!(&json)], false),
-            vec![json_path_value!(json!(3))]
+            path_inst.flat_find(vec![jp_v!(&json)], false),
+            vec![jp_v!(json!(3))]
         );
     }
 }

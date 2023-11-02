@@ -318,6 +318,13 @@ fn test() {
 }
 ```
 
+### Return paths instead of values
+To be able to return paths instead of values just invoke `find_path` :
+
+```rust
+ 
+```
+
 ### The structure
 
 ```rust
