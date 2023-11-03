@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn array_slice_end_start_test() {
-        let array = vec![0, 1, 2, 3, 4, 5];
+        let array = [0, 1, 2, 3, 4, 5];
         let len = array.len() as i32;
         let mut slice = ArraySlice::new(0, 0, 0);
 
@@ -518,8 +518,8 @@ mod tests {
                 {"field":1},
             ]
         });
-        let exp1 = json!( {"field":10});
-        let exp2 = json!( {"field":5});
+        let _exp1 = json!( {"field":10});
+        let _exp2 = json!( {"field":5});
         let exp3 = json!( {"field":4});
         let exp4 = json!( {"field":1});
 

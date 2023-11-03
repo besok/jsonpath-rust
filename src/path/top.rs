@@ -25,7 +25,7 @@ impl<'a> Path<'a> for Wildcard {
                 Object(elems) => {
                     let mut res = vec![];
                     for (key, el) in elems.into_iter() {
-                        res.push(Slice(el, jsp_obj(&pref, &key)));
+                        res.push(Slice(el, jsp_obj(&pref, key)));
                     }
                     res
                 }
@@ -197,7 +197,7 @@ fn deep_path_by_key<'a>(
     pref: JsPathStr,
 ) -> Vec<(&'a Value, JsPathStr)> {
     let mut result: Vec<(&'a Value, JsPathStr)> =
-        JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(&data, pref.clone())));
+        JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(data, pref.clone())));
     match data {
         Object(elems) => {
             let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems

@@ -372,10 +372,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 
     pub fn has_value(&self) -> bool {
-        match self {
-            NoValue => false,
-            _ => true,
-        }
+        !matches!(self, NoValue)
     }
 
     pub fn vec_as_data(input: Vec<JsonPathValue<'a, Data>>) -> Vec<&'a Data> {
@@ -498,7 +495,7 @@ impl JsonPathFinder {
 #[cfg(test)]
 mod tests {
     use crate::JsonPathQuery;
-    use crate::JsonPathValue::{NewValue, NoValue, Slice};
+    use crate::JsonPathValue::{NoValue, Slice};
     use crate::{jp_v, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
