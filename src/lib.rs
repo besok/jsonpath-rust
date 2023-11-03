@@ -80,16 +80,17 @@
 //! - `[?(<expression>)]`the logical expression to filter elements in the list.It is used with arrays preliminary.
 //!
 //! # Examples
-//!```
+//!```rust
 //! use serde_json::{json,Value};
 //! use jsonpath_rust::jp_v;
 //! use self::jsonpath_rust::JsonPathFinder;
 //! use self::jsonpath_rust::JsonPathValue;
+//!
 //! fn test(){
 //!     let  finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
 //!     let slice_of_data:Vec<JsonPathValue<Value>> = finder.find_slice();
-//!     let js = json!({"active":1});
-//!     assert_eq!(slice_of_data, jp_v![&js,]);
+//!     let js = json!({"active":2});
+//!     assert_eq!(slice_of_data, jp_v![&js;"$.first.second[0]",]);
 //! }
 //! ```
 //! or even simpler:
@@ -155,7 +156,7 @@ extern crate pest;
 ///
 ///         let v = finder.find_slice();
 ///         let js = json!("Sayings of the Century");
-///         assert_eq!(v, jp_v![&js,]);
+///         assert_eq!(v, jp_v![&js;"",]);
 ///     }
 ///
 /// ```
@@ -248,7 +249,7 @@ impl JsonPathQuery for Value {
 ///
 ///         let v = finder.find_slice();
 ///         let js = json!("Sayings of the Century");
-///         assert_eq!(v, jp_v![&js,]);
+///         assert_eq!(v, jp_v![&js;"",]);
 ///     }
 /// ```
 #[macro_export]
@@ -286,6 +287,8 @@ macro_rules! jp_v {
     };
 
 }
+
+/// Represents the path of the found json data
 type JsPathStr = String;
 
 pub(crate) fn jsp_idx(prefix: &str, idx: usize) -> String {
@@ -393,6 +396,14 @@ impl<'a, Data> JsonPathValue<'a, Data> {
             })
             .collect()
     }
+
+    /// moves a pointer (from slice) out or provides a default value when the value was generated
+    pub fn slice_or(self, default: &'a Data) -> &'a Data {
+        match self {
+            Slice(r, _) => r,
+            NewValue(_) | NoValue => default,
+        }
+    }
 }
 
 /// The base structure stitching the json instance and jsonpath instance
@@ -473,7 +484,7 @@ impl JsonPathFinder {
     }
     /// finds a path of the values.
     /// If the values has been obtained by moving the data out of the initial json the path is absent.
-    pub fn find_path(&self) -> Value {
+    pub fn find_as_path(&self) -> Value {
         Value::Array(
             self.find_slice()
                 .into_iter()
