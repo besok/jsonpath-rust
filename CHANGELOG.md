@@ -33,3 +33,5 @@
   * make jsonpath inst cloneable.
 * **`0.3.3`**
   * fix a bug with the logical operators
+* **`0.3.4`**
+  * add a result as a path
