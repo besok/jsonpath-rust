@@ -9,12 +9,19 @@ comes from XPath for XML structures. The details can be found [there](https://go
 Therefore JsonPath is a query language for JSON, similar to XPath for XML. The JsonPath query is a set of assertions to
 specify the JSON fields that need to be verified.
 
+Python bindings ([jsonpath-rust-bindings](https://github.com/night-crawler/jsonpath-rust-bindings)) are available on
+pypi:
+
+```bash
+pip install jsonpath-rust-bindings
+```
+
 ## Simple examples
 
 Let's suppose we have a following json:
 
 ```json
-  {
+{
   "shop": {
     "orders": [
       {
@@ -97,7 +104,7 @@ following elements:
 Filter expressions can be chained using `||` and `&&` (logical or and logical and correspondingly) in the following way:
 
 ```json
-          {
+{
   "key": [
     {
       "city": "London",
@@ -165,7 +172,7 @@ used.
 Given the json
 
  ```json
- {
+{
   "store": {
     "book": [
       {
@@ -262,7 +269,7 @@ fn main() {
 or with a separate instantiation:
 
 ```rust
- use serde_json::{json, Value};
+use serde_json::{json, Value};
 use crate::jsonpath_rust::{JsonPathFinder, JsonPathQuery, JsonPathInst, JsonPathValue};
 use std::str::FromStr;
 
@@ -310,7 +317,7 @@ fn test(json: Box<Value>, path: &str) {
     let path = JsonPathInst::from_str(path).unwrap();
     JsonPathFinder::new(json, path)
 }
- ```
+```
 
 also, the trait `JsonPathQuery` can be used:
 
@@ -361,7 +368,7 @@ fn main() {
 
 or it can be taken from the `JsonPathValue` instance:
 ```rust
- use serde_json::{json, Value};
+use serde_json::{json, Value};
 use crate::jsonpath_rust::{JsonPathFinder, JsonPathQuery, JsonPathInst, JsonPathValue};
 use std::str::FromStr;
 
