@@ -32,36 +32,47 @@ pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed
 fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
     match rule.as_rule() {
-        Rule::path => Ok(rule
+        Rule::path => rule
             .into_inner()
             .next()
-            .map(parse_internal)
-            .unwrap_or(Ok(JsonPath::Empty))
-            .unwrap_or(JsonPath::Empty)),
+            .ok_or(JsonPathParserError::ParserError(
+                "expected valid Rule::path token but found found nothing".to_string(),
+            ))
+            .and_then(parse_internal),
         Rule::current => Ok(JsonPath::Current(Box::new(
             rule.into_inner()
                 .next()
                 .map(parse_internal)
-                .unwrap_or(Ok(JsonPath::Empty))
-                .unwrap_or(JsonPath::Empty),
+                .unwrap_or(Ok(JsonPath::Empty))?,
         ))),
-        Rule::chain => Ok(JsonPath::Chain(
-            rule.into_inner()
-                .map(|r| parse_internal(r).unwrap_or(JsonPath::Empty))
-                .collect(),
-        )),
+        Rule::chain => {
+            let chain: Result<Vec<JsonPath>, JsonPathParserError> =
+                rule.into_inner().map(parse_internal).collect();
+            Ok(JsonPath::Chain(chain?))
+        }
         Rule::root => Ok(JsonPath::Root),
         Rule::wildcard => Ok(JsonPath::Wildcard),
-        Rule::descent => Ok(parse_key(down(rule)?)?
-            .map(JsonPath::Descent)
-            .unwrap_or(JsonPath::Empty)),
+        Rule::descent => {
+            parse_key(down(rule)?)?
+                .map(JsonPath::Descent)
+                .ok_or(JsonPathParserError::ParserError(
+                    "expected valid JsonPath::Descent key but found nothing".to_string(),
+                ))
+        }
         Rule::descent_w => Ok(JsonPath::DescentW),
         Rule::function => Ok(JsonPath::Fn(Function::Length)),
-        Rule::field => Ok(parse_key(down(rule)?)?
-            .map(JsonPath::Field)
-            .unwrap_or(JsonPath::Empty)),
+        Rule::field => {
+            parse_key(down(rule)?)?
+                .map(JsonPath::Field)
+                .ok_or(JsonPathParserError::ParserError(
+                    "expected valid JsonPath::Field key but found nothing".to_string(),
+                ))
+        }
         Rule::index => Ok(JsonPath::Index(parse_index(rule)?)),
-        _ => Ok(JsonPath::Empty),
+        _ => Err(JsonPathParserError::ParserError(format!(
+            "{} did not match any 'Rule' variant",
+            rule.to_string()
+        ))),
     }
 }
 
@@ -186,14 +197,15 @@ fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParse
 fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
-            Rule::logic => parse_logic(pairs.next().unwrap().into_inner()),
+            Rule::logic => parse_logic(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
             Rule::atom => {
                 let left: Operand = parse_atom(pairs.next().unwrap())?;
                 if pairs.peek().is_none() {
                     Ok(FilterExpression::exists(left))
                 } else {
-                    let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
-                    let right: Operand = parse_atom(pairs.next().unwrap())?;
+                    let sign: FilterSign = FilterSign::new(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").as_str());
+                    let right: Operand =
+                        parse_atom(pairs.next().expect("unreachable in arithemetic: should have a right side operand"))?;
                     Ok(FilterExpression::Atom(left, sign, right))
                 }
             }
