@@ -71,7 +71,7 @@ fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
         Rule::index => Ok(JsonPath::Index(parse_index(rule)?)),
         _ => Err(JsonPathParserError::ParserError(format!(
             "{} did not match any 'Rule' variant",
-            rule.to_string()
+            rule
         ))),
     }
 }
