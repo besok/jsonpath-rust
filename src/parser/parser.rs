@@ -1,8 +1,8 @@
+use crate::parser::errors::JsonPathParserError;
 use crate::parser::model::FilterExpression::{And, Or};
 use crate::parser::model::{
     FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
 };
-use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use serde_json::Value;
@@ -11,99 +11,130 @@ use serde_json::Value;
 #[grammar = "parser/grammar/json_path.pest"]
 struct JsonPathParser;
 
-/// the parsing function.
-/// Since the parsing can finish with error the result is [[Result]]
-#[allow(clippy::result_large_err)]
-pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, Error<Rule>> {
-    Ok(parse_internal(
-        JsonPathParser::parse(Rule::path, jp_str)?.next().unwrap(),
-    ))
+/// Parses a string into a [JsonPath].
+///
+/// # Errors
+///
+/// Returns a variant of [JsonPathParserError] if the parsing operation failed.
+pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
+    match JsonPathParser::parse(Rule::path, jp_str)?.next() {
+        Some(parsed_pair) => Ok(parse_internal(parsed_pair)?),
+        None => Err(JsonPathParserError::ParserError(format!(
+            "Failed to parse JSONPath {jp_str}"
+        ))),
+    }
 }
 
 /// Internal function takes care of the logic by parsing the operators and unrolling the string into the final result.
-fn parse_internal(rule: Pair<Rule>) -> JsonPath {
+///
+/// # Errors
+///
+/// Returns a variant of [JsonPathParserError] if the parsing operation failed
+fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
     match rule.as_rule() {
         Rule::path => rule
             .into_inner()
             .next()
-            .map(parse_internal)
-            .unwrap_or(JsonPath::Empty),
-        Rule::current => JsonPath::Current(Box::new(
+            .ok_or(JsonPathParserError::ParserError(
+                "expected valid Rule::path token but found found nothing".to_string(),
+            ))
+            .and_then(parse_internal),
+        Rule::current => Ok(JsonPath::Current(Box::new(
             rule.into_inner()
                 .next()
                 .map(parse_internal)
-                .unwrap_or(JsonPath::Empty),
-        )),
-        Rule::chain => JsonPath::Chain(rule.into_inner().map(parse_internal).collect()),
-        Rule::root => JsonPath::Root,
-        Rule::wildcard => JsonPath::Wildcard,
-        Rule::descent => parse_key(down(rule))
-            .map(JsonPath::Descent)
-            .unwrap_or(JsonPath::Empty),
-        Rule::descent_w => JsonPath::DescentW,
-        Rule::function => JsonPath::Fn(Function::Length),
-        Rule::field => parse_key(down(rule))
-            .map(JsonPath::Field)
-            .unwrap_or(JsonPath::Empty),
-        Rule::index => JsonPath::Index(parse_index(rule)),
-        _ => JsonPath::Empty,
+                .unwrap_or(Ok(JsonPath::Empty))?,
+        ))),
+        Rule::chain => {
+            let chain: Result<Vec<JsonPath>, JsonPathParserError> =
+                rule.into_inner().map(parse_internal).collect();
+            Ok(JsonPath::Chain(chain?))
+        }
+        Rule::root => Ok(JsonPath::Root),
+        Rule::wildcard => Ok(JsonPath::Wildcard),
+        Rule::descent => {
+            parse_key(down(rule)?)?
+                .map(JsonPath::Descent)
+                .ok_or(JsonPathParserError::ParserError(
+                    "expected valid JsonPath::Descent key but found nothing".to_string(),
+                ))
+        }
+        Rule::descent_w => Ok(JsonPath::DescentW),
+        Rule::function => Ok(JsonPath::Fn(Function::Length)),
+        Rule::field => {
+            parse_key(down(rule)?)?
+                .map(JsonPath::Field)
+                .ok_or(JsonPathParserError::ParserError(
+                    "expected valid JsonPath::Field key but found nothing".to_string(),
+                ))
+        }
+        Rule::index => Ok(JsonPath::Index(parse_index(rule)?)),
+        _ => Err(JsonPathParserError::ParserError(format!(
+            "{} did not match any 'Rule' variant",
+            rule
+        ))),
     }
 }
 
-/// parsing the rule 'key' with the structures either .key or .]'key'[
-fn parse_key(rule: Pair<Rule>) -> Option<String> {
-    match rule.as_rule() {
-        Rule::key | Rule::key_unlim | Rule::string_qt => parse_key(down(rule)),
-        Rule::key_lim | Rule::inner => Some(String::from(rule.as_str())),
-        _ => None,
-    }
+/// parsing the rule 'key' with the structures either .key or .\['key'\]
+fn parse_key(rule: Pair<Rule>) -> Result<Option<String>, JsonPathParserError> {
+    let parsed_key = match rule.as_rule() {
+        Rule::key | Rule::key_unlim | Rule::string_qt => parse_key(down(rule)?),
+        Rule::key_lim | Rule::inner => Ok(Some(String::from(rule.as_str()))),
+        _ => Ok(None),
+    };
+    parsed_key
 }
 
-fn parse_slice(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+fn parse_slice(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
     let mut start = 0;
     let mut end = 0;
     let mut step = 1;
-    while pairs.peek().is_some() {
-        let in_pair = pairs.next().unwrap();
+    for in_pair in pairs {
         match in_pair.as_rule() {
             Rule::start_slice => start = in_pair.as_str().parse::<i32>().unwrap_or(start),
             Rule::end_slice => end = in_pair.as_str().parse::<i32>().unwrap_or(end),
-            Rule::step_slice => step = down(in_pair).as_str().parse::<usize>().unwrap_or(step),
+            Rule::step_slice => step = down(in_pair)?.as_str().parse::<usize>().unwrap_or(step),
             _ => (),
         }
     }
-    JsonPathIndex::Slice(start, end, step)
+    Ok(JsonPathIndex::Slice(start, end, step))
 }
 
-fn parse_unit_keys(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+fn parse_unit_keys(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
     let mut keys = vec![];
 
-    while pairs.peek().is_some() {
-        keys.push(String::from(down(pairs.next().unwrap()).as_str()));
+    for pair in pairs {
+        keys.push(String::from(down(pair)?.as_str()));
     }
-    JsonPathIndex::UnionKeys(keys)
+    Ok(JsonPathIndex::UnionKeys(keys))
 }
 
-fn number_to_value(number: &str) -> Value {
-    number
+fn number_to_value(number: &str) -> Result<Value, JsonPathParserError> {
+    match number
         .parse::<i64>()
         .ok()
         .map(Value::from)
         .or_else(|| number.parse::<f64>().ok().map(Value::from))
-        .unwrap()
+    {
+        Some(value) => Ok(value),
+        None => Err(JsonPathParserError::ParserError(format!(
+            "Failed to parse {number} as either f64 or i64"
+        ))),
+    }
 }
 
-fn parse_unit_indexes(mut pairs: Pairs<Rule>) -> JsonPathIndex {
+fn parse_unit_indexes(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
     let mut keys = vec![];
 
-    while pairs.peek().is_some() {
-        keys.push(number_to_value(pairs.next().unwrap().as_str()));
+    for pair in pairs {
+        keys.push(number_to_value(pair.as_str())?);
     }
-    JsonPathIndex::UnionIndex(keys)
+    Ok(JsonPathIndex::UnionIndex(keys))
 }
 
-fn parse_chain_in_operand(rule: Pair<Rule>) -> Operand {
-    match parse_internal(rule) {
+fn parse_chain_in_operand(rule: Pair<Rule>) -> Result<Operand, JsonPathParserError> {
+    let parsed_chain = match parse_internal(rule)? {
         JsonPath::Chain(elems) => {
             if elems.len() == 1 {
                 match elems.first() {
@@ -123,81 +154,99 @@ fn parse_chain_in_operand(rule: Pair<Rule>) -> Operand {
             }
         }
         jp => Operand::Dynamic(Box::new(jp)),
-    }
+    };
+    Ok(parsed_chain)
 }
 
-fn parse_filter_index(pair: Pair<Rule>) -> JsonPathIndex {
-    JsonPathIndex::Filter(parse_logic(pair.into_inner()))
+fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+    Ok(JsonPathIndex::Filter(parse_logic(pair.into_inner())?))
 }
 
-fn parse_logic(mut pairs: Pairs<Rule>) -> FilterExpression {
+fn parse_logic(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
-    while pairs.peek().is_some() {
-        let next_expr = parse_logic_and(pairs.next().unwrap().into_inner());
+    let error_message = format!("Failed to parse logical expression: {:?}", pairs);
+    for pair in pairs {
+        let next_expr = parse_logic_and(pair.into_inner())?;
         match expr {
             None => expr = Some(next_expr),
             Some(e) => expr = Some(Or(Box::new(e), Box::new(next_expr))),
         }
     }
-    expr.unwrap()
+    match expr {
+        Some(expr) => Ok(expr),
+        None => Err(JsonPathParserError::ParserError(error_message)),
+    }
 }
 
-fn parse_logic_and(mut pairs: Pairs<Rule>) -> FilterExpression {
+fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
-
-    while pairs.peek().is_some() {
-        let next_expr = parse_logic_atom(pairs.next().unwrap().into_inner());
+    let error_message = format!("Failed to parse logical `and` expression: {:?}", pairs,);
+    for pair in pairs {
+        let next_expr = parse_logic_atom(pair.into_inner())?;
         match expr {
             None => expr = Some(next_expr),
             Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr))),
         }
     }
-    expr.unwrap()
+    match expr {
+        Some(expr) => Ok(expr),
+        None => Err(JsonPathParserError::ParserError(error_message)),
+    }
 }
 
-fn parse_logic_atom(mut pairs: Pairs<Rule>) -> FilterExpression {
-    match pairs.peek().map(|x| x.as_rule()) {
-        Some(Rule::logic) => parse_logic(pairs.next().unwrap().into_inner()),
-        Some(Rule::atom) => {
-            let left: Operand = parse_atom(pairs.next().unwrap());
-            if pairs.peek().is_none() {
-                FilterExpression::exists(left)
-            } else {
-                let sign: FilterSign = FilterSign::new(pairs.next().unwrap().as_str());
-                let right: Operand = parse_atom(pairs.next().unwrap());
-                FilterExpression::Atom(left, sign, right)
+fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+    if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
+        match rule {
+            Rule::logic => parse_logic(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
+            Rule::atom => {
+                let left: Operand = parse_atom(pairs.next().unwrap())?;
+                if pairs.peek().is_none() {
+                    Ok(FilterExpression::exists(left))
+                } else {
+                    let sign: FilterSign = FilterSign::new(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").as_str());
+                    let right: Operand =
+                        parse_atom(pairs.next().expect("unreachable in arithemetic: should have a right side operand"))?;
+                    Ok(FilterExpression::Atom(left, sign, right))
+                }
             }
+            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
         }
-        Some(x) => panic!("unexpected => {:?}", x),
-        None => panic!("unexpected none"),
+    } else {
+        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
     }
 }
 
-fn parse_atom(rule: Pair<Rule>) -> Operand {
-    let atom = down(rule.clone());
-    match atom.as_rule() {
-        Rule::number => Operand::Static(number_to_value(rule.as_str())),
-        Rule::string_qt => Operand::Static(Value::from(down(atom).as_str())),
-        Rule::chain => parse_chain_in_operand(down(rule)),
-        Rule::boolean => Operand::Static(rule.as_str().parse().unwrap()),
+fn parse_atom(rule: Pair<Rule>) -> Result<Operand, JsonPathParserError> {
+    let atom = down(rule.clone())?;
+    let parsed_atom = match atom.as_rule() {
+        Rule::number => Operand::Static(number_to_value(rule.as_str())?),
+        Rule::string_qt => Operand::Static(Value::from(down(atom)?.as_str())),
+        Rule::chain => parse_chain_in_operand(down(rule)?)?,
+        Rule::boolean => Operand::Static(rule.as_str().parse::<Value>()?),
         _ => Operand::Static(Value::Null),
-    }
+    };
+    Ok(parsed_atom)
 }
 
-fn parse_index(rule: Pair<Rule>) -> JsonPathIndex {
-    let next = down(rule);
-    match next.as_rule() {
-        Rule::unsigned => JsonPathIndex::Single(number_to_value(next.as_str())),
-        Rule::slice => parse_slice(next.into_inner()),
-        Rule::unit_indexes => parse_unit_indexes(next.into_inner()),
-        Rule::unit_keys => parse_unit_keys(next.into_inner()),
-        Rule::filter => parse_filter_index(down(next)),
-        _ => JsonPathIndex::Single(number_to_value(next.as_str())),
-    }
+fn parse_index(rule: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+    let next = down(rule)?;
+    let parsed_index = match next.as_rule() {
+        Rule::unsigned => JsonPathIndex::Single(number_to_value(next.as_str())?),
+        Rule::slice => parse_slice(next.into_inner())?,
+        Rule::unit_indexes => parse_unit_indexes(next.into_inner())?,
+        Rule::unit_keys => parse_unit_keys(next.into_inner())?,
+        Rule::filter => parse_filter_index(down(next)?)?,
+        _ => JsonPathIndex::Single(number_to_value(next.as_str())?),
+    };
+    Ok(parsed_index)
 }
 
-fn down(rule: Pair<Rule>) -> Pair<Rule> {
-    rule.into_inner().next().unwrap()
+fn down(rule: Pair<Rule>) -> Result<Pair<Rule>, JsonPathParserError> {
+    let error_message = format!("Failed to get inner pairs for {:?}", rule);
+    match rule.into_inner().next() {
+        Some(rule) => Ok(rule.to_owned()),
+        None => Err(JsonPathParserError::ParserError(error_message)),
+    }
 }
 
 #[cfg(test)]
@@ -480,5 +529,29 @@ mod tests {
             "$.k.length.field",
             vec![path!($), path!("k"), path!("length"), path!("field")],
         )
+    }
+
+    #[test]
+    fn parser_error_test_invalid_rule() {
+        let result = parse_json_path("notapath");
+
+        assert!(result.is_err());
+        assert!(result
+            .err()
+            .unwrap()
+            .to_string()
+            .starts_with("Failed to parse rule"));
+    }
+
+    #[test]
+    fn parser_error_test_empty_rule() {
+        let result = parse_json_path("");
+
+        assert!(result.is_err());
+        assert!(result
+            .err()
+            .unwrap()
+            .to_string()
+            .starts_with("Failed to parse rule"));
     }
 }
