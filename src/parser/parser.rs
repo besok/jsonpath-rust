@@ -1,4 +1,5 @@
-use crate::parser::errors::JsonPathParserError;
+use crate::parser::errors::JsonPathParserError::ParserError;
+use crate::parser::errors::{parser_err, JsonPathParserError};
 use crate::parser::model::FilterExpression::{And, Or};
 use crate::parser::model::{
     FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
@@ -17,12 +18,10 @@ struct JsonPathParser;
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
-    match JsonPathParser::parse(Rule::path, jp_str)?.next() {
-        Some(parsed_pair) => Ok(parse_internal(parsed_pair)?),
-        None => Err(JsonPathParserError::ParserError(format!(
-            "Failed to parse JSONPath {jp_str}"
-        ))),
-    }
+    JsonPathParser::parse(Rule::path, jp_str)?
+        .next()
+        .ok_or(parser_err(jp_str))
+        .and_then(parse_internal)
 }
 
 /// Internal function takes care of the logic by parsing the operators and unrolling the string into the final result.
@@ -35,44 +34,31 @@ fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
         Rule::path => rule
             .into_inner()
             .next()
-            .ok_or(JsonPathParserError::ParserError(
-                "expected valid Rule::path token but found found nothing".to_string(),
-            ))
+            .ok_or(parser_err("expected a Rule::path but found nothing"))
             .and_then(parse_internal),
-        Rule::current => Ok(JsonPath::Current(Box::new(
-            rule.into_inner()
-                .next()
-                .map(parse_internal)
-                .unwrap_or(Ok(JsonPath::Empty))?,
-        ))),
-        Rule::chain => {
-            let chain: Result<Vec<JsonPath>, JsonPathParserError> =
-                rule.into_inner().map(parse_internal).collect();
-            Ok(JsonPath::Chain(chain?))
-        }
+        Rule::current => rule
+            .into_inner()
+            .next()
+            .map(parse_internal)
+            .unwrap_or(Ok(JsonPath::Empty))
+            .map(JsonPath::current),
+        Rule::chain => rule
+            .into_inner()
+            .map(parse_internal)
+            .collect::<Result<Vec<_>, _>>()
+            .map(JsonPath::Chain),
         Rule::root => Ok(JsonPath::Root),
         Rule::wildcard => Ok(JsonPath::Wildcard),
-        Rule::descent => {
-            parse_key(down(rule)?)?
-                .map(JsonPath::Descent)
-                .ok_or(JsonPathParserError::ParserError(
-                    "expected valid JsonPath::Descent key but found nothing".to_string(),
-                ))
-        }
+        Rule::descent => parse_key(down(rule)?)?
+            .map(JsonPath::Descent)
+            .ok_or(parser_err("expected a JsonPath::Descent but found nothing")),
         Rule::descent_w => Ok(JsonPath::DescentW),
         Rule::function => Ok(JsonPath::Fn(Function::Length)),
-        Rule::field => {
-            parse_key(down(rule)?)?
-                .map(JsonPath::Field)
-                .ok_or(JsonPathParserError::ParserError(
-                    "expected valid JsonPath::Field key but found nothing".to_string(),
-                ))
-        }
-        Rule::index => Ok(JsonPath::Index(parse_index(rule)?)),
-        _ => Err(JsonPathParserError::ParserError(format!(
-            "{} did not match any 'Rule' variant",
-            rule
-        ))),
+        Rule::field => parse_key(down(rule)?)?
+            .map(JsonPath::Field)
+            .ok_or(parser_err("expected a JsonPath::Field but found nothing")),
+        Rule::index => parse_index(rule).map(JsonPath::Index),
+        _ => Err(ParserError(format!("{rule} did not match any 'Rule' "))),
     }
 }
 
@@ -245,7 +231,7 @@ fn down(rule: Pair<Rule>) -> Result<Pair<Rule>, JsonPathParserError> {
     let error_message = format!("Failed to get inner pairs for {:?}", rule);
     match rule.into_inner().next() {
         Some(rule) => Ok(rule.to_owned()),
-        None => Err(JsonPathParserError::ParserError(error_message)),
+        None => Err(ParserError(error_message)),
     }
 }
 

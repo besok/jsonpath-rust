@@ -16,3 +16,7 @@ pub enum JsonPathParserError<'a> {
     #[error("Unexpected `none` when trying to parse logic atom: {0:?}")]
     UnexpectedNoneLogicError(Pairs<'a, Rule>),
 }
+
+pub fn parser_err(cause: &str) -> JsonPathParserError<'_> {
+    JsonPathParserError::ParserError(format!("Failed to parse JSONPath: {cause}"))
+}

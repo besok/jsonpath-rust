@@ -28,6 +28,12 @@ pub enum JsonPath {
     Fn(Function),
 }
 
+impl JsonPath {
+    pub fn current(jp: JsonPath) -> Self {
+        JsonPath::Current(Box::new(jp))
+    }
+}
+
 impl TryFrom<&str> for JsonPath {
     type Error = String;
 
