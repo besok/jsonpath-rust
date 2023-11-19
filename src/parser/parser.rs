@@ -1,6 +1,6 @@
 use crate::parser::errors::JsonPathParserError::ParserError;
 use crate::parser::errors::{parser_err, JsonPathParserError};
-use crate::parser::model::FilterExpression::{And, Or};
+use crate::parser::model::FilterExpression::{And, Not, Or};
 use crate::parser::model::{
     FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
 };
@@ -148,7 +148,23 @@ fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserE
     Ok(JsonPathIndex::Filter(parse_logic(pair.into_inner())?))
 }
 
-fn parse_logic(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+fn parse_logic(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+    if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
+        match rule {
+            Rule::logic_not => parse_logic_not(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
+            Rule::logic_or => parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
+            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
+        }
+    } else {
+        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
+    }
+}
+
+fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+    Ok(Not(Box::new(parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner())?)))
+}
+
+fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
     let error_message = format!("Failed to parse logical expression: {:?}", pairs);
     for pair in pairs {

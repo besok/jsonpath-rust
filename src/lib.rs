@@ -1221,10 +1221,26 @@ mod tests {
             JsonPathInst::from_str("$.first[?(@.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
+        let finder = JsonPathFinder::new(json.clone(), path);
 
         let v = finder.find_slice();
         assert_eq!(v, vec![NoValue]);
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!@.does_not_exist >= 1.0)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(v, vec![Slice(&json!({"second":[{"active": 1}, {"passive": 1}]}), "$.['first']".to_string())]);
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!(@.does_not_exist >= 1.0))]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json, path);
+        let v = finder.find_slice();
+        assert_eq!(v, vec![Slice(&json!({"second":[{"active": 1}, {"passive": 1}]}), "$.['first']".to_string())])
     }
 
     // #[test]

@@ -86,6 +86,7 @@ following elements:
 
 | Expression sign | Description                                                                                | Where to use                                                                                             |
 |-----------------|--------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `!`             | Not                                                                                        | To negate the expression                                                                                 |
 | `==`            | Equal                                                                                      | To compare numbers or string literals                                                                    |
 | `!=`            | Unequal                                                                                    | To compare numbers or string literals in opposite way to equals                                          |
 | `<`             | Less                                                                                       | To compare numbers                                                                                       |
@@ -99,7 +100,7 @@ following elements:
 | `noneOf`        | The left size has no intersection with right                                               |                                                                                                          |
 | `anyOf`         | The left size has at least one intersection with right                                     |                                                                                                          |
 | `subsetOf`      | The left is a subset of the right side                                                     |                                                                                                          |
-|                 | Exists operator.                                                                           | The operator checks the existence of the field depicted on the left side like that `[?(@.key.isActive)]` |
+| `?`             | Exists operator.                                                                           | The operator checks the existence of the field depicted on the left side like that `[?(@.key.isActive)]` |
 
 Filter expressions can be chained using `||` and `&&` (logical or and logical and correspondingly) in the following way:
 

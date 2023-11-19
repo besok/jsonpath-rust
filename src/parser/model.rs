@@ -69,6 +69,8 @@ pub enum FilterExpression {
     And(Box<FilterExpression>, Box<FilterExpression>),
     /// or with ||
     Or(Box<FilterExpression>, Box<FilterExpression>),
+    /// not with !
+    Not(Box<FilterExpression>),
 }
 
 impl FilterExpression {
