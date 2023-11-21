@@ -145,24 +145,10 @@ fn parse_chain_in_operand(rule: Pair<Rule>) -> Result<Operand, JsonPathParserErr
 }
 
 fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
-    Ok(JsonPathIndex::Filter(parse_logic(pair.into_inner())?))
+    Ok(JsonPathIndex::Filter(parse_logic_or(pair.into_inner())?))
 }
 
-fn parse_logic(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
-    if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
-        match rule {
-            Rule::logic_not => parse_logic_not(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
-            Rule::logic_or => parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
-            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
-        }
-    } else {
-        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
-    }
-}
 
-fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
-    Ok(Not(Box::new(parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner())?)))
-}
 
 fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
@@ -184,7 +170,7 @@ fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParse
     let mut expr: Option<FilterExpression> = None;
     let error_message = format!("Failed to parse logical `and` expression: {:?}", pairs,);
     for pair in pairs {
-        let next_expr = parse_logic_atom(pair.into_inner())?;
+        let next_expr = parse_logic_not(pair.into_inner())?;
         match expr {
             None => expr = Some(next_expr),
             Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr))),
@@ -196,10 +182,26 @@ fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParse
     }
 }
 
+fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+    if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
+        match rule {
+            Rule::not => {
+                pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)");
+                parse_logic_not(pairs)
+                    .map(|expr|Not(Box::new(expr)))
+            },
+            Rule::logic_atom => parse_logic_atom(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
+            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
+        }
+    } else {
+        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
+    }
+}
+
 fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
-            Rule::logic => parse_logic(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
+            Rule::logic_or => parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
             Rule::atom => {
                 let left: Operand = parse_atom(pairs.next().unwrap())?;
                 if pairs.peek().is_none() {
