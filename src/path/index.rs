@@ -207,7 +207,7 @@ pub enum FilterPath<'a> {
     },
     Not {
         exp: PathInstance<'a>,
-    }
+    },
 }
 
 impl<'a> FilterPath<'a> {
@@ -228,7 +228,7 @@ impl<'a> FilterPath<'a> {
             },
             FilterExpression::Not(exp) => FilterPath::Not {
                 exp: Box::new(FilterPath::new(exp, root)),
-            }
+            },
         }
     }
     fn compound(

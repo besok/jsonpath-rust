@@ -148,8 +148,6 @@ fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserE
     Ok(JsonPathIndex::Filter(parse_logic_or(pair.into_inner())?))
 }
 
-
-
 fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
     let error_message = format!("Failed to parse logical expression: {:?}", pairs);
