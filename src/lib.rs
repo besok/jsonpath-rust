@@ -1227,6 +1227,23 @@ mod tests {
         assert_eq!(v, vec![NoValue]);
     }
 
+    #[test]
+    fn regex_filter_test() {
+        let json: Box<Value> = Box::new(json!({
+            "author":"abcd(Rees)",
+        }));
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.[?(@.author ~= '(?i)d\\(Rees\\)')]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        assert_eq!(
+            finder.find_slice(),
+            vec![Slice(&json!({"author":"abcd(Rees)"}), "$".to_string())]
+        );
+    }
+
     // #[test]
     // fn no_value_len_field_test() {
     //     let json: Box<Value> =
