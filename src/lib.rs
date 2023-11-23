@@ -1244,6 +1244,66 @@ mod tests {
         );
     }
 
+    #[test]
+    fn logical_not_exp_test() {
+        let json: Box<Value> = Box::new(json!({"first":{"second":{"active":1}}}));
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!@.does_not_exist >= 1.0)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(
+            v,
+            vec![Slice(
+                &json!({"second":{"active": 1}}),
+                "$.['first']".to_string()
+            )]
+        );
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!(@.does_not_exist >= 1.0))]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(
+            v,
+            vec![Slice(
+                &json!({"second":{"active": 1}}),
+                "$.['first']".to_string()
+            )]
+        );
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!(@.second.active == 1) || @.second.active == 1)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json.clone(), path);
+        let v = finder.find_slice();
+        assert_eq!(
+            v,
+            vec![Slice(
+                &json!({"second":{"active": 1}}),
+                "$.['first']".to_string()
+            )]
+        );
+
+        let path: Box<JsonPathInst> = Box::from(
+            JsonPathInst::from_str("$.first[?(!@.second.active == 1 && !@.second.active == 1 || !@.second.active == 2)]")
+                .expect("the path is correct"),
+        );
+        let finder = JsonPathFinder::new(json, path);
+        let v = finder.find_slice();
+        assert_eq!(
+            v,
+            vec![Slice(
+                &json!({"second":{"active": 1}}),
+                "$.['first']".to_string()
+            )]
+        );
+    }
+
     // #[test]
     // fn no_value_len_field_test() {
     //     let json: Box<Value> =

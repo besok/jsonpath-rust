@@ -205,6 +205,9 @@ pub enum FilterPath<'a> {
         left: PathInstance<'a>,
         right: PathInstance<'a>,
     },
+    Not {
+        exp: PathInstance<'a>,
+    },
 }
 
 impl<'a> FilterPath<'a> {
@@ -222,6 +225,9 @@ impl<'a> FilterPath<'a> {
             FilterExpression::Or(l, r) => FilterPath::Or {
                 left: Box::new(FilterPath::new(l, root)),
                 right: Box::new(FilterPath::new(r, root)),
+            },
+            FilterExpression::Not(exp) => FilterPath::Not {
+                exp: Box::new(FilterPath::new(exp, root)),
             },
         }
     }
@@ -306,6 +312,9 @@ impl<'a> FilterPath<'a> {
                 } else {
                     !JsonPathValue::vec_as_data(right.find(Slice(curr_el, pref))).is_empty()
                 }
+            }
+            FilterPath::Not { exp } => {
+                JsonPathValue::vec_as_data(exp.find(Slice(curr_el, pref))).is_empty()
             }
         }
     }
