@@ -14,7 +14,7 @@ string_qt = ${ "\'" ~ inner ~ "\'" }
 inner = @{ char* }
 char = _{
     !("\"" | "\\" | "\'") ~ ANY
-    | "\\" ~ ("\"" | "\'" |  "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("\"" | "\'" |  "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "(" | ")")
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 root = {"$"}
@@ -25,7 +25,7 @@ key_unlim = {"[" ~ string_qt ~ "]"}
 key = ${key_lim | key_unlim}
 
 descent = {dot ~ dot ~ key}
-descent_w = {dot ~ dot ~ "*"} // refactor afterwards 
+descent_w = {dot ~ dot ~ "*"} // refactor afterwards
 wildcard = {dot? ~ "[" ~"*"~"]" | dot ~ "*"}
 current = {"@" ~ chain?}
 field = ${dot? ~ key_unlim | dot ~ key_lim }
