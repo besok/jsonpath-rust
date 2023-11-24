@@ -35,3 +35,7 @@
   * fix a bug with the logical operators
 * **`0.3.4`**
   * add a result as a path
+* **`0.3.5`**
+  * add `!` negation operation in filters
+  * allow using  () in filters
+
