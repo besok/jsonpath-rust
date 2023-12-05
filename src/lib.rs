@@ -81,31 +81,17 @@
 //!
 //! # Examples
 //!```rust
-//! use serde_json::{json,Value};
-//! use jsonpath_rust::jp_v;
-//! use self::jsonpath_rust::JsonPathFinder;
-//! use self::jsonpath_rust::JsonPathValue;
+//! use std::str::FromStr;
+//! use serde_json::{json, Value};
+//! use jsonpath_rust::{jp_v, find_slice, JsonPathValue, JsonPathInst};
 //!
-//! fn test(){
-//!     let  finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
-//!     let slice_of_data:Vec<JsonPathValue<Value>> = finder.find_slice();
+//! fn test() -> Result<(), Box<dyn std::error::Error>> {
+//!     let json = serde_json::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#)?;
+//!     let path = JsonPathInst::from_str("$.first.second[?(@.active)]")?;
+//!     let slice_of_data:Vec<JsonPathValue<Value>> = find_slice(&path, &json);
 //!     let js = json!({"active":1});
 //!     assert_eq!(slice_of_data, jp_v![&js;"$.first.second[0]",]);
-//! }
-//! ```
-//! or even simpler:
-//!
-//!```
-//! use serde_json::{json,Value};
-//! use self::jsonpath_rust::JsonPathFinder;
-//! use self::jsonpath_rust::JsonPathValue;
-//! fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
-//!    match JsonPathFinder::from_str(json, path) {
-//!        Ok(finder) => assert_eq!(finder.find_slice(), expected),
-//!        Err(e) => panic!("error while parsing json or jsonpath: {}", e)
-//!    }
-//!
-//!
+//!     # Ok(())
 //! }
 //! ```
 //!
@@ -116,11 +102,10 @@
 
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
-use crate::path::{json_path_instance, PathInstance};
+use crate::path::json_path_instance;
 use serde_json::Value;
 use std::convert::TryInto;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::str::FromStr;
 use JsonPathValue::{NewValue, NoValue, Slice};
@@ -138,27 +123,28 @@ extern crate pest;
 /// # Examples:
 /// ```
 /// use std::str::FromStr;
-/// use serde_json::{json,Value};
+/// use serde_json::{json, Value};
 /// use jsonpath_rust::jp_v;
-/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst,JsonPathValue};
-///fn test(){
-///         let json: Value = serde_json::from_str("{}").unwrap();
-///         let v = json.path("$..book[?(@.author size 10)].title").unwrap();
-///         assert_eq!(v, json!([]));
+/// use jsonpath_rust::{find_slice, JsonPathQuery, JsonPathInst, JsonPathValue};
 ///
-///         let json: Value = serde_json::from_str("{}").unwrap();
-///         let path = json.path("$..book[?(@.author size 10)].title").unwrap();
+/// fn test() -> Result<(), Box<dyn std::error::Error>> {
+///     let json: Value = serde_json::from_str("{}")?;
+///     let v = json.path("$..book[?(@.author size 10)].title")?;
+///     assert_eq!(v, json!([]));
 ///
-///         assert_eq!(path, json!(["Sayings of the Century"]));
+///     let json: Value = serde_json::from_str("{}")?;
+///     let path = json.path("$..book[?(@.author size 10)].title")?;
 ///
-///         let json: Box<Value> = serde_json::from_str("{}").unwrap();
-///         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
-///         let  finder = JsonPathFinder::new(json, path);
+///     assert_eq!(path, json!(["Sayings of the Century"]));
 ///
-///         let v = finder.find_slice();
-///         let js = json!("Sayings of the Century");
-///         assert_eq!(v, jp_v![&js;"",]);
-///     }
+///     let json: Value = serde_json::from_str("{}")?;
+///     let path: JsonPathInst = JsonPathInst::from_str("$..book[?(@.author size 10)].title")?;
+///
+///     let v = find_slice(&path, &json);
+///     let js = json!("Sayings of the Century");
+///     assert_eq!(v, jp_v![&js;"",]);
+///     # Ok(())
+/// }
 ///
 /// ```
 /// #Note:
@@ -218,40 +204,44 @@ impl<'a> Deref for JsonPtr<'a, Value> {
     }
 }
 
-impl JsonPathQuery for Box<Value> {
-    fn path(self, query: &str) -> Result<Value, String> {
-        let p = JsonPathInst::from_str(query)?;
-        Ok(JsonPathFinder::new(self, Box::new(p)).find())
-    }
-}
-
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, String> {
         let p = JsonPathInst::from_str(query)?;
-        Ok(JsonPathFinder::new(Box::new(self), Box::new(p)).find())
+        Ok(find(&p, &self))
     }
 }
 
+/*
+impl<T> JsonPathQuery for T
+    where T: Deref<Target=Value> {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(find(&p, self.deref()))
+    }
+}
+ */
+
 /// just to create a json path value of data
 /// Example:
-///  - json_path_value(&json) = `JsonPathValue::Slice(&json)`
-///  - json_path_value(&json,) = `vec![JsonPathValue::Slice(&json)]`
-///  - `json_path_value[&json1,&json1]` = `vec![JsonPathValue::Slice(&json1),JsonPathValue::Slice(&json2)]`
-///  - json_path_value(json) = `JsonPathValue::NewValue(json)`
+///  - `jp_v(&json) = JsonPathValue::Slice(&json)`
+///  - `jp_v(&json;"foo") = JsonPathValue::Slice(&json, "foo".to_string())`
+///  - `jp_v(&json,) = vec![JsonPathValue::Slice(&json)]`
+///  - `jp_v[&json1,&json1] = vec![JsonPathValue::Slice(&json1),JsonPathValue::Slice(&json2)]`
+///  - `jp_v(json) = JsonPathValue::NewValue(json)`
 /// ```
 /// use std::str::FromStr;
-/// use serde_json::{json,Value};
-/// use jsonpath_rust::jp_v;
-/// use crate::jsonpath_rust::{JsonPathFinder,JsonPathQuery,JsonPathInst,JsonPathValue};
-///fn test(){
-///         let json: Box<Value> = serde_json::from_str("{}").unwrap();
-///         let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
-///         let  finder = JsonPathFinder::new(json, path);
+/// use serde_json::{json, Value};
+/// use jsonpath_rust::{jp_v, find_slice, JsonPathQuery, JsonPathInst, JsonPathValue};
 ///
-///         let v = finder.find_slice();
-///         let js = json!("Sayings of the Century");
-///         assert_eq!(v, jp_v![&js;"",]);
-///     }
+/// fn test() -> Result<(), Box<dyn std::error::Error>> {
+///     let json: Value = serde_json::from_str("{}")?;
+///     let path: JsonPathInst = JsonPathInst::from_str("$..book[?(@.author size 10)].title")?;
+///     let v = find_slice(&path, &json);
+///
+///     let js = json!("Sayings of the Century");
+///     assert_eq!(v, jp_v![&js;"",]);
+///     # Ok(())
+/// }
 /// ```
 #[macro_export]
 macro_rules! jp_v {
@@ -259,9 +249,9 @@ macro_rules! jp_v {
         JsonPathValue::Slice(&$v, String::new())
     };
 
-     (&$v:expr ; $s:expr) =>{
+    (&$v:expr ; $s:expr) =>{
         JsonPathValue::Slice(&$v, $s.to_string())
-     };
+    };
 
     ($(&$v:expr;$s:expr),+ $(,)?) =>{
         {
@@ -404,120 +394,72 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 }
 
-/// The base structure stitching the json instance and jsonpath instance
-pub struct JsonPathFinder {
-    json: Box<Value>,
-    path: Box<JsonPathInst>,
-}
+/// finds a slice of data in the set json.
+/// The result is a vector of references to the incoming structure.
+pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathValue<'a, Value>> {
+    let instance = json_path_instance(&path.inner, json);
+    let res = instance.find(JsonPathValue::from_root(json));
+    let has_v: Vec<JsonPathValue<'_, Value>> = res.into_iter().filter(|v| v.has_value()).collect();
 
-impl Debug for JsonPathFinder {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let json_as_str = serde_json::to_string(&*self.json).map_err(|_| fmt::Error)?;
-
-        f.write_str("JsonPathFinder:")?;
-        f.write_str(format!("   json:{}", json_as_str).as_str())?;
-        f.write_str(format!("   path:{:?}", self.path).as_str())?;
-        Ok(())
+    if has_v.is_empty() {
+        vec![NoValue]
+    } else {
+        has_v
     }
 }
 
-impl JsonPathFinder {
-    /// creates a new instance of [JsonPathFinder]
-    pub fn new(json: Box<Value>, path: Box<JsonPathInst>) -> Self {
-        JsonPathFinder { json, path }
-    }
-
-    /// updates a path with a new one
-    pub fn set_path(&mut self, path: Box<JsonPathInst>) {
-        self.path = path
-    }
-    /// updates a json with a new one
-    pub fn set_json(&mut self, json: Box<Value>) {
-        self.json = json
-    }
-    /// updates a json from string and therefore can be some parsing errors
-    pub fn set_json_str(&mut self, json: &str) -> Result<(), String> {
-        self.json = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        Ok(())
-    }
-    /// updates a path from string and therefore can be some parsing errors
-    pub fn set_path_str(&mut self, path: &str) -> Result<(), String> {
-        self.path = Box::new(JsonPathInst::from_str(path)?);
-        Ok(())
-    }
-
-    /// create a new instance from string and therefore can be some parsing errors
-    pub fn from_str(json: &str, path: &str) -> Result<Self, String> {
-        let json = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        let path = Box::new(JsonPathInst::from_str(path)?);
-        Ok(JsonPathFinder::new(json, path))
-    }
-
-    /// creates an instance to find a json slice from the json
-    pub fn instance(&self) -> PathInstance {
-        json_path_instance(&self.path.inner, &self.json)
-    }
-    /// finds a slice of data in the set json.
-    /// The result is a vector of references to the incoming structure.
-    pub fn find_slice(&self) -> Vec<JsonPathValue<'_, Value>> {
-        let res = self.instance().find(JsonPathValue::from_root(&self.json));
-        let has_v: Vec<JsonPathValue<'_, Value>> =
-            res.into_iter().filter(|v| v.has_value()).collect();
-
-        if has_v.is_empty() {
-            vec![NoValue]
+/// finds a slice of data and wrap it with Value::Array by cloning the data.
+/// Returns either an array of elements or Json::Null if the match is incorrect.
+pub fn find(path: &JsonPathInst, json: &Value) -> Value {
+    let slice = find_slice(&path, &json);
+    if !slice.is_empty() {
+        if JsonPathValue::only_no_value(&slice) {
+            Value::Null
         } else {
-            has_v
+            Value::Array(
+                slice
+                    .into_iter()
+                    .filter(|v| v.has_value())
+                    .map(|v| v.to_data())
+                    .collect(),
+            )
         }
+    } else {
+        Value::Array(vec![])
     }
-
-    /// finds a slice of data and wrap it with Value::Array by cloning the data.
-    /// Returns either an array of elements or Json::Null if the match is incorrect.
-    pub fn find(&self) -> Value {
-        let slice = self.find_slice();
-        if !slice.is_empty() {
-            if JsonPathValue::only_no_value(&slice) {
-                Value::Null
-            } else {
-                Value::Array(
-                    self.find_slice()
-                        .into_iter()
-                        .filter(|v| v.has_value())
-                        .map(|v| v.to_data())
-                        .collect(),
-                )
-            }
-        } else {
-            Value::Array(vec![])
-        }
-    }
-    /// finds a path of the values.
-    /// If the values has been obtained by moving the data out of the initial json the path is absent.
-    pub fn find_as_path(&self) -> Value {
-        Value::Array(
-            self.find_slice()
-                .into_iter()
-                .flat_map(|v| v.to_path())
-                .map(|v| v.into())
-                .collect(),
-        )
-    }
+}
+/// finds a path of the values.
+/// If the values has been obtained by moving the data out of the initial json the path is absent.
+pub fn find_as_path(path: &JsonPathInst, json: &Value) -> Value {
+    Value::Array(
+        find_slice(path, json)
+            .into_iter()
+            .flat_map(|v| v.to_path())
+            .map(|v| v.into())
+            .collect(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
-    use crate::{jp_v, JsonPathFinder, JsonPathInst, JsonPathValue};
+    use crate::{jp_v, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
     use std::str::FromStr;
 
     fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
-        match JsonPathFinder::from_str(json, path) {
-            Ok(finder) => assert_eq!(finder.find_slice(), expected),
-            Err(e) => panic!("error while parsing json or jsonpath: {}", e),
-        }
+        let json: Value = match serde_json::from_str(json) {
+            Ok(json) => json,
+            Err(e) => panic!("error while parsing json: {}", e),
+        };
+        let path = match JsonPathInst::from_str(path) {
+            Ok(path) => path,
+            Err(e) => panic!("error while parsing jsonpath: {}", e),
+        };
+
+        assert_eq!(super::find_slice(&path, &json), expected)
     }
 
     fn template_json<'a>() -> &'a str {
@@ -932,9 +874,7 @@ mod tests {
             JsonPathInst::from_str("$..book[?(@.author size 10)].title")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         let js = json!("Sayings of the Century");
         assert_eq!(v, jp_v![&js;"$.['store'].['book'][0].['title']",]);
     }
@@ -945,9 +885,7 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.verb == 'TEST')]").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         let js = json!({"verb":"TEST"});
         assert_eq!(v, jp_v![&js;"$[0]",]);
     }
@@ -960,9 +898,7 @@ mod tests {
             JsonPathInst::from_str("$.[?(@.verb == 'TEST')].length()")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = json!([2]);
         assert_eq!(v, js);
 
@@ -970,8 +906,7 @@ mod tests {
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), json!([3]));
+        assert_eq!(super::find(&path, &json), json!([3]));
 
         // length of search following the wildcard returns correct result
         let json: Box<Value> =
@@ -980,37 +915,32 @@ mod tests {
             JsonPathInst::from_str("$.[?(@.verb == 'TEST')].[*].length()")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), json!([3]));
+        assert_eq!(super::find(&path, &json), json!([3]));
 
         // length of object returns 0
         let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), Value::Null);
+        assert_eq!(super::find(&path, &json), Value::Null);
 
         // length of integer returns null
         let json: Box<Value> = Box::new(json!(1));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), Value::Null);
+        assert_eq!(super::find(&path, &json), Value::Null);
 
         // length of array returns correct result
         let json: Box<Value> = Box::new(json!([[1], [2], [3]]));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), json!([3]));
+        assert_eq!(super::find(&path, &json), json!([3]));
 
         // path does not exist returns length null
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.not.exist.length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        assert_eq!(finder.find(), Value::Null);
+        assert_eq!(super::find(&path, &json), Value::Null);
 
         // seraching one value returns correct length
         let json: Box<Value> =
@@ -1018,9 +948,8 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.verb == 'RUN')].length()").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
 
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = json!([1]);
         assert_eq!(v, js);
 
@@ -1031,9 +960,8 @@ mod tests {
             JsonPathInst::from_str("$.[?(@.verb == 'RUN')].key123.length()")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
 
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = json!(null);
         assert_eq!(v, js);
 
@@ -1042,9 +970,8 @@ mod tests {
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.[0].length()").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
 
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = Value::Null;
         assert_eq!(v, js);
 
@@ -1053,9 +980,8 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.prop)].prop.[0].length()").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
 
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = json!([3]);
         assert_eq!(v, js);
 
@@ -1064,9 +990,8 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.prop)].prop.[1].length()").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
 
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = Value::Null;
         assert_eq!(v, js);
     }
@@ -1079,8 +1004,7 @@ mod tests {
 
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.field[1]").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
 
         let json: Box<Value> = Box::new(json!({
@@ -1089,8 +1013,7 @@ mod tests {
 
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.field[1]").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1102,8 +1025,7 @@ mod tests {
 
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.field[?(@ == 0)]").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1116,8 +1038,7 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.field[?(@.f_ == 0)]").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1129,8 +1050,7 @@ mod tests {
 
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$..f_").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(
             v,
             vec![Slice(&json!(1), "$.['field'][1].['f'].['f_']".to_string())]
@@ -1145,15 +1065,13 @@ mod tests {
 
         let path: Box<JsonPathInst> =
             Box::from(JsonPathInst::from_str("$.field_.field").expect("the path is correct"));
-        let finder = JsonPathFinder::new(json.clone(), path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
 
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.field_.field[?(@ == 1)]").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1165,9 +1083,7 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.[?(@.verb == \"RUN1\")]").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-
-        let v = finder.find();
+        let v = super::find(&path, &json);
         let js = json!(null);
         assert_eq!(v, js);
     }
@@ -1181,8 +1097,7 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.field.field.length()").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
 
         let json: Box<Value> = Box::new(json!({
@@ -1191,8 +1106,7 @@ mod tests {
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.field[?(@.a == 0)].f.length()").expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1224,18 +1138,14 @@ mod tests {
             JsonPathInst::from_str("$.first[?(@.does_not_exist && @.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json.clone(), path);
-
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
 
         let path: Box<JsonPathInst> = Box::from(
             JsonPathInst::from_str("$.first[?(@.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(v, vec![NoValue]);
     }
 
@@ -1249,9 +1159,8 @@ mod tests {
             JsonPathInst::from_str("$.[?(@.author ~= '(?i)d\\(Rees\\)')]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json.clone(), path);
         assert_eq!(
-            finder.find_slice(),
+            super::find_slice(&path, &json.clone()),
             vec![Slice(&json!({"author":"abcd(Rees)"}), "$".to_string())]
         );
     }
@@ -1263,8 +1172,7 @@ mod tests {
             JsonPathInst::from_str("$.first[?(!@.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json.clone(), path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(
             v,
             vec![Slice(
@@ -1277,8 +1185,7 @@ mod tests {
             JsonPathInst::from_str("$.first[?(!(@.does_not_exist >= 1.0))]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json.clone(), path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(
             v,
             vec![Slice(
@@ -1291,8 +1198,7 @@ mod tests {
             JsonPathInst::from_str("$.first[?(!(@.second.active == 1) || @.second.active == 1)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json.clone(), path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(
             v,
             vec![Slice(
@@ -1305,8 +1211,7 @@ mod tests {
             JsonPathInst::from_str("$.first[?(!@.second.active == 1 && !@.second.active == 1 || !@.second.active == 2)]")
                 .expect("the path is correct"),
         );
-        let finder = JsonPathFinder::new(json, path);
-        let v = finder.find_slice();
+        let v = super::find_slice(&path, &json);
         assert_eq!(
             v,
             vec![Slice(
