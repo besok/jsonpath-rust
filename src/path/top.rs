@@ -117,7 +117,7 @@ impl<'a> Path<'a> for FnPath {
                 _ => NoValue,
             };
 
-            match input.get(0) {
+            match input.first() {
                 Some(v) => match v {
                     NewValue(d) => take_len(d),
                     Slice(s, _) => take_len(s),

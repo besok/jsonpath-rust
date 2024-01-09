@@ -1,10 +1,9 @@
 [package]
 name = "jsonpath-rust"
 description = "The library provides the basic functionality to find the set of the data according to the filtering query."
-version = "0.3.5"
+version = "0.4.0"
 authors = ["BorisZhguchev <zhguchev@gmail.com>"]
 edition = "2018"
-license = "MIT"
 license-file = "LICENSE"
 homepage = "https://github.com/besok/jsonpath-rust"
 repository = "https://github.com/besok/jsonpath-rust"

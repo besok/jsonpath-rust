@@ -5,7 +5,7 @@ use serde_json::Value;
 /// The method expects to get a number on the right side and array or string or object on the left
 /// where the number of characters, elements or fields will be compared respectively.
 pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
-    if let Some(Value::Number(n)) = right.get(0) {
+    if let Some(Value::Number(n)) = right.first() {
         if let Some(sz) = n.as_f64() {
             for el in left.iter() {
                 match el {
@@ -32,7 +32,7 @@ pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     }
 
     if let Some(elems) = left.first().and_then(|e| e.as_array()) {
-        if let Some(Value::Array(right_elems)) = right.get(0) {
+        if let Some(Value::Array(right_elems)) = right.first() {
             if right_elems.is_empty() {
                 return false;
             }
@@ -65,7 +65,7 @@ pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         return false;
     }
 
-    if let Some(Value::Array(elems)) = right.get(0) {
+    if let Some(Value::Array(elems)) = right.first() {
         if elems.is_empty() {
             return false;
         }
@@ -98,7 +98,7 @@ pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         return false;
     }
 
-    match right.get(0) {
+    match right.first() {
         Some(Value::String(str)) => {
             if let Ok(regex) = Regex::new(str) {
                 for el in left.iter() {
@@ -121,7 +121,7 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
         return false;
     }
 
-    match right.get(0) {
+    match right.first() {
         Some(Value::Array(elems)) => {
             for el in left.iter() {
                 if elems.contains(el) {
@@ -147,7 +147,7 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 /// ensure the number on the left side is less the number on the right side
 pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     if left.len() == 1 && right.len() == 1 {
-        match (left.get(0), right.get(0)) {
+        match (left.first(), right.first()) {
             (Some(Value::Number(l)), Some(Value::Number(r))) => l
                 .as_f64()
                 .and_then(|v1| r.as_f64().map(|v2| v1 < v2))

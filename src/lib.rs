@@ -1195,7 +1195,7 @@ mod tests {
             .expect("the path is correct");
 
         let results = query.find_slice(&json);
-        let v = results.get(0).expect("to get value");
+        let v = results.first().expect("to get value");
 
         // V can be implicitly converted to &Value
         test_coercion(v);

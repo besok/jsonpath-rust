@@ -432,5 +432,6 @@ TBD
 
 ## How to update version
  - update files
+ - commit them
  - add tag `git tag -a v<Version> -m "message"`
  - git push origin <tag_name>
