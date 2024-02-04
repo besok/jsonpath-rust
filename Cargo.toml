@@ -17,9 +17,9 @@ regex = "1"
 pest = "2.0"
 pest_derive = "2.0"
 thiserror = "1.0.50"
+lazy_static = "1.4"
 
 [dev-dependencies]
-lazy_static = "1.0"
 criterion = "0.5.1"
 
 [[bench]]

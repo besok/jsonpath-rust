@@ -114,14 +114,22 @@
 
 #![allow(clippy::vec_init_then_push)]
 
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use std::mem;
 use std::ops::Deref;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use lazy_static::lazy_static;
+
+use regex::{Error, Regex};
 use JsonPathValue::{NewValue, NoValue, Slice};
 
 pub mod parser;
@@ -166,10 +174,74 @@ pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
 
+#[derive(Debug, Clone)]
+pub struct JsonPathConfig {
+    pub with_regex_cache: bool,
+    pub regex_cache: JsPathRegexCache,
+}
+lazy_static!(
+    static ref CACHE:JsPathRegexCache = JsPathRegexCache::new();
+    static ref cache_on:Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
+);
+pub fn cache_off() {
+    cache_on.store(false, Ordering::Relaxed);
+}
+
+impl Default for JsonPathConfig {
+    fn default() -> Self {
+        JsonPathConfig {
+            with_regex_cache: cache_on.clone().load(Ordering::Relaxed),
+            regex_cache: CACHE.clone(),
+        }
+    }
+}
+
+
+#[derive(Default, Debug, Clone)]
+struct JsPathRegexCache {
+    cache: Arc<Mutex<HashMap<String, Regex>>>,
+}
+
+
+impl JsPathRegexCache {
+    pub fn new() -> Self {
+        JsPathRegexCache {
+            cache: Arc::new(Mutex::new(Default::default())),
+        }
+    }
+    pub fn contains(&self, str: &String) -> bool {
+        self
+            .cache
+            .lock()
+            .unwrap()
+            .contains_key(str)
+    }
+    pub fn matched(&self, str: &String, left: Vec<&Value>) -> bool {
+        let guard = self.cache.lock().unwrap();
+        let r = guard.get(str).unwrap();
+        for el in left.iter() {
+            if let Some(v) = el.as_str() {
+                if r.is_match(v) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+    pub fn set(&self, str: &String, regex: Regex) {
+        self
+            .cache
+            .lock()
+            .unwrap()
+            .insert(str.to_owned(), regex);
+    }
+}
+
 #[derive(Clone)]
 pub struct JsonPathInst {
     inner: JsonPath,
 }
+
 
 impl FromStr for JsonPathInst {
     type Err = String;
@@ -294,6 +366,7 @@ type JsPathStr = String;
 pub(crate) fn jsp_idx(prefix: &str, idx: usize) -> String {
     format!("{}[{}]", prefix, idx)
 }
+
 pub(crate) fn jsp_obj(prefix: &str, key: &str) -> String {
     format!("{}.['{}']", prefix, key)
 }
@@ -347,8 +420,8 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 
     fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-    where
-        F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
+        where
+            F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref)
@@ -362,8 +435,8 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 
     fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-    where
-        F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
+        where
+            F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref),
@@ -407,12 +480,22 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 pub struct JsonPathFinder {
     json: Box<Value>,
     path: Box<JsonPathInst>,
+    cfg: JsonPathConfig,
 }
 
 impl JsonPathFinder {
     /// creates a new instance of [JsonPathFinder]
     pub fn new(json: Box<Value>, path: Box<JsonPathInst>) -> Self {
-        JsonPathFinder { json, path }
+        JsonPathFinder { json, path, cfg: JsonPathConfig::default() }
+    }
+
+    pub fn new_with_cfg(json: Box<Value>, path: Box<JsonPathInst>, cfg: JsonPathConfig) -> Self {
+        JsonPathFinder { json, path, cfg }
+    }
+
+    /// sets a cfg with a new one
+    pub fn set_cfg(&mut self, cfg: JsonPathConfig) {
+        self.cfg = cfg
     }
 
     /// updates a path with a new one
@@ -1257,7 +1340,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1271,7 +1354,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1285,7 +1368,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1299,7 +1382,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
     }

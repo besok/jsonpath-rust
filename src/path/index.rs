@@ -1,4 +1,4 @@
-use crate::jsp_idx;
+use crate::{JsonPathConfig, jsp_idx};
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 use crate::path::json::*;
 use crate::path::top::ObjectField;
@@ -196,6 +196,7 @@ pub enum FilterPath<'a> {
         left: PathInstance<'a>,
         right: PathInstance<'a>,
         op: &'a FilterSign,
+        cfg: JsonPathConfig,
     },
     Or {
         left: PathInstance<'a>,
@@ -211,23 +212,24 @@ pub enum FilterPath<'a> {
 }
 
 impl<'a> FilterPath<'a> {
-    pub(crate) fn new(expr: &'a FilterExpression, root: &'a Value) -> Self {
+    pub(crate) fn new(expr: &'a FilterExpression, root: &'a Value, cfg: JsonPathConfig) -> Self {
         match expr {
             FilterExpression::Atom(left, op, right) => FilterPath::Filter {
                 left: process_operand(left, root),
                 right: process_operand(right, root),
                 op,
+                cfg,
             },
             FilterExpression::And(l, r) => FilterPath::And {
-                left: Box::new(FilterPath::new(l, root)),
-                right: Box::new(FilterPath::new(r, root)),
+                left: Box::new(FilterPath::new(l, root, cfg.clone())),
+                right: Box::new(FilterPath::new(r, root, cfg.clone())),
             },
             FilterExpression::Or(l, r) => FilterPath::Or {
-                left: Box::new(FilterPath::new(l, root)),
-                right: Box::new(FilterPath::new(r, root)),
+                left: Box::new(FilterPath::new(l, root, cfg.clone())),
+                right: Box::new(FilterPath::new(r, root, cfg.clone())),
             },
             FilterExpression::Not(exp) => FilterPath::Not {
-                exp: Box::new(FilterPath::new(exp, root)),
+                exp: Box::new(FilterPath::new(exp, root, cfg)),
             },
         }
     }
@@ -236,45 +238,48 @@ impl<'a> FilterPath<'a> {
         two: &'a FilterSign,
         left: Vec<JsonPathValue<Value>>,
         right: Vec<JsonPathValue<Value>>,
+        cfg:JsonPathConfig
     ) -> bool {
-        FilterPath::process_atom(one, left.clone(), right.clone())
-            || FilterPath::process_atom(two, left, right)
+        FilterPath::process_atom(one, left.clone(), right.clone(),cfg.clone())
+            || FilterPath::process_atom(two, left, right,cfg)
     }
     fn process_atom(
         op: &'a FilterSign,
         left: Vec<JsonPathValue<Value>>,
         right: Vec<JsonPathValue<Value>>,
+        cfg:JsonPathConfig
     ) -> bool {
         match op {
             FilterSign::Equal => eq(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
-            FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
+            FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right,cfg),
             FilterSign::Less => less(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
             FilterSign::LeOrEq => {
-                FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right)
+                FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right,cfg)
             }
             FilterSign::Greater => less(
                 JsonPathValue::vec_as_data(right),
                 JsonPathValue::vec_as_data(left),
             ),
             FilterSign::GrOrEq => {
-                FilterPath::compound(&FilterSign::Greater, &FilterSign::Equal, left, right)
+                FilterPath::compound(&FilterSign::Greater, &FilterSign::Equal, left, right,cfg)
             }
             FilterSign::Regex => regex(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
+                cfg
             ),
             FilterSign::In => inside(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
-            FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
-            FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
+            FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right,cfg),
+            FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right,cfg),
             FilterSign::AnyOf => any_of(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
@@ -294,10 +299,11 @@ impl<'a> FilterPath<'a> {
     fn process(&self, curr_el: &'a Value) -> bool {
         let pref = String::new();
         match self {
-            FilterPath::Filter { left, right, op } => FilterPath::process_atom(
+            FilterPath::Filter { left, right, op, cfg } => FilterPath::process_atom(
                 op,
                 left.find(Slice(curr_el, pref.clone())),
                 right.find(Slice(curr_el, pref)),
+                cfg.clone()
             ),
             FilterPath::Or { left, right } => {
                 if !JsonPathValue::vec_as_data(left.find(Slice(curr_el, pref.clone()))).is_empty() {

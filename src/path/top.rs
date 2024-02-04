@@ -103,7 +103,7 @@ impl<'a> Path<'a> for FnPath {
     fn flat_find(
         &self,
         input: Vec<JsonPathValue<'a, Self::Data>>,
-        is_search_length: bool,
+        is_search_length: bool
     ) -> Vec<JsonPathValue<'a, Self::Data>> {
         // todo rewrite
         if JsonPathValue::only_no_value(&input) {

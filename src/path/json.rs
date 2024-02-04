@@ -1,5 +1,6 @@
 use regex::Regex;
 use serde_json::Value;
+use crate::JsonPathConfig;
 
 /// compare sizes of json elements
 /// The method expects to get a number on the right side and array or string or object on the left
@@ -92,24 +93,34 @@ pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
     false
 }
 
-/// ensure that the element on the left sides mathes the regex on the right side
-pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+/// ensure that the element on the left sides matches the regex on the right side
+pub fn regex(left: Vec<&Value>, right: Vec<&Value>, cfg: JsonPathConfig) -> bool {
     if left.is_empty() || right.is_empty() {
         return false;
     }
 
+
     match right.first() {
         Some(Value::String(str)) => {
-            if let Ok(regex) = Regex::new(str) {
-                for el in left.iter() {
-                    if let Some(v) = el.as_str() {
-                        if regex.is_match(v) {
-                            return true;
+            if cfg.with_regex_cache {
+                if cfg.regex_cache.contains(str) {
+                    return cfg.regex_cache.matched(str, left)
+                } else {
+                    cfg.regex_cache.set(str, Regex::new(str).unwrap());
+                    return regex(left, right, cfg);
+                }
+            } else {
+                if let Ok(regex) = Regex::new(str) {
+                    for el in left.iter() {
+                        if let Some(v) = el.as_str() {
+                            if regex.is_match(v) {
+                                return true;
+                            }
                         }
                     }
                 }
+                false
             }
-            false
         }
         _ => false,
     }
@@ -172,6 +183,7 @@ pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 mod tests {
     use crate::path::json::{any_of, eq, less, regex, size, sub_set_of};
     use serde_json::{json, Value};
+    use crate::JsonPathConfig;
 
     #[test]
     fn value_eq_test() {
@@ -202,12 +214,12 @@ mod tests {
 
         assert!(eq(
             vec![&left, &left1, &left2, &left3],
-            vec![&right, &right1, &right2, &right3]
+            vec![&right, &right1, &right2, &right3],
         ));
 
         assert!(!eq(
             vec![&left1, &left, &left2, &left3],
-            vec![&right, &right1, &right2, &right3]
+            vec![&right, &right1, &right2, &right3],
         ));
     }
 
@@ -243,8 +255,8 @@ mod tests {
         let left3 = json!("a#11");
         let left4 = json!("#a11");
 
-        assert!(regex(vec![&left1, &left2, &left3, &left4], vec![&right]));
-        assert!(!regex(vec![&left1, &left3, &left4], vec![&right]))
+        assert!(regex(vec![&left1, &left2, &left3, &left4], vec![&right], JsonPathConfig::default()));
+        assert!(!regex(vec![&left1, &left3, &left4], vec![&right], JsonPathConfig::default()))
     }
 
     #[test]
@@ -272,13 +284,13 @@ mod tests {
             vec![&Value::Array(vec![
                 left1.clone(),
                 left2.clone(),
-                left3.clone()
+                left3.clone(),
             ])],
-            vec![&right]
+            vec![&right],
         ));
         assert!(!sub_set_of(
             vec![&Value::Array(vec![left1, left2, left3, left40])],
-            vec![&right]
+            vec![&right],
         ));
     }
 
