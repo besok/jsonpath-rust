@@ -1,6 +1,6 @@
 use regex::Regex;
 use serde_json::Value;
-use crate::JsonPathConfig;
+use crate::path::config::cache::{RegexCache, RegexCacheError, RegexCacheInst};
 
 /// compare sizes of json elements
 /// The method expects to get a number on the right side and array or string or object on the left
@@ -94,21 +94,18 @@ pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 }
 
 /// ensure that the element on the left sides matches the regex on the right side
-pub fn regex(left: Vec<&Value>, right: Vec<&Value>, cfg: JsonPathConfig) -> bool {
+pub fn regex(left: Vec<&Value>, right: Vec<&Value>, cache: &RegexCache<impl RegexCacheInst + Clone>) -> bool {
     if left.is_empty() || right.is_empty() {
         return false;
     }
 
-
     match right.first() {
         Some(Value::String(str)) => {
-            if cfg.with_regex_cache {
-                if cfg.regex_cache.contains(str) {
-                    return cfg.regex_cache.matched(str, left)
-                } else {
-                    cfg.regex_cache.set(str, Regex::new(str).unwrap());
-                    return regex(left, right, cfg);
-                }
+            if cache.is_implemented() {
+                cache
+                    .get_instance()
+                    .and_then(|inst| inst.validate(str, left))
+                    .unwrap_or(false)
             } else {
                 if let Ok(regex) = Regex::new(str) {
                     for el in left.iter() {
@@ -184,6 +181,7 @@ mod tests {
     use crate::path::json::{any_of, eq, less, regex, size, sub_set_of};
     use serde_json::{json, Value};
     use crate::JsonPathConfig;
+    use crate::path::config::cache::RegexCache;
 
     #[test]
     fn value_eq_test() {
@@ -255,8 +253,8 @@ mod tests {
         let left3 = json!("a#11");
         let left4 = json!("#a11");
 
-        assert!(regex(vec![&left1, &left2, &left3, &left4], vec![&right], JsonPathConfig::default()));
-        assert!(!regex(vec![&left1, &left3, &left4], vec![&right], JsonPathConfig::default()))
+        assert!(regex(vec![&left1, &left2, &left3, &left4], vec![&right], &RegexCache::default()));
+        assert!(!regex(vec![&left1, &left3, &left4], vec![&right], &RegexCache::default()))
     }
 
     #[test]

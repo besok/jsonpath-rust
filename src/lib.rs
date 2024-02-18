@@ -114,23 +114,19 @@
 
 #![allow(clippy::vec_init_then_push)]
 
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
-use std::mem;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock};
-use std::sync::atomic::{AtomicBool, Ordering};
 use lazy_static::lazy_static;
-
-use regex::{Error, Regex};
+use once_cell::sync::Lazy;
 use JsonPathValue::{NewValue, NoValue, Slice};
+use crate::path::config::cache::{DefaultRegexCacheInst, RegexCache};
+use crate::path::config::JsonPathConfig;
 
 pub mod parser;
 pub mod path;
@@ -173,75 +169,11 @@ extern crate pest;
 pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
-
-#[derive(Debug, Clone)]
-pub struct JsonPathConfig {
-    pub with_regex_cache: bool,
-    pub regex_cache: JsPathRegexCache,
-}
-lazy_static!(
-    static ref CACHE:JsPathRegexCache = JsPathRegexCache::new();
-    static ref cache_on:Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
-);
-pub fn cache_off() {
-    cache_on.store(false, Ordering::Relaxed);
-}
-
-impl Default for JsonPathConfig {
-    fn default() -> Self {
-        JsonPathConfig {
-            with_regex_cache: cache_on.clone().load(Ordering::Relaxed),
-            regex_cache: CACHE.clone(),
-        }
-    }
-}
-
-
-#[derive(Default, Debug, Clone)]
-struct JsPathRegexCache {
-    cache: Arc<Mutex<HashMap<String, Regex>>>,
-}
-
-
-impl JsPathRegexCache {
-    pub fn new() -> Self {
-        JsPathRegexCache {
-            cache: Arc::new(Mutex::new(Default::default())),
-        }
-    }
-    pub fn contains(&self, str: &String) -> bool {
-        self
-            .cache
-            .lock()
-            .unwrap()
-            .contains_key(str)
-    }
-    pub fn matched(&self, str: &String, left: Vec<&Value>) -> bool {
-        let guard = self.cache.lock().unwrap();
-        let r = guard.get(str).unwrap();
-        for el in left.iter() {
-            if let Some(v) = el.as_str() {
-                if r.is_match(v) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-    pub fn set(&self, str: &String, regex: Regex) {
-        self
-            .cache
-            .lock()
-            .unwrap()
-            .insert(str.to_owned(), regex);
-    }
-}
-
+pub static CONFIG: Lazy<JsonPathConfig> = Lazy::new(|| JsonPathConfig::new(RegexCache::instance(DefaultRegexCacheInst::default())));
 #[derive(Clone)]
 pub struct JsonPathInst {
     inner: JsonPath,
 }
-
 
 impl FromStr for JsonPathInst {
     type Err = String;
@@ -296,10 +228,24 @@ impl JsonPathQuery for Box<Value> {
     }
 }
 
+impl JsonPathQuery for (Box<Value>, JsonPathConfig) {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new_with_cfg(self.0, Box::new(p), self.1).find())
+    }
+}
+
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, String> {
         let p = JsonPathInst::from_str(query)?;
         Ok(JsonPathFinder::new(Box::new(self), Box::new(p)).find())
+    }
+}
+
+impl JsonPathQuery for (Value, JsonPathConfig) {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new_with_cfg(Box::new(self.0), Box::new(p), self.1).find())
     }
 }
 

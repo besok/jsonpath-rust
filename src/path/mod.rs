@@ -1,4 +1,4 @@
-use crate::{JsonPathConfig, JsonPathFinder, JsonPathValue};
+use crate::{JsonPathConfig, JsonPathValue};
 use serde_json::Value;
 
 use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
@@ -11,6 +11,8 @@ mod index;
 mod json;
 /// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
+/// The module provides the ability to adjust the behavior of the search
+pub mod config;
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]

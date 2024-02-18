@@ -272,7 +272,7 @@ impl<'a> FilterPath<'a> {
             FilterSign::Regex => regex(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
-                cfg
+                &cfg.regex_cache
             ),
             FilterSign::In => inside(
                 JsonPathValue::vec_as_data(left),
