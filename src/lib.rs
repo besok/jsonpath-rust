@@ -116,6 +116,7 @@
 
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
+use crate::path::config::JsonPathConfig;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
@@ -182,8 +183,12 @@ impl FromStr for JsonPathInst {
 }
 
 impl JsonPathInst {
-    pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
-        json_path_instance(&self.inner, value)
+    pub fn find_slice<'a>(
+        &'a self,
+        value: &'a Value,
+        cfg: JsonPathConfig,
+    ) -> Vec<JsonPtr<'a, Value>> {
+        json_path_instance(&self.inner, value, cfg)
             .find(JsonPathValue::from_root(value))
             .into_iter()
             .filter(|v| v.has_value())
@@ -224,10 +229,24 @@ impl JsonPathQuery for Box<Value> {
     }
 }
 
+impl JsonPathQuery for (Box<Value>, JsonPathConfig) {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new_with_cfg(self.0, Box::new(p), self.1).find())
+    }
+}
+
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, String> {
         let p = JsonPathInst::from_str(query)?;
         Ok(JsonPathFinder::new(Box::new(self), Box::new(p)).find())
+    }
+}
+
+impl JsonPathQuery for (Value, JsonPathConfig) {
+    fn path(self, query: &str) -> Result<Value, String> {
+        let p = JsonPathInst::from_str(query)?;
+        Ok(JsonPathFinder::new_with_cfg(Box::new(self.0), Box::new(p), self.1).find())
     }
 }
 
@@ -294,6 +313,7 @@ type JsPathStr = String;
 pub(crate) fn jsp_idx(prefix: &str, idx: usize) -> String {
     format!("{}[{}]", prefix, idx)
 }
+
 pub(crate) fn jsp_obj(prefix: &str, key: &str) -> String {
     format!("{}.['{}']", prefix, key)
 }
@@ -337,7 +357,7 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
 }
 
 impl<'a, Data> JsonPathValue<'a, Data> {
-    fn only_no_value(input: &Vec<JsonPathValue<'a, Data>>) -> bool {
+    fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }
     fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
@@ -407,12 +427,26 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 pub struct JsonPathFinder {
     json: Box<Value>,
     path: Box<JsonPathInst>,
+    cfg: JsonPathConfig,
 }
 
 impl JsonPathFinder {
     /// creates a new instance of [JsonPathFinder]
     pub fn new(json: Box<Value>, path: Box<JsonPathInst>) -> Self {
-        JsonPathFinder { json, path }
+        JsonPathFinder {
+            json,
+            path,
+            cfg: JsonPathConfig::default(),
+        }
+    }
+
+    pub fn new_with_cfg(json: Box<Value>, path: Box<JsonPathInst>, cfg: JsonPathConfig) -> Self {
+        JsonPathFinder { json, path, cfg }
+    }
+
+    /// sets a cfg with a new one
+    pub fn set_cfg(&mut self, cfg: JsonPathConfig) {
+        self.cfg = cfg
     }
 
     /// updates a path with a new one
@@ -440,10 +474,15 @@ impl JsonPathFinder {
         let path = Box::new(JsonPathInst::from_str(path)?);
         Ok(JsonPathFinder::new(json, path))
     }
+    pub fn from_str_with_cfg(json: &str, path: &str, cfg: JsonPathConfig) -> Result<Self, String> {
+        let json = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        let path = Box::new(JsonPathInst::from_str(path)?);
+        Ok(JsonPathFinder::new_with_cfg(json, path, cfg))
+    }
 
     /// creates an instance to find a json slice from the json
     pub fn instance(&self) -> PathInstance {
-        json_path_instance(&self.path.inner, &self.json)
+        json_path_instance(&self.path.inner, &self.json, self.cfg.clone())
     }
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
@@ -494,6 +533,7 @@ impl JsonPathFinder {
 
 #[cfg(test)]
 mod tests {
+    use crate::path::config::JsonPathConfig;
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{jp_v, JsonPathFinder, JsonPathInst, JsonPathValue};
@@ -1194,7 +1234,7 @@ mod tests {
         let query = JsonPathInst::from_str("$..book[?(@.author size 10)].title")
             .expect("the path is correct");
 
-        let results = query.find_slice(&json);
+        let results = query.find_slice(&json, JsonPathConfig::default());
         let v = results.first().expect("to get value");
 
         // V can be implicitly converted to &Value
@@ -1257,7 +1297,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1271,7 +1311,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1285,7 +1325,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
 
@@ -1299,7 +1339,7 @@ mod tests {
             v,
             vec![Slice(
                 &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                "$.['first']".to_string(),
             )]
         );
     }
