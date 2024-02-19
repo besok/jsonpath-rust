@@ -1,9 +1,9 @@
-use crate::{JsonPathConfig, jsp_idx};
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 use crate::path::json::*;
 use crate::path::top::ObjectField;
 use crate::path::{json_path_instance, process_operand, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NoValue, Slice};
+use crate::{jsp_idx, JsonPathConfig};
 use serde_json::value::Value::Array;
 use serde_json::Value;
 
@@ -299,7 +299,12 @@ impl<'a> FilterPath<'a> {
     fn process(&self, curr_el: &'a Value) -> bool {
         let pref = String::new();
         match self {
-            FilterPath::Filter { left, right, op, cfg } => FilterPath::process_atom(
+            FilterPath::Filter {
+                left,
+                right,
+                op,
+                cfg,
+            } => FilterPath::process_atom(
                 op,
                 left.find(Slice(curr_el, pref.clone())),
                 right.find(Slice(curr_el, pref)),

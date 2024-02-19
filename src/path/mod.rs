@@ -5,14 +5,14 @@ use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
 use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 use crate::path::top::*;
 
+/// The module provides the ability to adjust the behavior of the search
+pub mod config;
 /// The module is in charge of processing [[JsonPathIndex]] elements
 mod index;
 /// The module is a helper module providing the set of helping funcitons to process a json elements
 mod json;
 /// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
-/// The module provides the ability to adjust the behavior of the search
-pub mod config;
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
@@ -43,10 +43,14 @@ pub trait Path<'a> {
 }
 
 /// The basic type for instances.
-pub type PathInstance<'a> = Box<dyn Path<'a, Data=Value> + 'a>;
+pub type PathInstance<'a> = Box<dyn Path<'a, Data = Value> + 'a>;
 
 /// The major method to process the top part of json part
-pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value, cfg: JsonPathConfig) -> PathInstance<'a> {
+pub fn json_path_instance<'a>(
+    json_path: &'a JsonPath,
+    root: &'a Value,
+    cfg: JsonPathConfig,
+) -> PathInstance<'a> {
     match json_path {
         JsonPath::Root => Box::new(RootPointer::new(root)),
         JsonPath::Field(key) => Box::new(ObjectField::new(key)),
@@ -62,7 +66,11 @@ pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value, cfg: Jso
 }
 
 /// The method processes the indexes(all expressions indie [])
-fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value, cfg: JsonPathConfig) -> PathInstance<'a> {
+fn process_index<'a>(
+    json_path_index: &'a JsonPathIndex,
+    root: &'a Value,
+    cfg: JsonPathConfig,
+) -> PathInstance<'a> {
     match json_path_index {
         JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(index.as_u64().unwrap() as usize)),
         JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),

@@ -116,16 +116,14 @@
 
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
+use crate::path::config::JsonPathConfig;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::str::FromStr;
-use once_cell::sync::Lazy;
 use JsonPathValue::{NewValue, NoValue, Slice};
-use crate::path::config::cache::{DefaultRegexCacheInst, RegexCache};
-use crate::path::config::JsonPathConfig;
 
 pub mod parser;
 pub mod path;
@@ -169,7 +167,6 @@ pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
 
-
 #[derive(Clone)]
 pub struct JsonPathInst {
     inner: JsonPath,
@@ -186,7 +183,11 @@ impl FromStr for JsonPathInst {
 }
 
 impl JsonPathInst {
-    pub fn find_slice<'a>(&'a self, value: &'a Value, cfg: JsonPathConfig) -> Vec<JsonPtr<'a, Value>> {
+    pub fn find_slice<'a>(
+        &'a self,
+        value: &'a Value,
+        cfg: JsonPathConfig,
+    ) -> Vec<JsonPtr<'a, Value>> {
         json_path_instance(&self.inner, value, cfg)
             .find(JsonPathValue::from_root(value))
             .into_iter()
@@ -356,7 +357,7 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
 }
 
 impl<'a, Data> JsonPathValue<'a, Data> {
-    fn only_no_value(input: &Vec<JsonPathValue<'a, Data>>) -> bool {
+    fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }
     fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
@@ -366,8 +367,8 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 
     fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-        where
-            F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
+    where
+        F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref)
@@ -381,8 +382,8 @@ impl<'a, Data> JsonPathValue<'a, Data> {
     }
 
     fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-        where
-            F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
+    where
+        F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref),
@@ -432,7 +433,11 @@ pub struct JsonPathFinder {
 impl JsonPathFinder {
     /// creates a new instance of [JsonPathFinder]
     pub fn new(json: Box<Value>, path: Box<JsonPathInst>) -> Self {
-        JsonPathFinder { json, path, cfg: JsonPathConfig::default() }
+        JsonPathFinder {
+            json,
+            path,
+            cfg: JsonPathConfig::default(),
+        }
     }
 
     pub fn new_with_cfg(json: Box<Value>, path: Box<JsonPathInst>, cfg: JsonPathConfig) -> Self {
@@ -528,13 +533,13 @@ impl JsonPathFinder {
 
 #[cfg(test)]
 mod tests {
+    use crate::path::config::JsonPathConfig;
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{jp_v, JsonPathFinder, JsonPathInst, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
     use std::str::FromStr;
-    use crate::path::config::JsonPathConfig;
 
     fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
         match JsonPathFinder::from_str(json, path) {

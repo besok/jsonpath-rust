@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, PoisonError};
 use regex::{Error, Regex};
 use serde_json::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
 /// The option to provide a cache for regex
 /// ```
@@ -19,25 +19,27 @@ use serde_json::Value;
 ///         .expect("the path is correct");
 #[derive(Clone)]
 pub enum RegexCache<T = DefaultRegexCacheInst>
-    where T: Clone + RegexCacheInst
+where
+    T: Clone + RegexCacheInst,
 {
     Absent,
     Implemented(T),
 }
 
 impl<T> RegexCache<T>
-    where T: Clone + RegexCacheInst
+where
+    T: Clone + RegexCacheInst,
 {
     pub fn is_implemented(&self) -> bool {
         match self {
             RegexCache::Absent => false,
-            RegexCache::Implemented(_) => true
+            RegexCache::Implemented(_) => true,
         }
     }
     pub fn get_instance(&self) -> Result<&T, RegexCacheError> {
         match self {
             RegexCache::Absent => Err(RegexCacheError::new("the instance is absent".to_owned())),
-            RegexCache::Implemented(inst) => Ok(inst)
+            RegexCache::Implemented(inst) => Ok(inst),
         }
     }
 
@@ -45,7 +47,7 @@ impl<T> RegexCache<T>
         RegexCache::Implemented(instance)
     }
 }
-
+#[allow(clippy::derivable_impls)]
 impl Default for RegexCache {
     fn default() -> Self {
         RegexCache::Absent
@@ -69,7 +71,7 @@ impl RegexCacheInst for DefaultRegexCacheInst {
         let mut cache = self.cache.lock()?;
         if cache.contains_key(regex) {
             let r = cache.get(regex).unwrap();
-             Ok(validate(r, values))
+            Ok(validate(r, values))
         } else {
             let new_reg = Regex::new(regex)?;
             let result = validate(&new_reg, values);

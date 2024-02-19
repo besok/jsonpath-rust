@@ -1,6 +1,6 @@
 pub mod cache;
 
-use crate::path::config::cache::{RegexCache};
+use crate::path::config::cache::RegexCache;
 
 /// Configuration to adjust the jsonpath search
 #[derive(Clone, Default)]
@@ -14,4 +14,3 @@ impl JsonPathConfig {
         Self { regex_cache }
     }
 }
-
