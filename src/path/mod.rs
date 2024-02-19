@@ -46,16 +46,16 @@ pub trait Path<'a> {
 pub type PathInstance<'a> = Box<dyn Path<'a, Data=Value> + 'a>;
 
 /// The major method to process the top part of json part
-pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a> {
+pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value, cfg: JsonPathConfig) -> PathInstance<'a> {
     match json_path {
         JsonPath::Root => Box::new(RootPointer::new(root)),
         JsonPath::Field(key) => Box::new(ObjectField::new(key)),
-        JsonPath::Chain(chain) => Box::new(Chain::from(chain, root)),
+        JsonPath::Chain(chain) => Box::new(Chain::from(chain, root, cfg)),
         JsonPath::Wildcard => Box::new(Wildcard {}),
         JsonPath::Descent(key) => Box::new(DescentObject::new(key)),
         JsonPath::DescentW => Box::new(DescentWildcard),
-        JsonPath::Current(value) => Box::new(Current::from(value, root)),
-        JsonPath::Index(index) => process_index(index, root,JsonPathConfig::default()),
+        JsonPath::Current(value) => Box::new(Current::from(value, root, cfg)),
+        JsonPath::Index(index) => process_index(index, root, cfg),
         JsonPath::Empty => Box::new(IdentityPath {}),
         JsonPath::Fn(Function::Length) => Box::new(FnPath::Size),
     }
@@ -73,9 +73,9 @@ fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value, cfg: J
 }
 
 /// The method processes the operand inside the filter expressions
-fn process_operand<'a>(op: &'a Operand, root: &'a Value) -> PathInstance<'a> {
+fn process_operand<'a>(op: &'a Operand, root: &'a Value, cfg: JsonPathConfig) -> PathInstance<'a> {
     match op {
-        Operand::Static(v) => json_path_instance(&JsonPath::Root, v),
-        Operand::Dynamic(jp) => json_path_instance(jp, root),
+        Operand::Static(v) => json_path_instance(&JsonPath::Root, v, cfg),
+        Operand::Dynamic(jp) => json_path_instance(jp, root, cfg),
     }
 }

@@ -389,7 +389,50 @@ fn test() {
 ** If the value has been modified during the search, there is no way to find a path of a new value. 
 It can happen if we try to find a length() of array, for in stance.**
 
+## Configuration
 
+The JsonPath provides a wat to configure the search by using `JsonPathConfig`.
+
+```rust
+pub fn main() {
+  let cfg = JsonPathConfig::new(RegexCache::Implemented(DefaultRegexCacheInst::default()));
+}
+```
+
+### Regex cache
+The configuration provides an ability to use a regex cache to improve the [performance](https://github.com/besok/jsonpath-rust/issues/61)
+
+To instantiate the cache needs to use `RegexCache` enum with the implementation of the trait `RegexCacheInst`.
+Default implementation `DefaultRegexCacheInst` uses `Arc<Mutex<HashMap<String,Regex>>>`.
+The pair of Box<Value> or Value  and config can be used:
+```rust
+pub fn main(){
+  let cfg = JsonPathConfig::new(RegexCache::Implemented(DefaultRegexCacheInst::default()));
+  let json = Box::new(json!({
+            "author":"abcd(Rees)",
+        }));
+
+  let _v = (json, cfg).path("$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]")
+          .expect("the path is correct");
+  
+  
+}
+```
+or using `JsonPathFinder` :
+
+```rust
+fn main() {
+    let cfg = JsonPathConfig::new(RegexCache::Implemented(DefaultRegexCacheInst::default()));
+    let finder = JsonPathFinder::from_str_with_cfg(
+        r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#,
+        "$.first.second[?(@.active)]",
+        cfg,
+    ).unwrap();
+    let slice_of_data: Vec<&Value> = finder.find_slice();
+    let js = json!({"active":1});
+    assert_eq!(slice_of_data, vec![JsonPathValue::Slice(&js, "$.first.second[0]".to_string())]);
+}
+```
 
 ## The structure
 

@@ -3,6 +3,20 @@ use std::sync::{Arc, Mutex, PoisonError};
 use regex::{Error, Regex};
 use serde_json::Value;
 
+/// The option to provide a cache for regex
+/// ```
+/// use serde_json::json;
+/// use jsonpath_rust::JsonPathQuery;
+/// use jsonpath_rust::path::config::cache::{DefaultRegexCacheInst, RegexCache};
+/// use jsonpath_rust::path::config::JsonPathConfig;
+///
+/// let cfg = JsonPathConfig::new(RegexCache::Implemented(DefaultRegexCacheInst::default()));
+///     let json = Box::new(json!({
+///             "author":"abcd(Rees)",
+///         }));
+///
+///     let _v = (json, cfg).path("$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]")
+///         .expect("the path is correct");
 #[derive(Clone)]
 pub enum RegexCache<T = DefaultRegexCacheInst>
     where T: Clone + RegexCacheInst
@@ -38,11 +52,13 @@ impl Default for RegexCache {
     }
 }
 
+/// A trait that defines the behavior for regex cache
 pub trait RegexCacheInst {
     fn validate(&self, regex: &str, values: Vec<&Value>) -> Result<bool, RegexCacheError>;
 }
 
-
+/// Default implementation for regex cache. It uses Arc and Mutex to be capable of working
+/// among the threads.
 #[derive(Default, Debug, Clone)]
 pub struct DefaultRegexCacheInst {
     cache: Arc<Mutex<HashMap<String, Regex>>>,

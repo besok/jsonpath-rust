@@ -122,7 +122,6 @@ use std::convert::TryInto;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::str::FromStr;
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 use JsonPathValue::{NewValue, NoValue, Slice};
 use crate::path::config::cache::{DefaultRegexCacheInst, RegexCache};
@@ -169,7 +168,8 @@ extern crate pest;
 pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
-pub static CONFIG: Lazy<JsonPathConfig> = Lazy::new(|| JsonPathConfig::new(RegexCache::instance(DefaultRegexCacheInst::default())));
+
+
 #[derive(Clone)]
 pub struct JsonPathInst {
     inner: JsonPath,
@@ -186,8 +186,8 @@ impl FromStr for JsonPathInst {
 }
 
 impl JsonPathInst {
-    pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
-        json_path_instance(&self.inner, value)
+    pub fn find_slice<'a>(&'a self, value: &'a Value, cfg: JsonPathConfig) -> Vec<JsonPtr<'a, Value>> {
+        json_path_instance(&self.inner, value, cfg)
             .find(JsonPathValue::from_root(value))
             .into_iter()
             .filter(|v| v.has_value())
@@ -469,10 +469,15 @@ impl JsonPathFinder {
         let path = Box::new(JsonPathInst::from_str(path)?);
         Ok(JsonPathFinder::new(json, path))
     }
+    pub fn from_str_with_cfg(json: &str, path: &str, cfg: JsonPathConfig) -> Result<Self, String> {
+        let json = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        let path = Box::new(JsonPathInst::from_str(path)?);
+        Ok(JsonPathFinder::new_with_cfg(json, path, cfg))
+    }
 
     /// creates an instance to find a json slice from the json
     pub fn instance(&self) -> PathInstance {
-        json_path_instance(&self.path.inner, &self.json)
+        json_path_instance(&self.path.inner, &self.json, self.cfg.clone())
     }
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
@@ -529,6 +534,7 @@ mod tests {
     use serde_json::{json, Value};
     use std::ops::Deref;
     use std::str::FromStr;
+    use crate::path::config::JsonPathConfig;
 
     fn test(json: &str, path: &str, expected: Vec<JsonPathValue<Value>>) {
         match JsonPathFinder::from_str(json, path) {
@@ -1223,7 +1229,7 @@ mod tests {
         let query = JsonPathInst::from_str("$..book[?(@.author size 10)].title")
             .expect("the path is correct");
 
-        let results = query.find_slice(&json);
+        let results = query.find_slice(&json, JsonPathConfig::default());
         let v = results.first().expect("to get value");
 
         // V can be implicitly converted to &Value

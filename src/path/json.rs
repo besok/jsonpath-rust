@@ -1,6 +1,6 @@
 use regex::Regex;
 use serde_json::Value;
-use crate::path::config::cache::{RegexCache, RegexCacheError, RegexCacheInst};
+use crate::path::config::cache::{RegexCache, RegexCacheInst};
 
 /// compare sizes of json elements
 /// The method expects to get a number on the right side and array or string or object on the left
@@ -100,25 +100,24 @@ pub fn regex(left: Vec<&Value>, right: Vec<&Value>, cache: &RegexCache<impl Rege
     }
 
     match right.first() {
-        Some(Value::String(str)) => {
+        Some(Value::String(str)) =>
             if cache.is_implemented() {
                 cache
                     .get_instance()
                     .and_then(|inst| inst.validate(str, left))
                     .unwrap_or(false)
-            } else {
-                if let Ok(regex) = Regex::new(str) {
-                    for el in left.iter() {
-                        if let Some(v) = el.as_str() {
-                            if regex.is_match(v) {
-                                return true;
-                            }
+            } else if let Ok(regex) = Regex::new(str) {
+                for el in left.iter() {
+                    if let Some(v) = el.as_str() {
+                        if regex.is_match(v) {
+                            return true;
                         }
                     }
                 }
                 false
-            }
-        }
+            } else {
+                false
+            },
         _ => false,
     }
 }

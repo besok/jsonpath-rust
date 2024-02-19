@@ -38,4 +38,8 @@
 * **`0.3.5`**
   * add `!` negation operation in filters
   * allow using  () in filters
+* **`0.5`**
+  * add config for jsonpath
+  * add an option to add a regex cache for boosting performance
+
 
