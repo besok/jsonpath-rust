@@ -89,7 +89,7 @@
 //! fn test(){
 //!     let  finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
 //!     let slice_of_data:Vec<JsonPathValue<Value>> = finder.find_slice();
-//!     let js = json!({"active":2});
+//!     let js = json!({"active":1});
 //!     assert_eq!(slice_of_data, jp_v![&js;"$.first.second[0]",]);
 //! }
 //! ```
