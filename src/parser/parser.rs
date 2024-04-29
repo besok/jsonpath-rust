@@ -365,13 +365,13 @@ mod tests {
         test_failed("[]");
         test("[-1,-2]", vec![path!(idx!(idx - 1, -2))]);
         test_failed("[abc,bcd]");
-        test_failed("[\"abc\",\"bcd\"]");
+        test("[\"abc\",\"bcd\"]", vec![path!(idx!("abc", "bcd"))]);
     }
 
     #[test]
     fn array_start_test() {
         test(
-            "$.[?(@.verb== 'TEST')]",
+            "$.[?(@.verb== \"TEST\")]",
             vec![
                 path!($),
                 path!(idx!(?filter!(op!(chain!(path!(@,path!("verb")))),"==",op!("TEST")))),

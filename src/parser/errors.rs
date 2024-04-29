@@ -4,6 +4,7 @@ use thiserror::Error;
 use super::parser::Rule;
 
 #[derive(Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum JsonPathParserError<'a> {
     #[error("Failed to parse rule: {0}")]
     PestError(#[from] pest::error::Error<Rule>),

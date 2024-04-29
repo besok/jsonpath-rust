@@ -10,7 +10,7 @@ word = _{ ('a'..'z' | 'A'..'Z')+ }
 specs = _{ "_" | "-" | "/" | "\\" | "#" }
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
 
-string_qt = ${ "\'" ~ inner ~ "\'" }
+string_qt = ${ ("\'" ~ inner ~ "\'") | ("\"" ~ inner ~ "\"") }
 inner = @{ char* }
 char = _{
     !("\"" | "\\" | "\'") ~ ANY

@@ -120,7 +120,8 @@ use crate::path::config::JsonPathConfig;
 use crate::path::{json_path_instance, PathInstance};
 use serde_json::Value;
 use std::convert::TryInto;
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::str::FromStr;
 use JsonPathValue::{NewValue, NoValue, Slice};
@@ -167,7 +168,7 @@ pub trait JsonPathQuery {
     fn path(self, query: &str) -> Result<Value, String>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct JsonPathInst {
     inner: JsonPath,
 }
@@ -428,6 +429,17 @@ pub struct JsonPathFinder {
     json: Box<Value>,
     path: Box<JsonPathInst>,
     cfg: JsonPathConfig,
+}
+
+impl Debug for JsonPathFinder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let json_as_str = serde_json::to_string(&*self.json).map_err(|_| fmt::Error)?;
+
+        f.write_str("JsonPathFinder:")?;
+        f.write_str(format!("   json:{}", json_as_str).as_str())?;
+        f.write_str(format!("   path:{:?}", self.path).as_str())?;
+        Ok(())
+    }
 }
 
 impl JsonPathFinder {
@@ -1191,7 +1203,7 @@ mod tests {
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'RUN1')]").expect("the path is correct"),
+            JsonPathInst::from_str("$.[?(@.verb == \"RUN1\")]").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
