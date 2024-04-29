@@ -433,7 +433,7 @@ pub struct JsonPathFinder {
 
 impl Debug for JsonPathFinder {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let json_as_str = serde_json::to_string(&*self.json).map_err(|_|fmt::Error)?;
+        let json_as_str = serde_json::to_string(&*self.json).map_err(|_| fmt::Error)?;
 
         f.write_str("JsonPathFinder:")?;
         f.write_str(format!("   json:{}", json_as_str).as_str())?;
