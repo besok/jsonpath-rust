@@ -1203,7 +1203,7 @@ mod tests {
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
         let path: Box<JsonPathInst> = Box::from(
-            JsonPathInst::from_str("$.[?(@.verb == 'RUN1')]").expect("the path is correct"),
+            JsonPathInst::from_str("$.[?(@.verb == \"RUN1\")]").expect("the path is correct"),
         );
         let finder = JsonPathFinder::new(json, path);
 
