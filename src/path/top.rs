@@ -1,5 +1,4 @@
 use crate::parser::model::*;
-use crate::path::config::JsonPathConfig;
 use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
 use crate::{jsp_idx, jsp_obj, JsPathStr};
@@ -157,7 +156,6 @@ impl<'a> Path<'a> for ObjectField<'a> {
         vec![res]
     }
 }
-
 /// the top method of the processing ..*
 pub(crate) struct DescentWildcard;
 
@@ -261,7 +259,7 @@ impl<'a> Chain<'a> {
             is_search_length,
         }
     }
-    pub fn from(chain: &'a [JsonPath], root: &'a Value, cfg: JsonPathConfig) -> Self {
+    pub fn from(chain: &'a [JsonPath], root: &'a Value) -> Self {
         let chain_len = chain.len();
         let is_search_length = if chain_len > 2 {
             let mut res = false;
@@ -301,10 +299,7 @@ impl<'a> Chain<'a> {
         };
 
         Chain::new(
-            chain
-                .iter()
-                .map(|p| json_path_instance(p, root, cfg.clone()))
-                .collect(),
+            chain.iter().map(|p| json_path_instance(p, root)).collect(),
             is_search_length,
         )
     }
@@ -373,17 +368,17 @@ mod tests {
         let field4 = path!("array");
         let field5 = path!("object");
 
-        let path_inst = json_path_instance(&path!($), &json, Default::default());
+        let path_inst = json_path_instance(&path!($), &json);
         assert_eq!(path_inst.find(jp_v!(&json)), jp_v!(&json;"$",));
 
-        let path_inst = json_path_instance(&field1, &json, Default::default());
+        let path_inst = json_path_instance(&field1, &json);
         let exp_json =
             json!({"k":{"f":42,"array":[0,1,2,3,4,5],"object":{"field1":"val1","field2":"val2"}}});
         assert_eq!(path_inst.find(jp_v!(&json)), jp_v!(&exp_json;".['v']",));
 
         let chain = chain!(path!($), field1.clone(), field2.clone(), field3);
 
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(42);
         assert_eq!(
             path_inst.find(jp_v!(&json)),
@@ -397,7 +392,7 @@ mod tests {
             field4.clone(),
             path!(idx!(3))
         );
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         let exp_json = json!(3);
         assert_eq!(
             path_inst.find(jp_v!(&json)),
@@ -412,7 +407,7 @@ mod tests {
             field4.clone(),
             path!(index)
         );
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         let one = json!(1);
         let tree = json!(3);
         assert_eq!(
@@ -428,7 +423,7 @@ mod tests {
             field4,
             path!(union)
         );
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         let tree = json!(1);
         let two = json!(2);
         assert_eq!(
@@ -438,7 +433,7 @@ mod tests {
 
         let union = idx!("field1", "field2");
         let chain = chain!(path!($), field1.clone(), field2, field5, path!(union));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         let one = json!("val1");
         let two = json!("val2");
         assert_eq!(
@@ -448,18 +443,16 @@ mod tests {
             &two;"$.['v'].['k'].['object'].['field2']")
         );
     }
-
     #[test]
     fn path_descent_arr_test() {
         let json = json!([{"a":1}]);
         let chain = chain!(path!($), path!(.."a"));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let one = json!(1);
         let expected_res = jp_v!(&one;"$[0].['a']",);
         assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
-
     #[test]
     fn deep_path_test() {
         let value = json!([1]);
@@ -474,7 +467,7 @@ mod tests {
             "key1": [1]
         });
         let chain = chain!(path!($), path!(..*));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let arr = json!([1]);
         let one = json!(1);
@@ -482,7 +475,6 @@ mod tests {
         let expected_res = jp_v!(&arr;"$.['key1']",&one;"$.['key1'][0]");
         assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
-
     #[test]
     fn path_descent_w_nested_array_test() {
         let json = json!(
@@ -490,7 +482,7 @@ mod tests {
             "key2" : [{"a":1},{}]
         });
         let chain = chain!(path!($), path!(..*));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let arr2 = json!([{"a": 1},{}]);
         let obj = json!({"a": 1});
@@ -523,7 +515,7 @@ mod tests {
             }
         });
         let chain = chain!(path!($), path!(..*));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let key1 = json!([1]);
         let one = json!(1);
@@ -560,7 +552,6 @@ mod tests {
         ];
         assert_eq!(path_inst.find(jp_v!(&json)), expected_res)
     }
-
     #[test]
     fn path_descent_test() {
         let json = json!(
@@ -577,7 +568,7 @@ mod tests {
             }
         });
         let chain = chain!(path!($), path!(.."key1"));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let res1 = json!([1, 2, 3]);
         let res2 = json!("key1");
@@ -602,7 +593,7 @@ mod tests {
         });
 
         let chain = chain!(path!($), path!(*));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         let res1 = json!([1, 2, 3]);
         let res2 = json!("key");
@@ -621,7 +612,7 @@ mod tests {
         });
 
         let chain = chain!(path!($), path!(*), function!(length));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
 
         assert_eq!(
             path_inst.flat_find(vec![jp_v!(&json)], true),
@@ -629,7 +620,7 @@ mod tests {
         );
 
         let chain = chain!(path!($), path!("key1"), function!(length));
-        let path_inst = json_path_instance(&chain, &json, Default::default());
+        let path_inst = json_path_instance(&chain, &json);
         assert_eq!(
             path_inst.flat_find(vec![jp_v!(&json)], false),
             vec![jp_v!(json!(3))]
