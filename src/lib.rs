@@ -328,9 +328,10 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
 }
 
 impl<'a, Data> JsonPathValue<'a, Data> {
-    fn only_no_value(input: &Vec<JsonPathValue<'a, Data>>) -> bool {
+    fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }
+
     fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
         data.into_iter()
             .map(|(data, pref)| Slice(data, pref))
@@ -411,7 +412,7 @@ pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathVa
 /// finds a slice of data and wrap it with Value::Array by cloning the data.
 /// Returns either an array of elements or Json::Null if the match is incorrect.
 pub fn find(path: &JsonPathInst, json: &Value) -> Value {
-    let slice = find_slice(&path, &json);
+    let slice = find_slice(path, json);
     if !slice.is_empty() {
         if JsonPathValue::only_no_value(&slice) {
             Value::Null
