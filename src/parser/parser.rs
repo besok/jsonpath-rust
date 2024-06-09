@@ -1,3 +1,5 @@
+#![allow(clippy::empty_docs)]
+
 use crate::parser::errors::JsonPathParserError::ParserError;
 use crate::parser::errors::{parser_err, JsonPathParserError};
 use crate::parser::model::FilterExpression::{And, Not, Or};

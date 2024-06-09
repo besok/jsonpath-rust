@@ -8,7 +8,7 @@ struct SearchData {
     path: JsonPathInst,
 }
 
-const PATH: &'static str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
+const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
 
 fn regex_perf_test_with_reuse(cfg: &SearchData) {
     let _v = jsonpath_rust::find(&cfg.path, &cfg.json);
@@ -37,10 +37,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| regex_perf_test_with_reuse(&data))
     });
     c.bench_function("regex bench without reuse", |b| {
-        b.iter(|| regex_perf_test_without_reuse())
+        b.iter(regex_perf_test_without_reuse)
     });
     c.bench_function("JsonPathInst generation", |b| {
-        b.iter(|| json_path_inst_compiling())
+        b.iter(json_path_inst_compiling)
     });
 }
 

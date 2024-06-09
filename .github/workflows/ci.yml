@@ -28,7 +28,7 @@ jobs:
           profile: minimal
           toolchain: stable
           components: clippy
-      - run: cargo clippy --workspace --tests --all-features -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   test:
     runs-on: ubuntu-latest
