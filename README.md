@@ -231,7 +231,7 @@ Given the json
 | `$..book[?(@.author ~= '(?i)REES')]` | All books matching regex (ignore case)                       |
 | `$..*`                               | Give me every thing                                          |
 
-### The library
+## Library Usage
 
 The library intends to provide the basic functionality for ability to find the slices of data using the syntax, saying
 above. The dependency can be found as following:
@@ -251,180 +251,43 @@ To extract data there are two methods, provided on the `value`:
 ```rust
 let v:JsonPathValue<Value> =...
 v.to_data();
-v.slice_or( & some_dafult_value)
-
+v.slice_or(&some_dafault_value)
 ```
 
-```rust
-use jsonpath_rust::JsonPathFinder;
-use serde_json::{json, Value, JsonPathValue};
+### Find
 
-fn main() {
-    let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
-    let slice_of_data: Vec<&Value> = finder.find_slice();
-    let js = json!({"active":1});
-    assert_eq!(slice_of_data, vec![JsonPathValue::Slice(&js,"$.first.second[0]".to_string())]);
-}
-```
+there are 3 different functions to find data inside a `value`.
+All take references, to increase reusability. Especially json parsing and jsonpath parsing can take significant time, compared to a simple find.
 
-or with a separate instantiation:
+The methods `find`, `find_as_path` and `find_slice` take the same inputs, but handle them differently depending on your usecase. They are further described in the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/index.html#functions).
 
 ```rust
-use serde_json::{json, Value};
-use crate::jsonpath_rust::{JsonPathFinder, JsonPathQuery, JsonPathInst, JsonPathValue};
+use jsonpath_rust::{JsonPathInst, JsonPathValue};
+use serde_json::json;
 use std::str::FromStr;
 
-fn test() {
-    let json: Value = serde_json::from_str("{}").unwrap();
-    let v = json.path("$..book[?(@.author size 10)].title").unwrap();
-    assert_eq!(v, json!([]));
-
-    let json: Value = serde_json::from_str("{}").unwrap();
-    let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
-
-    assert_eq!(path, &json!(["Sayings of the Century"]));
-
-    let json: Box<Value> = serde_json::from_str("{}").unwrap();
-    let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
-    let finder = JsonPathFinder::new(json, path);
-
-    let v = finder.find_slice();
-    let js = json!("Sayings of the Century");
-    assert_eq!(v, vec![JsonPathValue::Slice(&js,"$.book[0].title".to_string())]);
-}
-
-```
-In case, if there is no match `find_slice` will return `vec![NoValue]` and `find` return `json!(null)`
-
-```rust
-use jsonpath_rust::JsonPathFinder;
-use serde_json::{json, Value, JsonPathValue};
-
 fn main() {
-    let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.no_field").unwrap();
-    let res_js = finder.find();
-    assert_eq!(res_js, json!(null));
+    let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
+    let path = JsonPathInst::from_str("$.first.second[?(@.active)]").unwrap();
+    let slice_of_data = jsonpath_rust::find_slice(&path, &data);
+
+    let expected_value = json!({"active":1});
+    let expected_path = "$.['first'].['second'][0]".to_string();
+
+    assert_eq!(
+        slice_of_data,
+        vec![JsonPathValue::Slice(&expected_value, expected_path)]
+    );
 }
 ```
 
-also, it will work with the instances of [[Value]] as well.
+### The structure
 
-```rust
-  use serde_json::Value;
-use crate::jsonpath_rust::{JsonPathFinder, JsonPathQuery, JsonPathInst};
-use crate::path::{json_path_instance, PathInstance};
+The internal structure of the `JsonPath` can be found here:
+https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPath.html
 
-fn test(json: Box<Value>, path: &str) {
-    let path = JsonPathInst::from_str(path).unwrap();
-    JsonPathFinder::new(json, path)
-}
-```
-
-also, the trait `JsonPathQuery` can be used:
-
-```rust
-
-use serde_json::{json, Value};
-use jsonpath_rust::JsonPathQuery;
-
-fn test() {
-    let json: Value = serde_json::from_str("{}").unwrap();
-    let v = json.path("$..book[?(@.author size 10)].title").unwrap();
-    assert_eq!(v, json!([]));
-
-    let json: Value = serde_json::from_str(template_json()).unwrap();
-    let path = &json.path("$..book[?(@.author size 10)].title").unwrap();
-
-    assert_eq!(path, &json!(["Sayings of the Century"]));
-}
-```
-
-also, `JsonPathInst` can be used to query the data without cloning.
-```rust
-use serde_json::{json, Value};
-use crate::jsonpath_rust::{JsonPathInst};
-
-fn test() {
-    let json: Value = serde_json::from_str("{}").expect("to get json");
-    let query = JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap();
-
-    // To convert to &Value, use deref()
-    assert_eq!(query.find_slice(&json).get(0).expect("to get value").deref(), &json!("Sayings of the Century"));
-}
-```
-
-The library can return a path describing the value instead of the value itself. 
-To do that, the method `find_as_path` can be used:
-
-```rust
-use jsonpath_rust::JsonPathFinder;
-use serde_json::{json, Value, JsonPathValue};
-
-fn main() {
-  let finder = JsonPathFinder::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#, "$.first.second[?(@.active)]").unwrap();
-  let slice_of_data: Value = finder.find_as_path();
-  assert_eq!(slice_of_data, Value::Array(vec!["$.first.second[0]".to_string()]));
-}
-```
-
-or it can be taken from the `JsonPathValue` instance:
-```rust
-use serde_json::{json, Value};
-use crate::jsonpath_rust::{JsonPathFinder, JsonPathQuery, JsonPathInst, JsonPathValue};
-use std::str::FromStr;
-
-fn test() {
-    let json: Box<Value> = serde_json::from_str("{}").unwrap();
-    let path: Box<JsonPathInst> = Box::from(JsonPathInst::from_str("$..book[?(@.author size 10)].title").unwrap());
-    let finder = JsonPathFinder::new(json, path);
-
-    let v = finder.find_slice();
-    let js = json!("Sayings of the Century");
-    
-    // Slice has a path of its value as well 
-    assert_eq!(v, vec![JsonPathValue::Slice(&js,"$.book[0].title".to_string())]);
-}
-```
-
-** If the value has been modified during the search, there is no way to find a path of a new value. 
-It can happen if we try to find a length() of array, for in stance.**
-
-
-
-## The structure
-
-```rust
-pub enum JsonPath {
-    Root,
-    // <- $
-    Field(String),
-    // <- field of the object
-    Chain(Vec<JsonPath>),
-    // <- the whole jsonpath
-    Descent(String),
-    // <- '..'
-    Index(JsonPathIndex),
-    // <- the set of indexes represented by the next structure [[JsonPathIndex]]
-    Current(Box<JsonPath>),
-    // <- @
-    Wildcard,
-    // <- *
-    Empty, // the structure to avoid inconsistency
-}
-
-pub enum JsonPathIndex {
-    Single(usize),
-    // <- [1]
-    UnionIndex(Vec<f64>),
-    // <- [1,2,3]
-    UnionKeys(Vec<String>),
-    // <- ['key_1','key_2']
-    Slice(i32, i32, usize),
-    // [0:10:1]
-    Filter(Operand, FilterSign, Operand), // <- [?(operand sign operand)]
-}
-
-```
+The internal structure of the `JsonPathIndex` can be found here:
+https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPathIndex.html
 
 ## How to contribute
 

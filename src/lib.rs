@@ -397,6 +397,27 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 /// finds a slice of data in the set json.
 /// The result is a vector of references to the incoming structure.
+///
+/// In case, if there is no match `find_slice` will return `vec![NoValue]`.
+///
+/// ## Example
+/// ```rust
+/// use jsonpath_rust::{JsonPathInst, JsonPathValue};
+/// use serde_json::json;
+/// # use std::str::FromStr;
+///
+/// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
+/// let path = JsonPathInst::from_str("$.first.second[?(@.active)]").unwrap();
+/// let slice_of_data = jsonpath_rust::find_slice(&path, &data);
+///
+/// let expected_value = json!({"active":1});
+/// let expected_path = "$.['first'].['second'][0]".to_string();
+///
+/// assert_eq!(
+///     slice_of_data,
+///     vec![JsonPathValue::Slice(&expected_value, expected_path)]
+/// );
+/// ```
 pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathValue<'a, Value>> {
     let instance = json_path_instance(&path.inner, json);
     let res = instance.find(JsonPathValue::from_root(json));
@@ -411,6 +432,21 @@ pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathVa
 
 /// finds a slice of data and wrap it with Value::Array by cloning the data.
 /// Returns either an array of elements or Json::Null if the match is incorrect.
+///
+/// In case, if there is no match `find` will return `json!(null)`.
+///
+/// ## Example
+/// ```rust
+/// use jsonpath_rust::{JsonPathInst, JsonPathValue};
+/// use serde_json::{Value, json};
+/// # use std::str::FromStr;
+///
+/// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
+/// let path = JsonPathInst::from_str("$.first.second[?(@.active)]").unwrap();
+/// let cloned_data = jsonpath_rust::find(&path, &data);
+///
+/// assert_eq!(cloned_data, Value::Array(vec![json!({"active":1})]));
+/// ```
 pub fn find(path: &JsonPathInst, json: &Value) -> Value {
     let slice = find_slice(path, json);
     if !slice.is_empty() {
@@ -429,8 +465,26 @@ pub fn find(path: &JsonPathInst, json: &Value) -> Value {
         Value::Array(vec![])
     }
 }
-/// finds a path of the values.
+
+/// finds a path describing the value, instead of the value itself.
 /// If the values has been obtained by moving the data out of the initial json the path is absent.
+///
+/// ** If the value has been modified during the search, there is no way to find a path of a new value.
+/// It can happen if we try to find a length() of array, for in stance.**
+///
+/// ## Example
+/// ```rust
+/// use jsonpath_rust::{JsonPathInst, JsonPathValue};
+/// use serde_json::{Value, json};
+/// # use std::str::FromStr;
+///
+/// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
+/// let path = JsonPathInst::from_str("$.first.second[?(@.active)]").unwrap();
+/// let slice_of_data: Value = jsonpath_rust::find_as_path(&path, &data);
+///
+/// let expected_path = "$.['first'].['second'][0]".to_string();
+/// assert_eq!(slice_of_data, Value::Array(vec![Value::String(expected_path)]));
+/// ```
 pub fn find_as_path(path: &JsonPathInst, json: &Value) -> Value {
     Value::Array(
         find_slice(path, json)

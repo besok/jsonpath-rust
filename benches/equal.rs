@@ -8,7 +8,7 @@ struct SearchData {
     path: JsonPathInst,
 }
 
-const PATH: &'static str = "$.[?(@.author == 'abcd(Rees)')]";
+const PATH: &str = "$.[?(@.author == 'abcd(Rees)')]";
 
 fn equal_perf_test_with_reuse(cfg: &SearchData) {
     let _v = jsonpath_rust::find(&cfg.path, &cfg.json);
@@ -33,7 +33,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| equal_perf_test_with_reuse(&data))
     });
     c.bench_function("equal bench without reuse", |b| {
-        b.iter(|| equal_perf_test_without_reuse())
+        b.iter(equal_perf_test_without_reuse)
     });
 }
 
