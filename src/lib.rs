@@ -103,6 +103,7 @@
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::json_path_instance;
+use parser::errors::JsonPathParserError;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -150,7 +151,8 @@ extern crate pest;
 /// #Note:
 /// the result is going to be cloned and therefore it can be significant for the huge queries
 pub trait JsonPathQuery {
-    fn path(self, query: &str) -> Result<Value, String>;
+    #[allow(clippy::result_large_err)]
+    fn path(self, query: &str) -> Result<Value, JsonPathParserError>;
 }
 
 #[derive(Clone, Debug)]
@@ -159,7 +161,7 @@ pub struct JsonPathInst {
 }
 
 impl FromStr for JsonPathInst {
-    type Err = String;
+    type Err = JsonPathParserError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(JsonPathInst {
@@ -205,7 +207,7 @@ impl<'a> Deref for JsonPtr<'a, Value> {
 }
 
 impl JsonPathQuery for Value {
-    fn path(self, query: &str) -> Result<Value, String> {
+    fn path(self, query: &str) -> Result<Value, JsonPathParserError> {
         let p = JsonPathInst::from_str(query)?;
         Ok(find(&p, &self))
     }

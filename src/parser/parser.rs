@@ -1,7 +1,6 @@
 #![allow(clippy::empty_docs)]
 
-use crate::parser::errors::JsonPathParserError::ParserError;
-use crate::parser::errors::{parser_err, JsonPathParserError};
+use crate::parser::errors::JsonPathParserError;
 use crate::parser::model::FilterExpression::{And, Not, Or};
 use crate::parser::model::{
     FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
@@ -22,7 +21,7 @@ struct JsonPathParser;
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
     JsonPathParser::parse(Rule::path, jp_str)?
         .next()
-        .ok_or(parser_err(jp_str))
+        .ok_or(JsonPathParserError::UnexpectedPestOutput)
         .and_then(parse_internal)
 }
 
@@ -36,7 +35,7 @@ fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
         Rule::path => rule
             .into_inner()
             .next()
-            .ok_or(parser_err("expected a Rule::path but found nothing"))
+            .ok_or(JsonPathParserError::NoRulePath)
             .and_then(parse_internal),
         Rule::current => rule
             .into_inner()
@@ -53,14 +52,14 @@ fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
         Rule::wildcard => Ok(JsonPath::Wildcard),
         Rule::descent => parse_key(down(rule)?)?
             .map(JsonPath::Descent)
-            .ok_or(parser_err("expected a JsonPath::Descent but found nothing")),
+            .ok_or(JsonPathParserError::NoJsonPathDescent),
         Rule::descent_w => Ok(JsonPath::DescentW),
         Rule::function => Ok(JsonPath::Fn(Function::Length)),
         Rule::field => parse_key(down(rule)?)?
             .map(JsonPath::Field)
-            .ok_or(parser_err("expected a JsonPath::Field but found nothing")),
+            .ok_or(JsonPathParserError::NoJsonPathField),
         Rule::index => parse_index(rule).map(JsonPath::Index),
-        _ => Err(ParserError(format!("{rule} did not match any 'Rule' "))),
+        rule => Err(JsonPathParserError::InvalidTopLevelRule(rule)),
     }
 }
 
@@ -106,9 +105,7 @@ fn number_to_value(number: &str) -> Result<Value, JsonPathParserError> {
         .or_else(|| number.parse::<f64>().ok().map(Value::from))
     {
         Some(value) => Ok(value),
-        None => Err(JsonPathParserError::ParserError(format!(
-            "Failed to parse {number} as either f64 or i64"
-        ))),
+        None => Err(JsonPathParserError::InvalidNumber(number.to_string())),
     }
 }
 
@@ -152,23 +149,32 @@ fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserE
 
 fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
-    let error_message = format!("Failed to parse logical expression: {:?}", pairs);
-    for pair in pairs {
+    // only possible for the loop not to produce any value (except Errors)
+    if pairs.len() == 0 {
+        return Err(JsonPathParserError::UnexpectedNoneLogicError(
+            pairs.get_input().to_string(),
+            pairs.as_str().to_string(),
+        ));
+    }
+    for pair in pairs.into_iter() {
         let next_expr = parse_logic_and(pair.into_inner())?;
         match expr {
             None => expr = Some(next_expr),
             Some(e) => expr = Some(Or(Box::new(e), Box::new(next_expr))),
         }
     }
-    match expr {
-        Some(expr) => Ok(expr),
-        None => Err(JsonPathParserError::ParserError(error_message)),
-    }
+    Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
 fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
     let mut expr: Option<FilterExpression> = None;
-    let error_message = format!("Failed to parse logical `and` expression: {:?}", pairs,);
+    // only possible for the loop not to produce any value (except Errors)
+    if pairs.len() == 0 {
+        return Err(JsonPathParserError::UnexpectedNoneLogicError(
+            pairs.get_input().to_string(),
+            pairs.as_str().to_string(),
+        ));
+    }
     for pair in pairs {
         let next_expr = parse_logic_not(pair.into_inner())?;
         match expr {
@@ -176,10 +182,7 @@ fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParse
             Some(e) => expr = Some(And(Box::new(e), Box::new(next_expr))),
         }
     }
-    match expr {
-        Some(expr) => Ok(expr),
-        None => Err(JsonPathParserError::ParserError(error_message)),
-    }
+    Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
 fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
@@ -191,10 +194,13 @@ fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathP
                     .map(|expr|Not(Box::new(expr)))
             },
             Rule::logic_atom => parse_logic_atom(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
-            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
+            rule => Err(JsonPathParserError::UnexpectedRuleLogicError(rule, pairs.get_input().to_string(), pairs.as_str().to_string())),
         }
     } else {
-        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
+        Err(JsonPathParserError::UnexpectedNoneLogicError(
+            pairs.get_input().to_string(),
+            pairs.as_str().to_string(),
+        ))
     }
 }
 
@@ -213,10 +219,13 @@ fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPath
                     Ok(FilterExpression::Atom(left, sign, right))
                 }
             }
-            x => Err(JsonPathParserError::UnexpectedRuleLogicError(x, pairs)),
+            rule => Err(JsonPathParserError::UnexpectedRuleLogicError(rule, pairs.get_input().to_string(), pairs.as_str().to_string())),
         }
     } else {
-        Err(JsonPathParserError::UnexpectedNoneLogicError(pairs))
+        Err(JsonPathParserError::UnexpectedNoneLogicError(
+            pairs.get_input().to_string(),
+            pairs.as_str().to_string(),
+        ))
     }
 }
 
@@ -246,10 +255,10 @@ fn parse_index(rule: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
 }
 
 fn down(rule: Pair<Rule>) -> Result<Pair<Rule>, JsonPathParserError> {
-    let error_message = format!("Failed to get inner pairs for {:?}", rule);
+    let error_message = rule.to_string();
     match rule.into_inner().next() {
-        Some(rule) => Ok(rule.to_owned()),
-        None => Err(ParserError(error_message)),
+        Some(rule) => Ok(rule),
+        None => Err(JsonPathParserError::EmptyInner(error_message)),
     }
 }
 
