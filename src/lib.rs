@@ -151,7 +151,6 @@ extern crate pest;
 /// #Note:
 /// the result is going to be cloned and therefore it can be significant for the huge queries
 pub trait JsonPathQuery {
-    #[allow(clippy::result_large_err)]
     fn path(self, query: &str) -> Result<Value, JsonPathParserError>;
 }
 

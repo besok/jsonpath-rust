@@ -19,7 +19,8 @@ struct JsonPathParser;
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
-    JsonPathParser::parse(Rule::path, jp_str)?
+    JsonPathParser::parse(Rule::path, jp_str)
+        .map_err(Box::new)?
         .next()
         .ok_or(JsonPathParserError::UnexpectedPestOutput)
         .and_then(parse_internal)
@@ -107,6 +108,13 @@ fn number_to_value(number: &str) -> Result<Value, JsonPathParserError> {
         Some(value) => Ok(value),
         None => Err(JsonPathParserError::InvalidNumber(number.to_string())),
     }
+}
+
+fn bool_to_value(boolean: &str) -> Value {
+    boolean
+        .parse::<bool>()
+        .map(Value::from)
+        .expect("unreachable: according to .pest this is either `true` or `false`")
 }
 
 fn parse_unit_indexes(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
@@ -235,7 +243,7 @@ fn parse_atom(rule: Pair<Rule>) -> Result<Operand, JsonPathParserError> {
         Rule::number => Operand::Static(number_to_value(rule.as_str())?),
         Rule::string_qt => Operand::Static(Value::from(down(atom)?.as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)?)?,
-        Rule::boolean => Operand::Static(rule.as_str().parse::<Value>()?),
+        Rule::boolean => Operand::Static(bool_to_value(rule.as_str())),
         _ => Operand::Static(Value::Null),
     };
     Ok(parsed_atom)

@@ -3,12 +3,9 @@ use thiserror::Error;
 use super::parser::Rule;
 
 #[derive(Error, Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum JsonPathParserError {
     #[error("Failed to parse rule: {0}")]
-    PestError(#[from] pest::error::Error<Rule>),
-    #[error("Failed to parse JSON: {0}")]
-    JsonParsingError(#[from] serde_json::Error),
+    PestError(#[from] Box<pest::error::Error<Rule>>),
     #[error("Unexpected rule {0:?} when trying to parse logic atom: {1} within {2}")]
     UnexpectedRuleLogicError(Rule, String, String),
     #[error("Unexpected `none` when trying to parse logic atom: {0} within {1}")]
