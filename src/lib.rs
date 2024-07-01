@@ -171,6 +171,7 @@ impl FromStr for JsonPathInst {
 
 impl JsonPathInst {
     pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
+        use crate::path::Path;
         json_path_instance(&self.inner, value)
             .find(JsonPathValue::from_root(value))
             .into_iter()
@@ -420,6 +421,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 /// );
 /// ```
 pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathValue<'a, Value>> {
+    use crate::path::Path;
     let instance = json_path_instance(&path.inner, json);
     let res = instance.find(JsonPathValue::from_root(json));
     let has_v: Vec<JsonPathValue<'_, Value>> = res.into_iter().filter(|v| v.has_value()).collect();
