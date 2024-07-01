@@ -103,6 +103,7 @@
 use crate::parser::model::JsonPath;
 use crate::parser::parser::parse_json_path;
 use crate::path::json_path_instance;
+use parser::errors::JsonPathParserError;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -150,7 +151,7 @@ extern crate pest;
 /// #Note:
 /// the result is going to be cloned and therefore it can be significant for the huge queries
 pub trait JsonPathQuery {
-    fn path(self, query: &str) -> Result<Value, String>;
+    fn path(self, query: &str) -> Result<Value, JsonPathParserError>;
 }
 
 #[derive(Clone, Debug)]
@@ -159,7 +160,7 @@ pub struct JsonPathInst {
 }
 
 impl FromStr for JsonPathInst {
-    type Err = String;
+    type Err = JsonPathParserError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(JsonPathInst {
@@ -170,6 +171,7 @@ impl FromStr for JsonPathInst {
 
 impl JsonPathInst {
     pub fn find_slice<'a>(&'a self, value: &'a Value) -> Vec<JsonPtr<'a, Value>> {
+        use crate::path::Path;
         json_path_instance(&self.inner, value)
             .find(JsonPathValue::from_root(value))
             .into_iter()
@@ -205,7 +207,7 @@ impl<'a> Deref for JsonPtr<'a, Value> {
 }
 
 impl JsonPathQuery for Value {
-    fn path(self, query: &str) -> Result<Value, String> {
+    fn path(self, query: &str) -> Result<Value, JsonPathParserError> {
         let p = JsonPathInst::from_str(query)?;
         Ok(find(&p, &self))
     }
@@ -419,6 +421,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 /// );
 /// ```
 pub fn find_slice<'a>(path: &'a JsonPathInst, json: &'a Value) -> Vec<JsonPathValue<'a, Value>> {
+    use crate::path::Path;
     let instance = json_path_instance(&path.inner, json);
     let res = instance.find(JsonPathValue::from_root(json));
     let has_v: Vec<JsonPathValue<'_, Value>> = res.into_iter().filter(|v| v.has_value()).collect();

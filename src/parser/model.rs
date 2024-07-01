@@ -2,6 +2,8 @@ use crate::parse_json_path;
 use serde_json::Value;
 use std::convert::TryFrom;
 
+use super::errors::JsonPathParserError;
+
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
 #[derive(Debug, Clone)]
@@ -35,10 +37,15 @@ impl JsonPath {
 }
 
 impl TryFrom<&str> for JsonPath {
-    type Error = String;
+    type Error = JsonPathParserError;
 
+    /// Parses a string into a [JsonPath].
+    ///
+    /// # Errors
+    ///
+    /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        parse_json_path(value).map_err(|e| e.to_string())
+        parse_json_path(value)
     }
 }
 

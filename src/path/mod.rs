@@ -36,40 +36,122 @@ pub trait Path<'a> {
     }
 }
 
-/// The basic type for instances.
-pub type PathInstance<'a> = Box<dyn Path<'a, Data = Value> + 'a>;
+/// all known Paths, mostly to avoid a dynamic Box and vtable for internal function
+pub(crate) enum TopPaths<'a> {
+    RootPointer(RootPointer<'a, Value>),
+    ObjectField(ObjectField<'a>),
+    Chain(Chain<'a>),
+    Wildcard(Wildcard),
+    DescentObject(DescentObject<'a>),
+    DescentWildcard(DescentWildcard),
+    Current(Current<'a>),
+    ArrayIndex(ArrayIndex),
+    ArraySlice(ArraySlice),
+    UnionIndex(UnionIndex<'a>),
+    FilterPath(FilterPath<'a>),
+    IdentityPath(IdentityPath),
+    FnPath(FnPath),
+}
 
-/// The major method to process the top part of json part
-pub fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> PathInstance<'a> {
-    match json_path {
-        JsonPath::Root => Box::new(RootPointer::new(root)),
-        JsonPath::Field(key) => Box::new(ObjectField::new(key)),
-        JsonPath::Chain(chain) => Box::new(Chain::from(chain, root)),
-        JsonPath::Wildcard => Box::new(Wildcard {}),
-        JsonPath::Descent(key) => Box::new(DescentObject::new(key)),
-        JsonPath::DescentW => Box::new(DescentWildcard),
-        JsonPath::Current(value) => Box::new(Current::from(value, root)),
-        JsonPath::Index(index) => process_index(index, root),
-        JsonPath::Empty => Box::new(IdentityPath {}),
-        JsonPath::Fn(Function::Length) => Box::new(FnPath::Size),
+impl<'a> Path<'a> for TopPaths<'a> {
+    type Data = Value;
+
+    fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        match self {
+            TopPaths::RootPointer(inner) => inner.find(input),
+            TopPaths::ObjectField(inner) => inner.find(input),
+            TopPaths::Chain(inner) => inner.find(input),
+            TopPaths::Wildcard(inner) => inner.find(input),
+            TopPaths::DescentObject(inner) => inner.find(input),
+            TopPaths::DescentWildcard(inner) => inner.find(input),
+            TopPaths::Current(inner) => inner.find(input),
+            TopPaths::ArrayIndex(inner) => inner.find(input),
+            TopPaths::ArraySlice(inner) => inner.find(input),
+            TopPaths::UnionIndex(inner) => inner.find(input),
+            TopPaths::FilterPath(inner) => inner.find(input),
+            TopPaths::IdentityPath(inner) => inner.find(input),
+            TopPaths::FnPath(inner) => inner.find(input),
+        }
+    }
+
+    fn flat_find(
+        &self,
+        input: Vec<JsonPathValue<'a, Self::Data>>,
+        _is_search_length: bool,
+    ) -> Vec<JsonPathValue<'a, Self::Data>> {
+        match self {
+            TopPaths::RootPointer(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::ObjectField(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::Chain(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::Wildcard(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::DescentObject(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::DescentWildcard(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::Current(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::ArrayIndex(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::ArraySlice(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::UnionIndex(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::FilterPath(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::IdentityPath(inner) => inner.flat_find(input, _is_search_length),
+            TopPaths::FnPath(inner) => inner.flat_find(input, _is_search_length),
+        }
+    }
+
+    fn needs_all(&self) -> bool {
+        match self {
+            TopPaths::RootPointer(inner) => inner.needs_all(),
+            TopPaths::ObjectField(inner) => inner.needs_all(),
+            TopPaths::Chain(inner) => inner.needs_all(),
+            TopPaths::Wildcard(inner) => inner.needs_all(),
+            TopPaths::DescentObject(inner) => inner.needs_all(),
+            TopPaths::DescentWildcard(inner) => inner.needs_all(),
+            TopPaths::Current(inner) => inner.needs_all(),
+            TopPaths::ArrayIndex(inner) => inner.needs_all(),
+            TopPaths::ArraySlice(inner) => inner.needs_all(),
+            TopPaths::UnionIndex(inner) => inner.needs_all(),
+            TopPaths::FilterPath(inner) => inner.needs_all(),
+            TopPaths::IdentityPath(inner) => inner.needs_all(),
+            TopPaths::FnPath(inner) => inner.needs_all(),
+        }
     }
 }
 
-/// The method processes the indexes(all expressions indie [])
-fn process_index<'a>(json_path_index: &'a JsonPathIndex, root: &'a Value) -> PathInstance<'a> {
-    match json_path_index {
-        JsonPathIndex::Single(index) => Box::new(ArrayIndex::new(index.as_u64().unwrap() as usize)),
-        JsonPathIndex::Slice(s, e, step) => Box::new(ArraySlice::new(*s, *e, *step)),
-        JsonPathIndex::UnionKeys(elems) => Box::new(UnionIndex::from_keys(elems)),
-        JsonPathIndex::UnionIndex(elems) => Box::new(UnionIndex::from_indexes(elems)),
-        JsonPathIndex::Filter(fe) => Box::new(FilterPath::new(fe, root)),
+/// The basic type for instances.
+pub(crate) type PathInstance<'a> = Box<dyn Path<'a, Data = Value> + 'a>;
+
+/// The major method to process the top part of json part
+pub(crate) fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> TopPaths<'a> {
+    match json_path {
+        JsonPath::Root => TopPaths::RootPointer(RootPointer::new(root)),
+        JsonPath::Field(key) => TopPaths::ObjectField(ObjectField::new(key)),
+        JsonPath::Chain(chain) => TopPaths::Chain(Chain::from(chain, root)),
+        JsonPath::Wildcard => TopPaths::Wildcard(Wildcard {}),
+        JsonPath::Descent(key) => TopPaths::DescentObject(DescentObject::new(key)),
+        JsonPath::DescentW => TopPaths::DescentWildcard(DescentWildcard),
+        JsonPath::Current(value) => TopPaths::Current(Current::from(value, root)),
+        JsonPath::Index(JsonPathIndex::Single(index)) => {
+            TopPaths::ArrayIndex(ArrayIndex::new(index.as_u64().unwrap() as usize))
+        }
+        JsonPath::Index(JsonPathIndex::Slice(s, e, step)) => {
+            TopPaths::ArraySlice(ArraySlice::new(*s, *e, *step))
+        }
+        JsonPath::Index(JsonPathIndex::UnionKeys(elems)) => {
+            TopPaths::UnionIndex(UnionIndex::from_keys(elems))
+        }
+        JsonPath::Index(JsonPathIndex::UnionIndex(elems)) => {
+            TopPaths::UnionIndex(UnionIndex::from_indexes(elems))
+        }
+        JsonPath::Index(JsonPathIndex::Filter(fe)) => {
+            TopPaths::FilterPath(FilterPath::new(fe, root))
+        }
+        JsonPath::Empty => TopPaths::IdentityPath(IdentityPath {}),
+        JsonPath::Fn(Function::Length) => TopPaths::FnPath(FnPath::Size),
     }
 }
 
 /// The method processes the operand inside the filter expressions
 fn process_operand<'a>(op: &'a Operand, root: &'a Value) -> PathInstance<'a> {
-    match op {
+    Box::new(match op {
         Operand::Static(v) => json_path_instance(&JsonPath::Root, v),
         Operand::Dynamic(jp) => json_path_instance(jp, root),
-    }
+    })
 }

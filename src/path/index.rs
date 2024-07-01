@@ -7,6 +7,8 @@ use crate::JsonPathValue::{NoValue, Slice};
 use serde_json::value::Value::Array;
 use serde_json::Value;
 
+use super::TopPaths;
+
 /// process the slice like [start:end:step]
 #[derive(Debug)]
 pub(crate) struct ArraySlice {
@@ -127,7 +129,7 @@ impl<'a> Current<'a> {
     pub(crate) fn from(jp: &'a JsonPath, root: &'a Value) -> Self {
         match jp {
             JsonPath::Empty => Current::none(),
-            tail => Current::new(json_path_instance(tail, root)),
+            tail => Current::new(Box::new(json_path_instance(tail, root))),
         }
     }
     pub(crate) fn new(tail: PathInstance<'a>) -> Self {
@@ -151,30 +153,32 @@ impl<'a> Path<'a> for Current<'a> {
 
 /// the list of indexes like [1,2,3]
 pub(crate) struct UnionIndex<'a> {
-    indexes: Vec<PathInstance<'a>>,
+    indexes: Vec<TopPaths<'a>>,
 }
 
 impl<'a> UnionIndex<'a> {
     pub fn from_indexes(elems: &'a [Value]) -> Self {
-        let mut indexes: Vec<PathInstance<'a>> = vec![];
+        let mut indexes: Vec<TopPaths<'a>> = vec![];
 
         for idx in elems.iter() {
-            indexes.push(Box::new(ArrayIndex::new(idx.as_u64().unwrap() as usize)))
+            indexes.push(TopPaths::ArrayIndex(ArrayIndex::new(
+                idx.as_u64().unwrap() as usize
+            )))
         }
 
         UnionIndex::new(indexes)
     }
     pub fn from_keys(elems: &'a [String]) -> Self {
-        let mut indexes: Vec<PathInstance<'a>> = vec![];
+        let mut indexes: Vec<TopPaths<'a>> = vec![];
 
         for key in elems.iter() {
-            indexes.push(Box::new(ObjectField::new(key)))
+            indexes.push(TopPaths::ObjectField(ObjectField::new(key)))
         }
 
         UnionIndex::new(indexes)
     }
 
-    pub fn new(indexes: Vec<PathInstance<'a>>) -> Self {
+    pub fn new(indexes: Vec<TopPaths<'a>>) -> Self {
         UnionIndex { indexes }
     }
 }
@@ -582,8 +586,8 @@ mod tests {
         let chain = chain!(path!($), path!("key"), index);
         let path_inst = json_path_instance(&chain, &json);
         let expected_res = jp_v![
-            &exp4;"$.['key'][0]", 
-            &exp3;"$.['key'][2]", 
+            &exp4;"$.['key'][0]",
+            &exp3;"$.['key'][2]",
             &exp4;"$.['key'][4]"];
         assert_eq!(
             path_inst.find(JsonPathValue::from_root(&json)),
