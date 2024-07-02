@@ -1,9 +1,11 @@
 use crate::parser::model::*;
-use crate::path::{json_path_instance, JsonPathValue, Path, PathInstance};
+use crate::path::{json_path_instance, JsonPathValue, Path};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
 use crate::{jsp_idx, jsp_obj, JsPathStr};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
+
+use super::TopPaths;
 
 /// to process the element [*]
 pub(crate) struct Wildcard {}
@@ -248,12 +250,12 @@ impl<'a> DescentObject<'a> {
 
 /// the top method of the processing representing the chain of other operators
 pub(crate) struct Chain<'a> {
-    chain: Vec<PathInstance<'a>>,
+    chain: Vec<TopPaths<'a>>,
     is_search_length: bool,
 }
 
 impl<'a> Chain<'a> {
-    pub fn new(chain: Vec<PathInstance<'a>>, is_search_length: bool) -> Self {
+    pub fn new(chain: Vec<TopPaths<'a>>, is_search_length: bool) -> Self {
         Chain {
             chain,
             is_search_length,
