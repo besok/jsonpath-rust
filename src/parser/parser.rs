@@ -43,7 +43,8 @@ fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
             .next()
             .map(parse_internal)
             .unwrap_or(Ok(JsonPath::Empty))
-            .map(JsonPath::current),
+            .map(Box::new)
+            .map(JsonPath::Current),
         Rule::chain => rule
             .into_inner()
             .map(parse_internal)
@@ -273,7 +274,8 @@ fn down(rule: Pair<Rule>) -> Result<Pair<Rule>, JsonPathParserError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{chain, filter, function, idx, op, path};
+    use crate::parser::macros::{chain, filter, idx, op};
+    use crate::path;
     use serde_json::json;
     use std::panic;
 
@@ -543,7 +545,7 @@ mod tests {
     fn fn_size_test() {
         test(
             "$.k.length()",
-            vec![path!($), path!("k"), function!(length)],
+            vec![path!($), path!("k"), JsonPath::Fn(Function::Length)],
         );
 
         test(

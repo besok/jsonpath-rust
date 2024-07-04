@@ -1,17 +1,17 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use jsonpath_rust::{JsonPathInst, JsonPathQuery};
+use jsonpath_rust::{JsonPath, JsonPathQuery};
 use serde_json::json;
 use std::str::FromStr;
 
 struct SearchData {
     json: serde_json::Value,
-    path: JsonPathInst,
+    path: JsonPath,
 }
 
 const PATH: &str = "$.[?(@.author == 'abcd(Rees)')]";
 
 fn equal_perf_test_with_reuse(cfg: &SearchData) {
-    let _v = jsonpath_rust::find(&cfg.path, &cfg.json);
+    let _v = cfg.path.find(&cfg.json);
 }
 
 fn equal_perf_test_without_reuse() {
@@ -27,7 +27,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         json: json!({
             "author":"abcd(Rees)",
         }),
-        path: JsonPathInst::from_str(PATH).unwrap(),
+        path: JsonPath::from_str(PATH).unwrap(),
     };
     c.bench_function("equal bench with reuse", |b| {
         b.iter(|| equal_perf_test_with_reuse(&data))

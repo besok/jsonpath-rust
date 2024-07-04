@@ -355,12 +355,15 @@ impl<'a> Path<'a> for FilterPath<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::jp_v;
+    use crate::parser::macros::{chain, filter, idx, op};
     use crate::parser::model::{FilterExpression, FilterSign, JsonPath, JsonPathIndex, Operand};
     use crate::path::index::{ArrayIndex, ArraySlice};
     use crate::path::JsonPathValue;
     use crate::path::{json_path_instance, Path};
     use crate::JsonPathValue::NoValue;
-    use crate::{chain, filter, idx, jp_v, op, path};
+
+    use crate::path;
     use serde_json::json;
 
     #[test]

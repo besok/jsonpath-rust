@@ -1,4 +1,4 @@
-#[macro_export]
+#[cfg(test)]
 macro_rules! filter {
    () => {FilterExpression::Atom(op!,FilterSign::new(""),op!())};
    ( $left:expr, $s:literal, $right:expr) => {
@@ -7,7 +7,8 @@ macro_rules! filter {
    ( $left:expr,||, $right:expr) => {FilterExpression::Or(Box::new($left),Box::new($right)) };
    ( $left:expr,&&, $right:expr) => {FilterExpression::And(Box::new($left),Box::new($right)) };
 }
-#[macro_export]
+
+#[cfg(test)]
 macro_rules! op {
     ( ) => {
         Operand::Dynamic(Box::new(JsonPath::Empty))
@@ -23,18 +24,24 @@ macro_rules! op {
     };
 }
 
-#[macro_export]
+#[cfg(test)]
 macro_rules! idx {
    ( $s:literal) => {JsonPathIndex::Single(json!($s))};
    ( idx $($ss:literal),+) => {{
-        let mut ss_vec = Vec::new();
-        $( ss_vec.push(json!($ss)) ; )+
-        JsonPathIndex::UnionIndex(ss_vec)
+       let ss_vec = vec![
+           $(
+               json!($ss),
+           )+
+       ];
+       JsonPathIndex::UnionIndex(ss_vec)
    }};
    ( $($ss:literal),+) => {{
-        let mut ss_vec = Vec::new();
-        $( ss_vec.push($ss.to_string()) ; )+
-        JsonPathIndex::UnionKeys(ss_vec)
+       let ss_vec = vec![
+           $(
+               $ss.to_string(),
+           )+
+       ];
+       JsonPathIndex::UnionKeys(ss_vec)
    }};
    ( $s:literal) => {JsonPathIndex::Single(json!($s))};
    ( ? $s:expr) => {JsonPathIndex::Filter($s)};
@@ -48,15 +55,28 @@ macro_rules! idx {
    ( [;;]) => {JsonPathIndex::Slice(0,0,1)};
 }
 
-#[macro_export]
+#[cfg(test)]
 macro_rules! chain {
     ($($ss:expr),+) => {{
-        let mut ss_vec = Vec::new();
-        $( ss_vec.push($ss) ; )+
+        let ss_vec = vec![
+            $(
+                $ss,
+            )+
+        ];
         JsonPath::Chain(ss_vec)
    }};
 }
 
+/// Can be used to Parse a JsonPath with a more native way.
+/// e.g.
+/// ```rust
+/// use jsonpath_rust::{path, JsonPath};
+/// use std::str::FromStr;
+///
+/// let path = JsonPath::from_str(".abc.*").unwrap();
+/// let path2 = JsonPath::Chain(vec![path!("abc"), path!(*)]);
+/// assert_eq!(path, path2);
+/// ```
 #[macro_export]
 macro_rules! path {
    ( ) => {JsonPath::Empty};
@@ -65,19 +85,25 @@ macro_rules! path {
    (@) => {JsonPath::Current(Box::new(JsonPath::Empty))};
    (@$e:expr) => {JsonPath::Current(Box::new($e))};
    (@,$($ss:expr),+) => {{
-        let mut ss_vec = Vec::new();
-        $( ss_vec.push($ss) ; )+
-        let chain = JsonPath::Chain(ss_vec);
-        JsonPath::Current(Box::new(chain))
+       let ss_vec = vec![
+           $(
+               $ss,
+           )+
+       ];
+       let chain = JsonPath::Chain(ss_vec);
+       JsonPath::Current(Box::new(chain))
    }};
    (..$e:literal) => {JsonPath::Descent($e.to_string())};
    (..*) => {JsonPath::DescentW};
    ($e:literal) => {JsonPath::Field($e.to_string())};
    ($e:expr) => {JsonPath::Index($e)};
 }
-#[macro_export]
-macro_rules! function {
-    (length) => {
-        JsonPath::Fn(Function::Length)
-    };
-}
+
+#[cfg(test)]
+pub(crate) use chain;
+#[cfg(test)]
+pub(crate) use filter;
+#[cfg(test)]
+pub(crate) use idx;
+#[cfg(test)]
+pub(crate) use op;
