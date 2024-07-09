@@ -1,4 +1,4 @@
-#[cfg(test)]
+#[macro_export]
 macro_rules! filter {
    () => {FilterExpression::Atom(op!,FilterSign::new(""),op!())};
    ( $left:expr, $s:literal, $right:expr) => {
@@ -8,7 +8,7 @@ macro_rules! filter {
    ( $left:expr,&&, $right:expr) => {FilterExpression::And(Box::new($left),Box::new($right)) };
 }
 
-#[cfg(test)]
+#[macro_export]
 macro_rules! op {
     ( ) => {
         Operand::Dynamic(Box::new(JsonPath::Empty))
@@ -24,7 +24,7 @@ macro_rules! op {
     };
 }
 
-#[cfg(test)]
+#[macro_export]
 macro_rules! idx {
    ( $s:literal) => {JsonPathIndex::Single(json!($s))};
    ( idx $($ss:literal),+) => {{
@@ -55,7 +55,7 @@ macro_rules! idx {
    ( [;;]) => {JsonPathIndex::Slice(0,0,1)};
 }
 
-#[cfg(test)]
+#[macro_export]
 macro_rules! chain {
     ($($ss:expr),+) => {{
         let ss_vec = vec![
