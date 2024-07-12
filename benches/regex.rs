@@ -1,17 +1,17 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use jsonpath_rust::{JsonPathInst, JsonPathQuery};
+use jsonpath_rust::{JsonPath, JsonPathQuery};
 use serde_json::json;
 use std::str::FromStr;
 
 struct SearchData {
     json: serde_json::Value,
-    path: JsonPathInst,
+    path: JsonPath,
 }
 
 const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
 
 fn regex_perf_test_with_reuse(cfg: &SearchData) {
-    let _v = jsonpath_rust::find(&cfg.path, &cfg.json);
+    let _v = cfg.path.find(&cfg.json);
 }
 
 fn regex_perf_test_without_reuse() {
@@ -22,8 +22,8 @@ fn regex_perf_test_without_reuse() {
     let _v = json.path(PATH).expect("the path is correct");
 }
 
-fn json_path_inst_compiling() {
-    let _v = JsonPathInst::from_str(PATH).unwrap();
+fn json_path_compiling() {
+    let _v = JsonPath::from_str(PATH).unwrap();
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -31,7 +31,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         json: json!({
             "author":"abcd(Rees)",
         }),
-        path: JsonPathInst::from_str(PATH).unwrap(),
+        path: JsonPath::from_str(PATH).unwrap(),
     };
     c.bench_function("regex bench with reuse", |b| {
         b.iter(|| regex_perf_test_with_reuse(&data))
@@ -39,9 +39,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("regex bench without reuse", |b| {
         b.iter(regex_perf_test_without_reuse)
     });
-    c.bench_function("JsonPathInst generation", |b| {
-        b.iter(json_path_inst_compiling)
-    });
+    c.bench_function("JsonPath generation", |b| b.iter(json_path_compiling));
 }
 
 criterion_group!(benches, criterion_benchmark);

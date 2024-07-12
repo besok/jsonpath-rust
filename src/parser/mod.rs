@@ -1,9 +1,12 @@
 //! The parser for the jsonpath.
 //! The module grammar denotes the structure of the parsing grammar
 
-pub mod errors;
-mod macros;
-pub mod model;
+mod errors;
+pub(crate) mod macros;
+pub(crate) mod model;
 #[allow(clippy::module_inception)]
-#[allow(clippy::result_large_err)]
-pub mod parser;
+pub(crate) mod parser;
+
+pub use errors::JsonPathParserError;
+pub use model::JsonPath;
+pub use parser::{parse_json_path, Rule};

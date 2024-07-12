@@ -1,13 +1,12 @@
-use jsonpath_rust::JsonPathInst;
+use jsonpath_rust::JsonPath;
 use serde_json::json;
-use std::str::FromStr;
 
 fn main() {
     let data = json!({
         "Hello":"World",
         "Good":"Bye",
     });
-    let path = JsonPathInst::from_str("$.Hello").unwrap();
-    let search_result = jsonpath_rust::find(&path, &data);
+    let path = JsonPath::try_from("$.Hello").unwrap();
+    let search_result = path.find(&data);
     println!("Hello, {}", search_result);
 }

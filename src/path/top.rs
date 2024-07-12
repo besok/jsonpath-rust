@@ -326,11 +326,13 @@ impl<'a> Path<'a> for Chain<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::jp_v;
+    use crate::parser::macros::{chain, idx};
     use crate::parser::model::{JsonPath, JsonPathIndex};
+    use crate::path;
     use crate::path::top::{deep_flatten, json_path_instance, Function, ObjectField, RootPointer};
     use crate::path::{JsonPathValue, Path};
     use crate::JsonPathValue::NoValue;
-    use crate::{chain, function, idx, jp_v, path};
     use serde_json::json;
     use serde_json::Value;
 
@@ -613,7 +615,7 @@ mod tests {
             "key3": {}
         });
 
-        let chain = chain!(path!($), path!(*), function!(length));
+        let chain = chain!(path!($), path!(*), JsonPath::Fn(Function::Length));
         let path_inst = json_path_instance(&chain, &json);
 
         assert_eq!(
@@ -621,7 +623,7 @@ mod tests {
             vec![jp_v!(json!(3))]
         );
 
-        let chain = chain!(path!($), path!("key1"), function!(length));
+        let chain = chain!(path!($), path!("key1"), JsonPath::Fn(Function::Length));
         let path_inst = json_path_instance(&chain, &json);
         assert_eq!(
             path_inst.flat_find(vec![jp_v!(&json)], false),

@@ -256,20 +256,20 @@ v.slice_or(&some_dafault_value)
 
 ### Find
 
-there are 3 different functions to find data inside a `value`.
+there are 4 different functions to find data inside a `value`.
 All take references, to increase reusability. Especially json parsing and jsonpath parsing can take significant time, compared to a simple find.
 
-The methods `find`, `find_as_path` and `find_slice` take the same inputs, but handle them differently depending on your usecase. They are further described in the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/index.html#functions).
+The methods `find`, `find_as_path`, `find_slice` and `find_slice_ptr` take the same inputs, but handle them differently depending on your usecase. They are further described in the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/enum.JsonPath.html#implementations).
 
 ```rust
-use jsonpath_rust::{JsonPathInst, JsonPathValue};
+use jsonpath_rust::{JsonPath, JsonPathValue};
 use serde_json::json;
 use std::str::FromStr;
 
 fn main() {
     let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    let path = JsonPathInst::from_str("$.first.second[?(@.active)]").unwrap();
-    let slice_of_data = jsonpath_rust::find_slice(&path, &data);
+    let path = JsonPath::from_str("$.first.second[?(@.active)]").unwrap();
+    let slice_of_data = path.find_slice(&data);
 
     let expected_value = json!({"active":1});
     let expected_path = "$.['first'].['second'][0]".to_string();

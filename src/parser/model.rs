@@ -1,11 +1,13 @@
-use crate::parse_json_path;
+use super::parse_json_path;
 use serde_json::Value;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
 use super::errors::JsonPathParserError;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
+///
+/// usually it's created by using [`FromStr`] or [`TryFrom<&str>`]
 #[derive(Debug, Clone)]
 pub enum JsonPath {
     /// The $ operator
@@ -30,12 +32,6 @@ pub enum JsonPath {
     Fn(Function),
 }
 
-impl JsonPath {
-    pub fn current(jp: JsonPath) -> Self {
-        JsonPath::Current(Box::new(jp))
-    }
-}
-
 impl TryFrom<&str> for JsonPath {
     type Error = JsonPathParserError;
 
@@ -45,6 +41,19 @@ impl TryFrom<&str> for JsonPath {
     ///
     /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        parse_json_path(value)
+    }
+}
+
+impl FromStr for JsonPath {
+    type Err = JsonPathParserError;
+
+    /// Parses a string into a [JsonPath].
+    ///
+    /// # Errors
+    ///
+    /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         parse_json_path(value)
     }
 }
