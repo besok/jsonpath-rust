@@ -47,6 +47,8 @@
 - **`0.6`**
     - allow to reuse regex, that improves performance without needing an internal cache
 
-- **`6.1`**
+- **`0.6.1`**
     - Performance improvements
     - Change the contract for the struct of errors
+- **`0.7.0`**
+    - Bug fixes and api changes
