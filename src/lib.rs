@@ -378,16 +378,21 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 #[cfg(test)]
 mod tests {
-    // #[test]
-    // fn no_value_len_field_test() {
-    //     let json: Box<Value> =
-    //         Box::new(json!([{"verb": "TEST","a":[1,2,3]},{"verb": "TEST","a":[1,2,3]},{"verb": "TEST"}, {"verb": "RUN"}]));
-    //     let path: Box<JsonPath> = Box::from(
-    //         JsonPath::from_str("$.[?(@.verb == 'TEST')].a.length()")
-    //             .expect("the path is correct"),
-    //     );
-    //
-    //     let v = json.find_slice(&path);
-    //     assert_eq!(v, vec![NewValue(json!(3))]);
-    // }
+    use crate::JsonPath;
+    use std::str::FromStr;
+
+    #[test]
+    fn to_string_test() {
+        let path: Box<JsonPath> = Box::from(
+            JsonPath::from_str(
+                "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?(@.verb == 'TEST')].a.length()",
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(
+            path.to_string(),
+            "$.'a'.'a'..book[1:3:1][*][1]['a','b'][?(@ exists )][?(@.'verb' == \"TEST\")].'a'.length()"
+        );
+    }
 }
