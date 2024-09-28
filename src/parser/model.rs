@@ -1,8 +1,8 @@
+use super::errors::JsonPathParserError;
 use super::parse_json_path;
 use serde_json::Value;
+use std::fmt::{Display, Formatter};
 use std::{convert::TryFrom, str::FromStr};
-
-use super::errors::JsonPathParserError;
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
@@ -30,6 +30,26 @@ pub enum JsonPath {
     Empty,
     /// Functions that can calculate some expressions
     Fn(Function),
+}
+
+impl Display for JsonPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            JsonPath::Root => "$".to_string(),
+            JsonPath::Field(e) => format!(".'{}'", e),
+            JsonPath::Chain(elems) => elems.iter().map(ToString::to_string).collect::<String>(),
+            JsonPath::Descent(e) => {
+                format!("..{}", e)
+            }
+            JsonPath::DescentW => "..*".to_string(),
+            JsonPath::Index(e) => e.to_string(),
+            JsonPath::Current(e) => format!("@{}", e),
+            JsonPath::Wildcard => "[*]".to_string(),
+            JsonPath::Empty => "".to_string(),
+            JsonPath::Fn(e) => format!(".{}", e),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 impl TryFrom<&str> for JsonPath {
@@ -63,6 +83,16 @@ pub enum Function {
     /// length()
     Length,
 }
+
+impl Display for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Function::Length => "length()".to_string(),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum JsonPathIndex {
     /// A single element in array
@@ -77,6 +107,39 @@ pub enum JsonPathIndex {
     Filter(FilterExpression),
 }
 
+impl Display for JsonPathIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            JsonPathIndex::Single(e) => format!("[{}]", e),
+            JsonPathIndex::UnionIndex(elems) => {
+                format!(
+                    "[{}]",
+                    elems
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            JsonPathIndex::UnionKeys(elems) => {
+                format!(
+                    "[{}]",
+                    elems
+                        .iter()
+                        .map(|el| format!("'{}'", el))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            JsonPathIndex::Slice(s, e, st) => {
+                format!("[{}:{}:{}]", s, e, st)
+            }
+            JsonPathIndex::Filter(filter) => format!("[?({})]", filter),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterExpression {
     /// a single expression like a > 2
@@ -87,6 +150,26 @@ pub enum FilterExpression {
     Or(Box<FilterExpression>, Box<FilterExpression>),
     /// not with !
     Not(Box<FilterExpression>),
+}
+
+impl Display for FilterExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            FilterExpression::Atom(left, sign, right) => {
+                format!("{} {} {}", left, sign, right)
+            }
+            FilterExpression::And(left, right) => {
+                format!("{} && {}", left, right)
+            }
+            FilterExpression::Or(left, right) => {
+                format!("{} || {}", left, right)
+            }
+            FilterExpression::Not(expr) => {
+                format!("!{}", expr)
+            }
+        };
+        write!(f, "{}", str)
+    }
 }
 
 impl FilterExpression {
@@ -104,6 +187,16 @@ impl FilterExpression {
 pub enum Operand {
     Static(Value),
     Dynamic(Box<JsonPath>),
+}
+
+impl Display for Operand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Operand::Static(e) => e.to_string(),
+            Operand::Dynamic(e) => e.to_string(),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[allow(dead_code)]
@@ -130,6 +223,28 @@ pub enum FilterSign {
     AnyOf,
     SubSetOf,
     Exists,
+}
+
+impl Display for FilterSign {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            FilterSign::Equal => "==",
+            FilterSign::Unequal => "!=",
+            FilterSign::Less => "<",
+            FilterSign::Greater => ">",
+            FilterSign::LeOrEq => "<=",
+            FilterSign::GrOrEq => ">=",
+            FilterSign::Regex => "~=",
+            FilterSign::In => "in",
+            FilterSign::Nin => "nin",
+            FilterSign::Size => "size",
+            FilterSign::NoneOf => "noneOf",
+            FilterSign::AnyOf => "anyOf",
+            FilterSign::SubSetOf => "subsetOf",
+            FilterSign::Exists => "exists",
+        };
+        write!(f, "{}", str)
+    }
 }
 
 impl FilterSign {
