@@ -1,10 +1,15 @@
 use regex::Regex;
 use serde_json::Value;
 
+use super::JsonLike;
+
 /// compare sizes of json elements
 /// The method expects to get a number on the right side and array or string or object on the left
 /// where the number of characters, elements or fields will be compared respectively.
-pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn size<T>(left: Vec<&T>, right: Vec<&T>) -> bool
+where
+    T: JsonLike<Data = T>,
+{
     if let Some(Value::Number(n)) = right.first() {
         if let Some(sz) = n.as_f64() {
             for el in left.iter() {
@@ -23,7 +28,7 @@ pub fn size(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 
 /// ensure the array on the left side is a subset of the array on the right side.
 //todo change the naive impl to sets
-pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn sub_set_of<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.is_empty() {
         return true;
     }
@@ -57,7 +62,7 @@ pub fn sub_set_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 
 /// ensure at least one element in the array  on the left side belongs to the array on the right side.
 //todo change the naive impl to sets
-pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn any_of<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.is_empty() {
         return true;
     }
@@ -93,7 +98,7 @@ pub fn any_of(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 }
 
 /// ensure that the element on the left sides mathes the regex on the right side
-pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn regex<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.is_empty() || right.is_empty() {
         return false;
     }
@@ -116,7 +121,7 @@ pub fn regex(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 }
 
 /// ensure that the element on the left side belongs to the array on the right side.
-pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn inside<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.is_empty() {
         return false;
     }
@@ -145,7 +150,7 @@ pub fn inside(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 }
 
 /// ensure the number on the left side is less the number on the right side
-pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn less<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.len() == 1 && right.len() == 1 {
         match (left.first(), right.first()) {
             (Some(Value::Number(l)), Some(Value::Number(r))) => l
@@ -160,7 +165,7 @@ pub fn less(left: Vec<&Value>, right: Vec<&Value>) -> bool {
 }
 
 /// compare elements
-pub fn eq(left: Vec<&Value>, right: Vec<&Value>) -> bool {
+pub fn eq<T>(left: Vec<&T>, right: Vec<&T>) -> bool {
     if left.len() != right.len() {
         false
     } else {

@@ -1,11 +1,16 @@
 use crate::path::json_path_instance;
+use crate::path::JsonLike;
 use crate::JsonPath;
 use crate::JsonPathValue;
 use crate::JsonPathValue::NoValue;
 use crate::JsonPtr;
 use crate::Value;
+use std::fmt::Debug;
 
-impl JsonPath {
+impl<T> JsonPath<T>
+where
+    T: JsonLike<Data = T> + Default + Debug + Clone,
+{
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
     ///
@@ -29,12 +34,11 @@ impl JsonPath {
     ///     vec![JsonPathValue::Slice(&expected_value, expected_path)]
     /// );
     /// ```
-    pub fn find_slice<'a>(&'a self, json: &'a Value) -> Vec<JsonPathValue<'a, Value>> {
+    pub fn find_slice<'a>(&'a self, json: &'a T) -> Vec<JsonPathValue<'a, T>> {
         use crate::path::Path;
         let instance = json_path_instance(self, json);
         let res = instance.find(JsonPathValue::from_root(json));
-        let has_v: Vec<JsonPathValue<'_, Value>> =
-            res.into_iter().filter(|v| v.has_value()).collect();
+        let has_v: Vec<JsonPathValue<'_, T>> = res.into_iter().filter(|v| v.has_value()).collect();
 
         if has_v.is_empty() {
             vec![NoValue]
@@ -45,7 +49,7 @@ impl JsonPath {
 
     /// like [`Self::find_slice`] but returns a vector of [`JsonPtr`], which has no [`JsonPathValue::NoValue`].
     /// if there is no match, it will return an empty vector
-    pub fn find_slice_ptr<'a>(&'a self, json: &'a Value) -> Vec<JsonPtr<'a, Value>> {
+    pub fn find_slice_ptr<'a>(&'a self, json: &'a T) -> Vec<JsonPtr<'a, T>> {
         use crate::path::Path;
         json_path_instance(self, json)
             .find(JsonPathValue::from_root(json))
@@ -76,7 +80,7 @@ impl JsonPath {
     ///
     /// assert_eq!(cloned_data, Value::Array(vec![json!({"active":1})]));
     /// ```
-    pub fn find(&self, json: &Value) -> Value {
+    pub fn find(&self, json: &T) -> Value {
         let slice = self.find_slice(json);
         if !slice.is_empty() {
             if JsonPathValue::only_no_value(&slice) {
@@ -114,7 +118,7 @@ impl JsonPath {
     /// let expected_path = "$.['first'].['second'][0]".to_string();
     /// assert_eq!(slice_of_data, Value::Array(vec![Value::String(expected_path)]));
     /// ```
-    pub fn find_as_path(&self, json: &Value) -> Value {
+    pub fn find_as_path(&self, json: &T) -> T {
         Value::Array(
             self.find_slice(json)
                 .into_iter()

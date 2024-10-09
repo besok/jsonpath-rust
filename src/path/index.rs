@@ -1,28 +1,32 @@
+use std::fmt::Debug;
+
 use crate::jsp_idx;
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 use crate::path::json::*;
 use crate::path::top::ObjectField;
 use crate::path::{json_path_instance, process_operand, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NoValue, Slice};
-use serde_json::value::Value::Array;
+
 use serde_json::Value;
 
-use super::TopPaths;
+use super::{JsonLike, TopPaths};
 
 /// process the slice like [start:end:step]
 #[derive(Debug)]
-pub(crate) struct ArraySlice {
+pub struct ArraySlice<T> {
     start_index: i32,
     end_index: i32,
     step: usize,
+    _t: std::marker::PhantomData<T>,
 }
 
-impl ArraySlice {
-    pub(crate) fn new(start_index: i32, end_index: i32, step: usize) -> ArraySlice {
+impl<T> ArraySlice<T> {
+    pub(crate) fn new(start_index: i32, end_index: i32, step: usize) -> Self {
         ArraySlice {
             start_index,
             end_index,
             step,
+            _t: std::marker::PhantomData,
         }
     }
 
@@ -54,9 +58,9 @@ impl ArraySlice {
         }
     }
 
-    fn process<'a, T>(&self, elements: &'a [T]) -> Vec<(&'a T, usize)> {
+    fn process<'a, F>(&self, elements: &'a [F]) -> Vec<(&'a F, usize)> {
         let len = elements.len() as i32;
-        let mut filtered_elems: Vec<(&'a T, usize)> = vec![];
+        let mut filtered_elems: Vec<(&'a F, usize)> = vec![];
         match (self.start(len), self.end(len)) {
             (Some(start_idx), Some(end_idx)) => {
                 let end_idx = if end_idx == 0 {
@@ -76,8 +80,11 @@ impl ArraySlice {
     }
 }
 
-impl<'a> Path<'a> for ArraySlice {
-    type Data = Value;
+impl<'a, T> Path<'a> for ArraySlice<T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         input.flat_map_slice(|data, pref| {
@@ -97,18 +104,25 @@ impl<'a> Path<'a> for ArraySlice {
 }
 
 /// process the simple index like [index]
-pub(crate) struct ArrayIndex {
+pub struct ArrayIndex<T> {
     index: usize,
+    _t: std::marker::PhantomData<T>,
 }
 
-impl ArrayIndex {
+impl<T> ArrayIndex<T> {
     pub(crate) fn new(index: usize) -> Self {
-        ArrayIndex { index }
+        ArrayIndex {
+            index,
+            _t: std::marker::PhantomData,
+        }
     }
 }
 
-impl<'a> Path<'a> for ArrayIndex {
-    type Data = Value;
+impl<'a, T> Path<'a> for ArrayIndex<T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         input.flat_map_slice(|data, pref| {
@@ -121,27 +135,40 @@ impl<'a> Path<'a> for ArrayIndex {
 }
 
 /// process @ element
-pub(crate) struct Current<'a> {
-    tail: Option<PathInstance<'a>>,
+pub struct Current<'a, T> {
+    tail: Option<PathInstance<'a, T>>,
+    _t: std::marker::PhantomData<T>,
 }
 
-impl<'a> Current<'a> {
-    pub(crate) fn from(jp: &'a JsonPath, root: &'a Value) -> Self {
+impl<'a, T> Current<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    pub(crate) fn from(jp: &'a JsonPath<T>, root: &'a T) -> Self {
         match jp {
             JsonPath::Empty => Current::none(),
             tail => Current::new(Box::new(json_path_instance(tail, root))),
         }
     }
-    pub(crate) fn new(tail: PathInstance<'a>) -> Self {
-        Current { tail: Some(tail) }
+    pub(crate) fn new(tail: PathInstance<'a, T>) -> Self {
+        Current {
+            tail: Some(tail),
+            _t: std::marker::PhantomData,
+        }
     }
     pub(crate) fn none() -> Self {
-        Current { tail: None }
+        Current {
+            tail: None,
+            _t: std::marker::PhantomData,
+        }
     }
 }
 
-impl<'a> Path<'a> for Current<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for Current<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         self.tail
@@ -152,13 +179,16 @@ impl<'a> Path<'a> for Current<'a> {
 }
 
 /// the list of indexes like [1,2,3]
-pub(crate) struct UnionIndex<'a> {
-    indexes: Vec<TopPaths<'a>>,
+pub struct UnionIndex<'a, T> {
+    indexes: Vec<TopPaths<'a, T>>,
 }
 
-impl<'a> UnionIndex<'a> {
-    pub fn from_indexes(elems: &'a [Value]) -> Self {
-        let mut indexes: Vec<TopPaths<'a>> = vec![];
+impl<'a, T> UnionIndex<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    pub fn from_indexes(elems: &'a [T]) -> Self {
+        let mut indexes: Vec<TopPaths<'a, T>> = vec![];
 
         for idx in elems.iter() {
             indexes.push(TopPaths::ArrayIndex(ArrayIndex::new(
@@ -169,7 +199,7 @@ impl<'a> UnionIndex<'a> {
         UnionIndex::new(indexes)
     }
     pub fn from_keys(elems: &'a [String]) -> Self {
-        let mut indexes: Vec<TopPaths<'a>> = vec![];
+        let mut indexes: Vec<TopPaths<'a, T>> = vec![];
 
         for key in elems.iter() {
             indexes.push(TopPaths::ObjectField(ObjectField::new(key)))
@@ -178,13 +208,16 @@ impl<'a> UnionIndex<'a> {
         UnionIndex::new(indexes)
     }
 
-    pub fn new(indexes: Vec<TopPaths<'a>>) -> Self {
+    pub fn new(indexes: Vec<TopPaths<'a, T>>) -> Self {
         UnionIndex { indexes }
     }
 }
 
-impl<'a> Path<'a> for UnionIndex<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for UnionIndex<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         self.indexes
@@ -195,27 +228,30 @@ impl<'a> Path<'a> for UnionIndex<'a> {
 }
 
 /// process filter element like [?(op sign op)]
-pub enum FilterPath<'a> {
+pub enum FilterPath<'a, T> {
     Filter {
-        left: PathInstance<'a>,
-        right: PathInstance<'a>,
+        left: PathInstance<'a, T>,
+        right: PathInstance<'a, T>,
         op: &'a FilterSign,
     },
     Or {
-        left: PathInstance<'a>,
-        right: PathInstance<'a>,
+        left: PathInstance<'a, T>,
+        right: PathInstance<'a, T>,
     },
     And {
-        left: PathInstance<'a>,
-        right: PathInstance<'a>,
+        left: PathInstance<'a, T>,
+        right: PathInstance<'a, T>,
     },
     Not {
-        exp: PathInstance<'a>,
+        exp: PathInstance<'a, T>,
     },
 }
 
-impl<'a> FilterPath<'a> {
-    pub(crate) fn new(expr: &'a FilterExpression, root: &'a Value) -> Self {
+impl<'a, T> FilterPath<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    pub(crate) fn new(expr: &'a FilterExpression<T>, root: &'a T) -> Self {
         match expr {
             FilterExpression::Atom(left, op, right) => FilterPath::Filter {
                 left: process_operand(left, root),
@@ -238,16 +274,16 @@ impl<'a> FilterPath<'a> {
     fn compound(
         one: &'a FilterSign,
         two: &'a FilterSign,
-        left: Vec<JsonPathValue<Value>>,
-        right: Vec<JsonPathValue<Value>>,
+        left: Vec<JsonPathValue<T>>,
+        right: Vec<JsonPathValue<T>>,
     ) -> bool {
         FilterPath::process_atom(one, left.clone(), right.clone())
             || FilterPath::process_atom(two, left, right)
     }
     fn process_atom(
         op: &'a FilterSign,
-        left: Vec<JsonPathValue<Value>>,
-        right: Vec<JsonPathValue<Value>>,
+        left: Vec<JsonPathValue<T>>,
+        right: Vec<JsonPathValue<T>>,
     ) -> bool {
         match op {
             FilterSign::Equal => eq(
@@ -295,7 +331,7 @@ impl<'a> FilterPath<'a> {
         }
     }
 
-    fn process(&self, curr_el: &'a Value) -> bool {
+    fn process(&self, curr_el: &'a T) -> bool {
         let pref = String::new();
         match self {
             FilterPath::Filter { left, right, op } => FilterPath::process_atom(
@@ -324,32 +360,33 @@ impl<'a> FilterPath<'a> {
     }
 }
 
-impl<'a> Path<'a> for FilterPath<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for FilterPath<'a, T> {
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        input.flat_map_slice(|data, pref| {
-            let mut res = vec![];
-            match data {
-                Array(elems) => {
-                    for (i, el) in elems.iter().enumerate() {
-                        if self.process(el) {
-                            res.push(Slice(el, jsp_idx(&pref, i)))
-                        }
-                    }
-                }
-                el => {
-                    if self.process(el) {
-                        res.push(Slice(el, pref))
-                    }
-                }
-            }
-            if res.is_empty() {
-                vec![NoValue]
-            } else {
-                res
-            }
-        })
+        todo!()
+        // input.flat_map_slice(|data, pref| {
+        //     let mut res = vec![];
+        //     match data {
+        //         Array(elems) => {
+        //             for (i, el) in elems.iter().enumerate() {
+        //                 if self.process(el) {
+        //                     res.push(Slice(el, jsp_idx(&pref, i)))
+        //                 }
+        //             }
+        //         }
+        //         el => {
+        //             if self.process(el) {
+        //                 res.push(Slice(el, pref))
+        //             }
+        //         }
+        //     }
+        //     if res.is_empty() {
+        //         vec![NoValue]
+        //     } else {
+        //         res
+        //     }
+        // })
     }
 }
 
@@ -364,13 +401,13 @@ mod tests {
     use crate::JsonPathValue::NoValue;
 
     use crate::path;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
     fn array_slice_end_start_test() {
         let array = [0, 1, 2, 3, 4, 5];
         let len = array.len() as i32;
-        let mut slice = ArraySlice::new(0, 0, 0);
+        let mut slice: ArraySlice<Value> = ArraySlice::new(0, 0, 0);
 
         assert_eq!(slice.start(len).unwrap(), 0);
         slice.start_index = 1;

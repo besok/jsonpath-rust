@@ -1,8 +1,10 @@
-use crate::JsonPathValue;
-use serde_json::Value;
+use std::fmt::Debug;
+
+use crate::{jsp_idx, jsp_obj, JsonPathValue};
+use serde_json::{json, Value};
 
 use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
-use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
+pub use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 use crate::path::top::*;
 
 /// The module is in charge of processing [[JsonPathIndex]] elements
@@ -11,6 +13,140 @@ mod index;
 mod json;
 /// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
+
+pub trait JsonLike {
+    type Data;
+    fn get(&self, key: &str) -> Option<&Self::Data>;
+    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self::Data>>;
+    fn array_len(&self) -> JsonPathValue<'static, Self::Data>;
+    fn init_with_usize(cnt: usize) -> Self::Data;
+    fn deep_flatten(&self, pref: String) -> Vec<(&Self::Data, String)>;
+    fn deep_path_by_key<'a>(
+        &'a self,
+        key: ObjectField<'a, Self::Data>,
+        pref: String,
+    ) -> Vec<(&'a Self::Data, String)>;
+    fn as_u64(&self) -> Option<u64>;
+    fn as_array(&self) -> Option<&Vec<Self::Data>>;
+    fn size<T>(left: Vec<&Self::Data>, right: Vec<&Self::Data>) -> bool;
+}
+
+impl JsonLike for Value {
+    type Data = Value;
+
+    fn get(&self, key: &str) -> Option<&Self::Data> {
+        self.get(key)
+    }
+
+    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self::Data>> {
+        let res = match self {
+            Value::Array(elems) => {
+                let mut res = vec![];
+                for (idx, el) in elems.iter().enumerate() {
+                    res.push(JsonPathValue::Slice(el, jsp_idx(&pref, idx)));
+                }
+                res
+            }
+            Value::Object(elems) => {
+                let mut res = vec![];
+                for (key, el) in elems.into_iter() {
+                    res.push(JsonPathValue::Slice(el, jsp_obj(&pref, key)));
+                }
+                res
+            }
+            _ => vec![],
+        };
+        if res.is_empty() {
+            vec![JsonPathValue::NoValue]
+        } else {
+            res
+        }
+    }
+    fn array_len(&self) -> JsonPathValue<'static, Self::Data> {
+        match self {
+            Value::Array(elems) => JsonPathValue::NewValue(json!(elems.len())),
+            _ => JsonPathValue::NoValue,
+        }
+    }
+
+    fn init_with_usize(cnt: usize) -> Self::Data {
+        json!(cnt)
+    }
+    fn deep_flatten(&self, pref: String) -> Vec<(&Self::Data, String)> {
+        let mut acc = vec![];
+        match self {
+            Value::Object(elems) => {
+                for (f, v) in elems.into_iter() {
+                    let pref = jsp_obj(&pref, f);
+                    acc.push((v, pref.clone()));
+                    acc.append(&mut v.deep_flatten(pref));
+                }
+            }
+            Value::Array(elems) => {
+                for (i, v) in elems.iter().enumerate() {
+                    let pref = jsp_idx(&pref, i);
+                    acc.push((v, pref.clone()));
+                    acc.append(&mut v.deep_flatten(pref));
+                }
+            }
+            _ => (),
+        }
+        acc
+    }
+    fn deep_path_by_key<'a>(
+        &'a self,
+        key: ObjectField<'a, Self::Data>,
+        pref: String,
+    ) -> Vec<(&'a Self::Data, String)> {
+        let mut result: Vec<(&'a Value, String)> =
+            JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(self, pref.clone())));
+        match self {
+            Value::Object(elems) => {
+                let mut next_levels: Vec<(&'a Value, String)> = elems
+                    .into_iter()
+                    .flat_map(|(k, v)| v.deep_path_by_key(key.clone(), jsp_obj(&pref, k)))
+                    .collect();
+                result.append(&mut next_levels);
+                result
+            }
+            Value::Array(elems) => {
+                let mut next_levels: Vec<(&'a Value, String)> = elems
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, v)| v.deep_path_by_key(key.clone(), jsp_idx(&pref, i)))
+                    .collect();
+                result.append(&mut next_levels);
+                result
+            }
+            _ => result,
+        }
+    }
+
+    fn as_u64(&self) -> Option<u64> {
+        self.as_u64()
+    }
+
+    fn as_array(&self) -> Option<&Vec<Self::Data>> {
+        self.as_array()
+    }
+
+    fn size<T>(left: Vec<&Self::Data>, right: Vec<&Self::Data>) -> bool {
+        if let Some(Value::Number(n)) = right.first() {
+            if let Some(sz) = n.as_f64() {
+                for el in left.iter() {
+                    match el {
+                        Value::String(v) if v.len() == sz as usize => true,
+                        Value::Array(elems) if elems.len() == sz as usize => true,
+                        Value::Object(fields) if fields.len() == sz as usize => true,
+                        _ => return false,
+                    };
+                }
+                return true;
+            }
+        }
+        false
+    }
+}
 
 /// The trait defining the behaviour of processing every separated element.
 /// type Data usually stands for json [[Value]]
@@ -37,24 +173,27 @@ pub trait Path<'a> {
 }
 
 /// all known Paths, mostly to avoid a dynamic Box and vtable for internal function
-pub(crate) enum TopPaths<'a> {
-    RootPointer(RootPointer<'a, Value>),
-    ObjectField(ObjectField<'a>),
-    Chain(Chain<'a>),
-    Wildcard(Wildcard),
-    DescentObject(DescentObject<'a>),
-    DescentWildcard(DescentWildcard),
-    Current(Current<'a>),
+pub enum TopPaths<'a, T> {
+    RootPointer(RootPointer<'a, T>),
+    ObjectField(ObjectField<'a, T>),
+    Chain(Chain<'a, T>),
+    Wildcard(Wildcard<T>),
+    DescentObject(DescentObject<'a, T>),
+    DescentWildcard(DescentWildcard<T>),
+    Current(Current<'a, T>),
     ArrayIndex(ArrayIndex),
     ArraySlice(ArraySlice),
-    UnionIndex(UnionIndex<'a>),
-    FilterPath(FilterPath<'a>),
+    UnionIndex(UnionIndex<'a, T>),
+    FilterPath(FilterPath<'a, T>),
     IdentityPath(IdentityPath),
-    FnPath(FnPath),
+    FnPath(FnPath<T>),
 }
 
-impl<'a> Path<'a> for TopPaths<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for TopPaths<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         match self {
@@ -116,17 +255,23 @@ impl<'a> Path<'a> for TopPaths<'a> {
 }
 
 /// The basic type for instances.
-pub(crate) type PathInstance<'a> = Box<dyn Path<'a, Data = Value> + 'a>;
+pub(crate) type PathInstance<'a, T> = Box<dyn Path<'a, Data = T> + 'a>;
 
 /// The major method to process the top part of json part
-pub(crate) fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -> TopPaths<'a> {
+pub(crate) fn json_path_instance<'a, T: JsonLike<Data = T>>(
+    json_path: &'a JsonPath<T>,
+    root: &'a T,
+) -> TopPaths<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
     match json_path {
         JsonPath::Root => TopPaths::RootPointer(RootPointer::new(root)),
         JsonPath::Field(key) => TopPaths::ObjectField(ObjectField::new(key)),
         JsonPath::Chain(chain) => TopPaths::Chain(Chain::from(chain, root)),
-        JsonPath::Wildcard => TopPaths::Wildcard(Wildcard {}),
+        JsonPath::Wildcard => TopPaths::Wildcard(Wildcard::new()),
         JsonPath::Descent(key) => TopPaths::DescentObject(DescentObject::new(key)),
-        JsonPath::DescentW => TopPaths::DescentWildcard(DescentWildcard),
+        JsonPath::DescentW => TopPaths::DescentWildcard(DescentWildcard::new()),
         JsonPath::Current(value) => TopPaths::Current(Current::from(value, root)),
         JsonPath::Index(JsonPathIndex::Single(index)) => {
             TopPaths::ArrayIndex(ArrayIndex::new(index.as_u64().unwrap() as usize))
@@ -144,12 +289,15 @@ pub(crate) fn json_path_instance<'a>(json_path: &'a JsonPath, root: &'a Value) -
             TopPaths::FilterPath(FilterPath::new(fe, root))
         }
         JsonPath::Empty => TopPaths::IdentityPath(IdentityPath {}),
-        JsonPath::Fn(Function::Length) => TopPaths::FnPath(FnPath::Size),
+        JsonPath::Fn(Function::Length) => TopPaths::FnPath(FnPath::new_size()),
     }
 }
 
 /// The method processes the operand inside the filter expressions
-fn process_operand<'a>(op: &'a Operand, root: &'a Value) -> PathInstance<'a> {
+fn process_operand<'a, T>(op: &'a Operand<T>, root: &'a T) -> PathInstance<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
     Box::new(match op {
         Operand::Static(v) => json_path_instance(&JsonPath::Root, v),
         Operand::Dynamic(jp) => json_path_instance(jp, root),

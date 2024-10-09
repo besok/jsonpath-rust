@@ -7,7 +7,6 @@ use crate::parser::model::{
 };
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
-use serde_json::Value;
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path.pest"]
@@ -18,7 +17,10 @@ struct JsonPathParser;
 /// # Errors
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
-pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
+pub fn parse_json_path<'a, T>(jp_str: &'a str) -> Result<JsonPath<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     JsonPathParser::parse(Rule::path, jp_str)
         .map_err(Box::new)?
         .next()
@@ -31,7 +33,10 @@ pub fn parse_json_path(jp_str: &str) -> Result<JsonPath, JsonPathParserError> {
 /// # Errors
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed
-fn parse_internal(rule: Pair<Rule>) -> Result<JsonPath, JsonPathParserError> {
+fn parse_internal<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPath<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     match rule.as_rule() {
         Rule::path => rule
             .into_inner()
@@ -75,7 +80,7 @@ fn parse_key(rule: Pair<Rule>) -> Result<Option<String>, JsonPathParserError> {
     parsed_key
 }
 
-fn parse_slice(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError> {
     let mut start = 0;
     let mut end = 0;
     let mut step = 1;
@@ -90,7 +95,7 @@ fn parse_slice(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError>
     Ok(JsonPathIndex::Slice(start, end, step))
 }
 
-fn parse_unit_keys(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+fn parse_unit_keys<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError> {
     let mut keys = vec![];
 
     for pair in pairs {
@@ -99,26 +104,35 @@ fn parse_unit_keys(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserEr
     Ok(JsonPathIndex::UnionKeys(keys))
 }
 
-fn number_to_value(number: &str) -> Result<Value, JsonPathParserError> {
+fn number_to_value<T>(number: &str) -> Result<T, JsonPathParserError>
+where
+    T: From<i64> + From<f64>,
+{
     match number
         .parse::<i64>()
         .ok()
-        .map(Value::from)
-        .or_else(|| number.parse::<f64>().ok().map(Value::from))
+        .map(T::from)
+        .or_else(|| number.parse::<f64>().ok().map(T::from))
     {
         Some(value) => Ok(value),
         None => Err(JsonPathParserError::InvalidNumber(number.to_string())),
     }
 }
 
-fn bool_to_value(boolean: &str) -> Value {
+fn bool_to_value<T>(boolean: &str) -> T
+where
+    T: From<bool>,
+{
     boolean
         .parse::<bool>()
-        .map(Value::from)
+        .map(T::from)
         .expect("unreachable: according to .pest this is either `true` or `false`")
 }
 
-fn parse_unit_indexes(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+fn parse_unit_indexes<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
+where
+    T: From<i64> + From<f64>,
+{
     let mut keys = vec![];
 
     for pair in pairs {
@@ -127,20 +141,21 @@ fn parse_unit_indexes(pairs: Pairs<Rule>) -> Result<JsonPathIndex, JsonPathParse
     Ok(JsonPathIndex::UnionIndex(keys))
 }
 
-fn parse_chain_in_operand(rule: Pair<Rule>) -> Result<Operand, JsonPathParserError> {
-    let parsed_chain = match parse_internal(rule)? {
+fn parse_chain_in_operand<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
+    let parsed_chain = match parse_internal::<T>(rule)? {
         JsonPath::Chain(elems) => {
             if elems.len() == 1 {
                 match elems.first() {
                     Some(JsonPath::Index(JsonPathIndex::UnionKeys(keys))) => {
-                        Operand::val(Value::from(keys.clone()))
+                        Operand::val(T::from(keys.clone()))
                     }
                     Some(JsonPath::Index(JsonPathIndex::UnionIndex(keys))) => {
-                        Operand::val(Value::from(keys.clone()))
+                        Operand::val(T::from(keys.clone()))
                     }
-                    Some(JsonPath::Field(f)) => {
-                        Operand::val(Value::Array(vec![Value::from(f.clone())]))
-                    }
+                    Some(JsonPath::Field(f)) => Operand::val(T::from(vec![f.to_string()])),
                     _ => Operand::Dynamic(Box::new(JsonPath::Chain(elems))),
                 }
             } else {
@@ -152,12 +167,18 @@ fn parse_chain_in_operand(rule: Pair<Rule>) -> Result<Operand, JsonPathParserErr
     Ok(parsed_chain)
 }
 
-fn parse_filter_index(pair: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+fn parse_filter_index<'a, T>(pair: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     Ok(JsonPathIndex::Filter(parse_logic_or(pair.into_inner())?))
 }
 
-fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
-    let mut expr: Option<FilterExpression> = None;
+fn parse_logic_or<'a, T>(pairs: Pairs<'a, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
+    let mut expr: Option<FilterExpression<T>> = None;
     // only possible for the loop not to produce any value (except Errors)
     if pairs.len() == 0 {
         return Err(JsonPathParserError::UnexpectedNoneLogicError(
@@ -175,8 +196,13 @@ fn parse_logic_or(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParser
     Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
-fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
-    let mut expr: Option<FilterExpression> = None;
+fn parse_logic_and<'a, T>(
+    pairs: Pairs<'a, Rule>,
+) -> Result<FilterExpression<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
+    let mut expr: Option<FilterExpression<T>> = None;
     // only possible for the loop not to produce any value (except Errors)
     if pairs.len() == 0 {
         return Err(JsonPathParserError::UnexpectedNoneLogicError(
@@ -194,7 +220,12 @@ fn parse_logic_and(pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParse
     Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
-fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+fn parse_logic_not<'a, T>(
+    mut pairs: Pairs<'a, Rule>,
+) -> Result<FilterExpression<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
             Rule::not => {
@@ -213,17 +244,22 @@ fn parse_logic_not(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathP
     }
 }
 
-fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPathParserError> {
+fn parse_logic_atom<'a, T>(
+    mut pairs: Pairs<'a, Rule>,
+) -> Result<FilterExpression<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
             Rule::logic_or => parse_logic_or(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").into_inner()),
             Rule::atom => {
-                let left: Operand = parse_atom(pairs.next().unwrap())?;
+                let left: Operand<T> = parse_atom(pairs.next().unwrap())?;
                 if pairs.peek().is_none() {
                     Ok(FilterExpression::exists(left))
                 } else {
                     let sign: FilterSign = FilterSign::new(pairs.next().expect("unreachable in arithmetic: should have a value as pairs.peek() was Some(_)").as_str());
-                    let right: Operand =
+                    let right: Operand<T> =
                         parse_atom(pairs.next().expect("unreachable in arithemetic: should have a right side operand"))?;
                     Ok(FilterExpression::Atom(left, sign, right))
                 }
@@ -238,19 +274,25 @@ fn parse_logic_atom(mut pairs: Pairs<Rule>) -> Result<FilterExpression, JsonPath
     }
 }
 
-fn parse_atom(rule: Pair<Rule>) -> Result<Operand, JsonPathParserError> {
+fn parse_atom<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     let atom = down(rule.clone())?;
     let parsed_atom = match atom.as_rule() {
         Rule::number => Operand::Static(number_to_value(rule.as_str())?),
-        Rule::string_qt => Operand::Static(Value::from(down(atom)?.as_str())),
+        Rule::string_qt => Operand::Static(T::from(down(atom)?.as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)?)?,
         Rule::boolean => Operand::Static(bool_to_value(rule.as_str())),
-        _ => Operand::Static(Value::Null),
+        _ => Operand::Static(T::from("")),
     };
     Ok(parsed_atom)
 }
 
-fn parse_index(rule: Pair<Rule>) -> Result<JsonPathIndex, JsonPathParserError> {
+fn parse_index<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
+where
+    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+{
     let next = down(rule)?;
     let parsed_index = match next.as_rule() {
         Rule::unsigned => JsonPathIndex::Single(number_to_value(next.as_str())?),

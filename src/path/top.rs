@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
@@ -5,45 +7,34 @@ use crate::{jsp_idx, jsp_obj, JsPathStr};
 use serde_json::value::Value::{Array, Object};
 use serde_json::{json, Value};
 
-use super::TopPaths;
+use super::{JsonLike, TopPaths};
 
 /// to process the element [*]
-pub(crate) struct Wildcard {}
+pub struct Wildcard<T> {
+    _t: std::marker::PhantomData<T>,
+}
 
-impl<'a> Path<'a> for Wildcard {
-    type Data = Value;
+impl<T> Wildcard<T> {
+    pub fn new() -> Self {
+        Self {
+            _t: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Path<'a> for Wildcard<T>
+where
+    T: JsonLike<Data = T>,
+{
+    type Data = T;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.flat_map_slice(|data, pref| {
-            let res = match data {
-                Array(elems) => {
-                    let mut res = vec![];
-                    for (idx, el) in elems.iter().enumerate() {
-                        res.push(Slice(el, jsp_idx(&pref, idx)));
-                    }
-
-                    res
-                }
-                Object(elems) => {
-                    let mut res = vec![];
-                    for (key, el) in elems.into_iter() {
-                        res.push(Slice(el, jsp_obj(&pref, key)));
-                    }
-                    res
-                }
-                _ => vec![],
-            };
-            if res.is_empty() {
-                vec![NoValue]
-            } else {
-                res
-            }
-        })
+        data.flat_map_slice(|data, pref| data.itre(pref))
     }
 }
 
 /// empty path. Returns incoming data.
-pub(crate) struct IdentityPath {}
+pub struct IdentityPath {}
 
 impl<'a> Path<'a> for IdentityPath {
     type Data = Value;
@@ -64,7 +55,7 @@ impl<'a> Path<'a> for EmptyPath {
 }
 
 /// process $ element
-pub(crate) struct RootPointer<'a, T> {
+pub struct RootPointer<'a, T> {
     root: &'a T,
 }
 
@@ -74,8 +65,11 @@ impl<'a, T> RootPointer<'a, T> {
     }
 }
 
-impl<'a> Path<'a> for RootPointer<'a, Value> {
-    type Data = Value;
+impl<'a, T> Path<'a> for RootPointer<'a, T>
+where
+    T: JsonLike + Clone + core::fmt::Debug + Default + 'a,
+{
+    type Data = T;
 
     fn find(&self, _data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         vec![JsonPathValue::from_root(self.root)]
@@ -83,24 +77,62 @@ impl<'a> Path<'a> for RootPointer<'a, Value> {
 }
 
 /// process object fields like ['key'] or .key
-pub(crate) struct ObjectField<'a> {
+pub struct ObjectField<'a, T> {
     key: &'a str,
+    _t: std::marker::PhantomData<T>,
 }
 
-impl<'a> ObjectField<'a> {
-    pub(crate) fn new(key: &'a str) -> ObjectField<'a> {
-        ObjectField { key }
+impl<'a, T> ObjectField<'a, T> {
+    pub(crate) fn new(key: &'a str) -> ObjectField<'a, T> {
+        ObjectField {
+            key,
+            _t: std::marker::PhantomData,
+        }
     }
 }
 
-impl<'a> Clone for ObjectField<'a> {
+impl<'a, T> Clone for ObjectField<'a, T> {
     fn clone(&self) -> Self {
         ObjectField::new(self.key)
     }
 }
 
-impl<'a> Path<'a> for FnPath {
-    type Data = Value;
+impl<'a, T> Path<'a> for ObjectField<'a, T>
+where
+    T: JsonLike<Data = T> + Clone + Default + Debug,
+{
+    type Data = T;
+
+    fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
+        let take_field = |v: &'a T| v.get(self.key);
+
+        let res = match data {
+            Slice(js, p) => take_field(js)
+                .map(|v| JsonPathValue::new_slice(v, jsp_obj(&p, self.key)))
+                .unwrap_or_else(|| NoValue),
+            _ => NoValue,
+        };
+        vec![res]
+    }
+}
+
+pub enum FnPath<T> {
+    Size { _t: std::marker::PhantomData<T> },
+}
+
+impl<T> FnPath<T> {
+    pub fn new_size() -> Self {
+        FnPath::Size {
+            _t: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Path<'a> for FnPath<T>
+where
+    T: JsonLike<Data = T> + 'static,
+{
+    type Data = T;
 
     fn flat_find(
         &self,
@@ -112,17 +144,14 @@ impl<'a> Path<'a> for FnPath {
             return vec![NoValue];
         }
         let res = if is_search_length {
-            NewValue(json!(input.iter().filter(|v| v.has_value()).count()))
+            NewValue(T::init_with_usize(
+                input.iter().filter(|v| v.has_value()).count(),
+            ))
         } else {
-            let take_len = |v: &Value| match v {
-                Array(elems) => NewValue(json!(elems.len())),
-                _ => NoValue,
-            };
-
             match input.first() {
                 Some(v) => match v {
-                    NewValue(d) => take_len(d),
-                    Slice(s, _) => take_len(s),
+                    NewValue(d) => d.array_len(),
+                    Slice(s, _) => s.array_len(),
                     NoValue => NoValue,
                 },
                 None => NoValue,
@@ -136,103 +165,75 @@ impl<'a> Path<'a> for FnPath {
     }
 }
 
-pub(crate) enum FnPath {
-    Size,
-}
-
-impl<'a> Path<'a> for ObjectField<'a> {
-    type Data = Value;
-
-    fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        let take_field = |v: &'a Value| match v {
-            Object(fields) => fields.get(self.key),
-            _ => None,
-        };
-
-        let res = match data {
-            Slice(js, p) => take_field(js)
-                .map(|v| JsonPathValue::new_slice(v, jsp_obj(&p, self.key)))
-                .unwrap_or_else(|| NoValue),
-            _ => NoValue,
-        };
-        vec![res]
-    }
-}
 /// the top method of the processing ..*
-pub(crate) struct DescentWildcard;
+pub struct DescentWildcard<T> {
+    _t: std::marker::PhantomData<T>,
+}
 
-impl<'a> Path<'a> for DescentWildcard {
-    type Data = Value;
+impl<T> DescentWildcard<T> {
+    pub fn new() -> Self {
+        DescentWildcard {
+            _t: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Path<'a> for DescentWildcard<T>
+where
+    T: JsonLike<Data = T>,
+{
+    type Data = T;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        data.map_slice(deep_flatten)
+        data.map_slice(|data, pref| data.deep_flatten(pref))
     }
 }
 
-// todo rewrite to tail rec
-fn deep_flatten(data: &Value, pref: JsPathStr) -> Vec<(&Value, JsPathStr)> {
-    let mut acc = vec![];
-    match data {
-        Object(elems) => {
-            for (f, v) in elems.into_iter() {
-                let pref = jsp_obj(&pref, f);
-                acc.push((v, pref.clone()));
-                acc.append(&mut deep_flatten(v, pref));
-            }
-        }
-        Array(elems) => {
-            for (i, v) in elems.iter().enumerate() {
-                let pref = jsp_idx(&pref, i);
-                acc.push((v, pref.clone()));
-                acc.append(&mut deep_flatten(v, pref));
-            }
-        }
-        _ => (),
-    }
-    acc
-}
-
-// todo rewrite to tail rec
-fn deep_path_by_key<'a>(
-    data: &'a Value,
-    key: ObjectField<'a>,
-    pref: JsPathStr,
-) -> Vec<(&'a Value, JsPathStr)> {
-    let mut result: Vec<(&'a Value, JsPathStr)> =
-        JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(data, pref.clone())));
-    match data {
-        Object(elems) => {
-            let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
-                .into_iter()
-                .flat_map(|(k, v)| deep_path_by_key(v, key.clone(), jsp_obj(&pref, k)))
-                .collect();
-            result.append(&mut next_levels);
-            result
-        }
-        Array(elems) => {
-            let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
-                .iter()
-                .enumerate()
-                .flat_map(|(i, v)| deep_path_by_key(v, key.clone(), jsp_idx(&pref, i)))
-                .collect();
-            result.append(&mut next_levels);
-            result
-        }
-        _ => result,
-    }
-}
+// // todo rewrite to tail rec
+// fn deep_path_by_key<'a>(
+//     data: &'a Value,
+//     key: ObjectField<'a>,
+//     pref: JsPathStr,
+// ) -> Vec<(&'a Value, JsPathStr)> {
+//     let mut result: Vec<(&'a Value, JsPathStr)> =
+//         JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(data, pref.clone())));
+//     match data {
+//         Object(elems) => {
+//             let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
+//                 .into_iter()
+//                 .flat_map(|(k, v)| deep_path_by_key(v, key.clone(), jsp_obj(&pref, k)))
+//                 .collect();
+//             result.append(&mut next_levels);
+//             result
+//         }
+//         Array(elems) => {
+//             let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
+//                 .iter()
+//                 .enumerate()
+//                 .flat_map(|(i, v)| deep_path_by_key(v, key.clone(), jsp_idx(&pref, i)))
+//                 .collect();
+//             result.append(&mut next_levels);
+//             result
+//         }
+//         _ => result,
+//     }
+// }
 
 /// processes decent object like ..
-pub(crate) struct DescentObject<'a> {
+pub struct DescentObject<'a, T> {
     key: &'a str,
+    _t: std::marker::PhantomData<T>,
 }
 
-impl<'a> Path<'a> for DescentObject<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for DescentObject<'a, T>
+where
+    T: JsonLike<Data = T>,
+{
+    type Data = T;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         data.flat_map_slice(|data, pref| {
-            let res_col = deep_path_by_key(data, ObjectField::new(self.key), pref.clone());
+            let res_col = data.deep_path_by_key(ObjectField::new(self.key), pref.clone());
             if res_col.is_empty() {
                 vec![NoValue]
             } else {
@@ -242,26 +243,32 @@ impl<'a> Path<'a> for DescentObject<'a> {
     }
 }
 
-impl<'a> DescentObject<'a> {
+impl<'a, T> DescentObject<'a, T> {
     pub fn new(key: &'a str) -> Self {
-        DescentObject { key }
+        DescentObject {
+            key,
+            _t: std::marker::PhantomData,
+        }
     }
 }
 
 /// the top method of the processing representing the chain of other operators
-pub(crate) struct Chain<'a> {
-    chain: Vec<TopPaths<'a>>,
+pub struct Chain<'a, T> {
+    chain: Vec<TopPaths<'a, T>>,
     is_search_length: bool,
 }
 
-impl<'a> Chain<'a> {
-    pub fn new(chain: Vec<TopPaths<'a>>, is_search_length: bool) -> Self {
+impl<'a, T> Chain<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    pub fn new(chain: Vec<TopPaths<'a, T>>, is_search_length: bool) -> Self {
         Chain {
             chain,
             is_search_length,
         }
     }
-    pub fn from(chain: &'a [JsonPath], root: &'a Value) -> Self {
+    pub fn from(chain: &'a [JsonPath<T>], root: &'a T) -> Self {
         let chain_len = chain.len();
         let is_search_length = if chain_len > 2 {
             let mut res = false;
@@ -307,8 +314,11 @@ impl<'a> Chain<'a> {
     }
 }
 
-impl<'a> Path<'a> for Chain<'a> {
-    type Data = Value;
+impl<'a, T> Path<'a> for Chain<'a, T>
+where
+    T: JsonLike<Data = T> + Default + Clone + Debug,
+{
+    type Data = T;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         let mut res = vec![data];
@@ -330,7 +340,7 @@ mod tests {
     use crate::parser::macros::{chain, idx};
     use crate::parser::model::{JsonPath, JsonPathIndex};
     use crate::path;
-    use crate::path::top::{deep_flatten, json_path_instance, Function, ObjectField, RootPointer};
+    use crate::path::top::{json_path_instance, Function, ObjectField, RootPointer};
     use crate::path::{JsonPathValue, Path};
     use crate::JsonPathValue::NoValue;
     use serde_json::json;
@@ -459,8 +469,9 @@ mod tests {
     }
     #[test]
     fn deep_path_test() {
+        use crate::path::JsonLike;
         let value = json!([1]);
-        let r = deep_flatten(&value, "".to_string());
+        let r = value.deep_flatten("".to_string());
         assert_eq!(r, vec![(&json!(1), "[0]".to_string())])
     }
 
