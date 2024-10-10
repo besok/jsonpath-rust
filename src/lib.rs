@@ -309,17 +309,17 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
 }
 
 impl<'a, Data> JsonPathValue<'a, Data> {
-    fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
+    pub fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }
 
-    fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
+    pub fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
         data.into_iter()
             .map(|(data, pref)| Slice(data, pref))
             .collect()
     }
 
-    fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
+    pub fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
         F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
     {
@@ -334,7 +334,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
         }
     }
 
-    fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
+    pub fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
         F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
     {
@@ -378,12 +378,14 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
+
     use crate::JsonPath;
     use std::str::FromStr;
 
     #[test]
     fn to_string_test() {
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::from_str(
                 "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?(@.verb == 'TEST')].a.length()",
             )
