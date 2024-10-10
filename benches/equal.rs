@@ -1,11 +1,11 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use jsonpath_rust::{JsonPath, JsonPathQuery};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::str::FromStr;
 
 struct SearchData {
     json: serde_json::Value,
-    path: JsonPath,
+    path: JsonPath<Value>,
 }
 
 const PATH: &str = "$.[?(@.author == 'abcd(Rees)')]";

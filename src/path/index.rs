@@ -2,12 +2,10 @@ use std::fmt::Debug;
 
 use crate::jsp_idx;
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
-use crate::path::json::*;
+
 use crate::path::top::ObjectField;
 use crate::path::{json_path_instance, process_operand, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NoValue, Slice};
-
-use serde_json::Value;
 
 use super::{JsonLike, TopPaths};
 
@@ -82,7 +80,7 @@ impl<T> ArraySlice<T> {
 
 impl<'a, T> Path<'a> for ArraySlice<T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 
@@ -120,7 +118,7 @@ impl<T> ArrayIndex<T> {
 
 impl<'a, T> Path<'a> for ArrayIndex<T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 
@@ -142,7 +140,7 @@ pub struct Current<'a, T> {
 
 impl<'a, T> Current<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     pub(crate) fn from(jp: &'a JsonPath<T>, root: &'a T) -> Self {
         match jp {
@@ -166,7 +164,7 @@ where
 
 impl<'a, T> Path<'a> for Current<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 
@@ -185,7 +183,7 @@ pub struct UnionIndex<'a, T> {
 
 impl<'a, T> UnionIndex<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     pub fn from_indexes(elems: &'a [T]) -> Self {
         let mut indexes: Vec<TopPaths<'a, T>> = vec![];
@@ -215,7 +213,7 @@ where
 
 impl<'a, T> Path<'a> for UnionIndex<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 
@@ -249,7 +247,7 @@ pub enum FilterPath<'a, T> {
 
 impl<'a, T> FilterPath<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike,
 {
     pub(crate) fn new(expr: &'a FilterExpression<T>, root: &'a T) -> Self {
         match expr {
@@ -286,45 +284,49 @@ where
         right: Vec<JsonPathValue<T>>,
     ) -> bool {
         match op {
-            FilterSign::Equal => eq(
+            FilterSign::Equal => <T as JsonLike>::eq(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
+            // eq(
+            //     JsonPathValue::vec_as_data(left),
+            //     JsonPathValue::vec_as_data(right),
+            // ),
             FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
-            FilterSign::Less => less(
+            FilterSign::Less => <T as JsonLike>::less(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
             FilterSign::LeOrEq => {
                 FilterPath::compound(&FilterSign::Less, &FilterSign::Equal, left, right)
             }
-            FilterSign::Greater => less(
+            FilterSign::Greater => <T as JsonLike>::less(
                 JsonPathValue::vec_as_data(right),
                 JsonPathValue::vec_as_data(left),
             ),
             FilterSign::GrOrEq => {
                 FilterPath::compound(&FilterSign::Greater, &FilterSign::Equal, left, right)
             }
-            FilterSign::Regex => regex(
+            FilterSign::Regex => <T as JsonLike>::regex(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
-            FilterSign::In => inside(
+            FilterSign::In => <T as JsonLike>::inside(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
             FilterSign::Nin => !FilterPath::process_atom(&FilterSign::In, left, right),
             FilterSign::NoneOf => !FilterPath::process_atom(&FilterSign::AnyOf, left, right),
-            FilterSign::AnyOf => any_of(
+            FilterSign::AnyOf => <T as JsonLike>::any_of(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
-            FilterSign::SubSetOf => sub_set_of(
+            FilterSign::SubSetOf => <T as JsonLike>::sub_set_of(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
             FilterSign::Exists => !JsonPathValue::vec_as_data(left).is_empty(),
-            FilterSign::Size => size(
+            FilterSign::Size => <T as JsonLike>::size(
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
@@ -360,33 +362,48 @@ where
     }
 }
 
-impl<'a, T> Path<'a> for FilterPath<'a, T> {
+impl<'a, T> Path<'a> for FilterPath<'a, T>
+where
+    T: JsonLike,
+{
     type Data = T;
 
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
-        todo!()
-        // input.flat_map_slice(|data, pref| {
-        //     let mut res = vec![];
-        //     match data {
-        //         Array(elems) => {
-        //             for (i, el) in elems.iter().enumerate() {
-        //                 if self.process(el) {
-        //                     res.push(Slice(el, jsp_idx(&pref, i)))
-        //                 }
-        //             }
-        //         }
-        //         el => {
-        //             if self.process(el) {
-        //                 res.push(Slice(el, pref))
-        //             }
-        //         }
-        //     }
-        //     if res.is_empty() {
-        //         vec![NoValue]
-        //     } else {
-        //         res
-        //     }
-        // })
+        input.flat_map_slice(|data, pref| {
+            let mut res = vec![];
+            if data.is_array() {
+                let elems = data.as_array().unwrap();
+                for (i, el) in elems.iter().enumerate() {
+                    if self.process(el) {
+                        res.push(Slice(el, jsp_idx(&pref, i)))
+                    }
+                }
+            } else {
+                if self.process(data) {
+                    res.push(Slice(data, pref))
+                }
+            }
+
+            // match data {
+            //     Array(elems) => {
+            //         for (i, el) in elems.iter().enumerate() {
+            //             if self.process(el) {
+            //                 res.push(Slice(el, jsp_idx(&pref, i)))
+            //             }
+            //         }
+            //     }
+            //     el => {
+            //         if self.process(el) {
+            //             res.push(Slice(el, pref))
+            //         }
+            //     }
+            // }
+            if res.is_empty() {
+                vec![NoValue]
+            } else {
+                res
+            }
+        })
     }
 }
 

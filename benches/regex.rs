@@ -1,11 +1,11 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use jsonpath_rust::{JsonPath, JsonPathQuery};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::str::FromStr;
 
 struct SearchData {
     json: serde_json::Value,
-    path: JsonPath,
+    path: JsonPath<Value>,
 }
 
 const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
@@ -23,7 +23,7 @@ fn regex_perf_test_without_reuse() {
 }
 
 fn json_path_compiling() {
-    let _v = JsonPath::from_str(PATH).unwrap();
+    let _v = JsonPath::<Value>::from_str(PATH).unwrap();
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {

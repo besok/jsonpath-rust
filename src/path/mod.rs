@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use crate::{jsp_idx, jsp_obj, JsonPathValue};
+use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
@@ -14,31 +15,61 @@ mod json;
 /// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
 
-pub trait JsonLike {
-    type Data;
-    fn get(&self, key: &str) -> Option<&Self::Data>;
-    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self::Data>>;
-    fn array_len(&self) -> JsonPathValue<'static, Self::Data>;
-    fn init_with_usize(cnt: usize) -> Self::Data;
-    fn deep_flatten(&self, pref: String) -> Vec<(&Self::Data, String)>;
+pub trait JsonLike:
+    Default
+    + Clone
+    + Debug
+    + for<'a> From<&'a str>
+    + From<Vec<String>>
+    + From<bool>
+    + From<i64>
+    + From<f64>
+    + From<Vec<Self>>
+    + From<String>
+    + PartialEq
+    + 'static
+{
+    fn get(&self, key: &str) -> Option<&Self>;
+    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self>>;
+    fn array_len(&self) -> JsonPathValue<'static, Self>;
+    fn init_with_usize(cnt: usize) -> Self;
+    fn deep_flatten(&self, pref: String) -> Vec<(&Self, String)>;
     fn deep_path_by_key<'a>(
         &'a self,
-        key: ObjectField<'a, Self::Data>,
+        key: ObjectField<'a, Self>,
         pref: String,
-    ) -> Vec<(&'a Self::Data, String)>;
+    ) -> Vec<(&'a Self, String)>;
     fn as_u64(&self) -> Option<u64>;
-    fn as_array(&self) -> Option<&Vec<Self::Data>>;
-    fn size<T>(left: Vec<&Self::Data>, right: Vec<&Self::Data>) -> bool;
+    fn is_array(&self) -> bool;
+    fn as_array(&self) -> Option<&Vec<Self>>;
+    fn size(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn sub_set_of(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn any_of(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn regex(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn inside(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn less(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn eq(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+    fn null() -> Self;
+    fn array(data: Vec<Self>) -> Self;
 }
 
 impl JsonLike for Value {
-    type Data = Value;
+    fn is_array(&self) -> bool {
+        self.is_array()
+    }
+    fn array(data: Vec<Self>) -> Self {
+        Value::Array(data)
+    }
 
-    fn get(&self, key: &str) -> Option<&Self::Data> {
+    fn null() -> Self {
+        Value::Null
+    }
+
+    fn get(&self, key: &str) -> Option<&Self> {
         self.get(key)
     }
 
-    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self::Data>> {
+    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self>> {
         let res = match self {
             Value::Array(elems) => {
                 let mut res = vec![];
@@ -62,17 +93,17 @@ impl JsonLike for Value {
             res
         }
     }
-    fn array_len(&self) -> JsonPathValue<'static, Self::Data> {
+    fn array_len(&self) -> JsonPathValue<'static, Self> {
         match self {
             Value::Array(elems) => JsonPathValue::NewValue(json!(elems.len())),
             _ => JsonPathValue::NoValue,
         }
     }
 
-    fn init_with_usize(cnt: usize) -> Self::Data {
+    fn init_with_usize(cnt: usize) -> Self {
         json!(cnt)
     }
-    fn deep_flatten(&self, pref: String) -> Vec<(&Self::Data, String)> {
+    fn deep_flatten(&self, pref: String) -> Vec<(&Self, String)> {
         let mut acc = vec![];
         match self {
             Value::Object(elems) => {
@@ -95,9 +126,9 @@ impl JsonLike for Value {
     }
     fn deep_path_by_key<'a>(
         &'a self,
-        key: ObjectField<'a, Self::Data>,
+        key: ObjectField<'a, Self>,
         pref: String,
-    ) -> Vec<(&'a Self::Data, String)> {
+    ) -> Vec<(&'a Self, String)> {
         let mut result: Vec<(&'a Value, String)> =
             JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(self, pref.clone())));
         match self {
@@ -126,11 +157,11 @@ impl JsonLike for Value {
         self.as_u64()
     }
 
-    fn as_array(&self) -> Option<&Vec<Self::Data>> {
+    fn as_array(&self) -> Option<&Vec<Self>> {
         self.as_array()
     }
 
-    fn size<T>(left: Vec<&Self::Data>, right: Vec<&Self::Data>) -> bool {
+    fn size(left: Vec<&Self>, right: Vec<&Self>) -> bool {
         if let Some(Value::Number(n)) = right.first() {
             if let Some(sz) = n.as_f64() {
                 for el in left.iter() {
@@ -145,6 +176,147 @@ impl JsonLike for Value {
             }
         }
         false
+    }
+
+    fn sub_set_of(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.is_empty() {
+            return true;
+        }
+        if right.is_empty() {
+            return false;
+        }
+
+        if let Some(elems) = left.first().and_then(|e| e.as_array()) {
+            if let Some(Value::Array(right_elems)) = right.first() {
+                if right_elems.is_empty() {
+                    return false;
+                }
+
+                for el in elems {
+                    let mut res = false;
+
+                    for r in right_elems.iter() {
+                        if el.eq(r) {
+                            res = true
+                        }
+                    }
+                    if !res {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    fn any_of(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.is_empty() {
+            return true;
+        }
+        if right.is_empty() {
+            return false;
+        }
+
+        if let Some(Value::Array(elems)) = right.first() {
+            if elems.is_empty() {
+                return false;
+            }
+
+            for el in left.iter() {
+                if let Some(left_elems) = el.as_array() {
+                    for l in left_elems.iter() {
+                        for r in elems.iter() {
+                            if l.eq(r) {
+                                return true;
+                            }
+                        }
+                    }
+                } else {
+                    for r in elems.iter() {
+                        if el.eq(&r) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    fn regex(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.is_empty() || right.is_empty() {
+            return false;
+        }
+
+        match right.first() {
+            Some(Value::String(str)) => {
+                if let Ok(regex) = Regex::new(str) {
+                    for el in left.iter() {
+                        if let Some(v) = el.as_str() {
+                            if regex.is_match(v) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    fn inside(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.is_empty() {
+            return false;
+        }
+
+        match right.first() {
+            Some(Value::Array(elems)) => {
+                for el in left.iter() {
+                    if elems.contains(el) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Some(Value::Object(elems)) => {
+                for el in left.iter() {
+                    for r in elems.values() {
+                        if el.eq(&r) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// ensure the number on the left side is less the number on the right side
+    fn less(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.len() == 1 && right.len() == 1 {
+            match (left.first(), right.first()) {
+                (Some(Value::Number(l)), Some(Value::Number(r))) => l
+                    .as_f64()
+                    .and_then(|v1| r.as_f64().map(|v2| v1 < v2))
+                    .unwrap_or(false),
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// compare elements
+    fn eq(left: Vec<&Self>, right: Vec<&Self>) -> bool {
+        if left.len() != right.len() {
+            false
+        } else {
+            left.iter().zip(right).map(|(a, b)| a.eq(&b)).all(|a| a)
+        }
     }
 }
 
@@ -181,17 +353,17 @@ pub enum TopPaths<'a, T> {
     DescentObject(DescentObject<'a, T>),
     DescentWildcard(DescentWildcard<T>),
     Current(Current<'a, T>),
-    ArrayIndex(ArrayIndex),
-    ArraySlice(ArraySlice),
+    ArrayIndex(ArrayIndex<T>),
+    ArraySlice(ArraySlice<T>),
     UnionIndex(UnionIndex<'a, T>),
     FilterPath(FilterPath<'a, T>),
-    IdentityPath(IdentityPath),
+    IdentityPath(IdentityPath<T>),
     FnPath(FnPath<T>),
 }
 
 impl<'a, T> Path<'a> for TopPaths<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 
@@ -258,12 +430,12 @@ where
 pub(crate) type PathInstance<'a, T> = Box<dyn Path<'a, Data = T> + 'a>;
 
 /// The major method to process the top part of json part
-pub(crate) fn json_path_instance<'a, T: JsonLike<Data = T>>(
+pub(crate) fn json_path_instance<'a, T: JsonLike>(
     json_path: &'a JsonPath<T>,
     root: &'a T,
 ) -> TopPaths<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     match json_path {
         JsonPath::Root => TopPaths::RootPointer(RootPointer::new(root)),
@@ -288,7 +460,7 @@ where
         JsonPath::Index(JsonPathIndex::Filter(fe)) => {
             TopPaths::FilterPath(FilterPath::new(fe, root))
         }
-        JsonPath::Empty => TopPaths::IdentityPath(IdentityPath {}),
+        JsonPath::Empty => TopPaths::IdentityPath(IdentityPath::new()),
         JsonPath::Fn(Function::Length) => TopPaths::FnPath(FnPath::new_size()),
     }
 }
@@ -296,7 +468,7 @@ where
 /// The method processes the operand inside the filter expressions
 fn process_operand<'a, T>(op: &'a Operand<T>, root: &'a T) -> PathInstance<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     Box::new(match op {
         Operand::Static(v) => json_path_instance(&JsonPath::Root, v),

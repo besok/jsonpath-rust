@@ -378,12 +378,14 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
+
     use crate::JsonPath;
     use std::str::FromStr;
 
     #[test]
     fn to_string_test() {
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::from_str(
                 "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?(@.verb == 'TEST')].a.length()",
             )

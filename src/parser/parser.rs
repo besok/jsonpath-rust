@@ -5,6 +5,7 @@ use crate::parser::model::FilterExpression::{And, Not, Or};
 use crate::parser::model::{
     FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
 };
+use crate::path::JsonLike;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 
@@ -19,7 +20,7 @@ struct JsonPathParser;
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path<'a, T>(jp_str: &'a str) -> Result<JsonPath<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     JsonPathParser::parse(Rule::path, jp_str)
         .map_err(Box::new)?
@@ -35,7 +36,7 @@ where
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed
 fn parse_internal<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPath<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     match rule.as_rule() {
         Rule::path => rule
@@ -143,7 +144,7 @@ where
 
 fn parse_chain_in_operand<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     let parsed_chain = match parse_internal::<T>(rule)? {
         JsonPath::Chain(elems) => {
@@ -169,14 +170,14 @@ where
 
 fn parse_filter_index<'a, T>(pair: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     Ok(JsonPathIndex::Filter(parse_logic_or(pair.into_inner())?))
 }
 
 fn parse_logic_or<'a, T>(pairs: Pairs<'a, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     let mut expr: Option<FilterExpression<T>> = None;
     // only possible for the loop not to produce any value (except Errors)
@@ -200,7 +201,7 @@ fn parse_logic_and<'a, T>(
     pairs: Pairs<'a, Rule>,
 ) -> Result<FilterExpression<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     let mut expr: Option<FilterExpression<T>> = None;
     // only possible for the loop not to produce any value (except Errors)
@@ -224,7 +225,7 @@ fn parse_logic_not<'a, T>(
     mut pairs: Pairs<'a, Rule>,
 ) -> Result<FilterExpression<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
@@ -248,7 +249,7 @@ fn parse_logic_atom<'a, T>(
     mut pairs: Pairs<'a, Rule>,
 ) -> Result<FilterExpression<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     if let Some(rule) = pairs.peek().map(|x| x.as_rule()) {
         match rule {
@@ -276,7 +277,7 @@ where
 
 fn parse_atom<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     let atom = down(rule.clone())?;
     let parsed_atom = match atom.as_rule() {
@@ -284,14 +285,14 @@ where
         Rule::string_qt => Operand::Static(T::from(down(atom)?.as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)?)?,
         Rule::boolean => Operand::Static(bool_to_value(rule.as_str())),
-        _ => Operand::Static(T::from("")),
+        _ => Operand::Static(T::null()),
     };
     Ok(parsed_atom)
 }
 
 fn parse_index<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
 where
-    T: From<&'a str> + From<Vec<String>> + From<bool> + From<i64> + From<f64> + 'static,
+    T: JsonLike,
 {
     let next = down(rule)?;
     let parsed_index = match next.as_rule() {
@@ -318,18 +319,21 @@ mod tests {
     use super::*;
     use crate::parser::macros::{chain, filter, idx, op};
     use crate::path;
-    use serde_json::json;
+    use serde_json::{json, Value};
     use std::panic;
 
     fn test_failed(input: &str) {
-        match parse_json_path(input) {
+        match parse_json_path::<Value>(input) {
             Ok(elem) => panic!("should be false but got {:?}", elem),
             Err(e) => println!("{}", e),
         }
     }
 
-    fn test(input: &str, expected: Vec<JsonPath>) {
-        match parse_json_path(input) {
+    fn test<T>(input: &str, expected: Vec<JsonPath<T>>)
+    where
+        T: JsonLike,
+    {
+        match parse_json_path::<T>(input) {
             Ok(JsonPath::Chain(elems)) => assert_eq!(elems, expected),
             Ok(e) => panic!("unexpected value {:?}", e),
             Err(e) => {
@@ -340,7 +344,7 @@ mod tests {
 
     #[test]
     fn path_test() {
-        test("$.k.['k']['k']..k..['k'].*.[*][*][1][1,2]['k','k'][:][10:][:10][10:10:10][?(@)][?(@.abc >= 10)]",
+        test::<Value>("$.k.['k']['k']..k..['k'].*.[*][*][1][1,2]['k','k'][:][10:][:10][10:10:10][?(@)][?(@.abc >= 10)]",
              vec![
                  path!($),
                  path!("k"),
@@ -361,7 +365,7 @@ mod tests {
                  path!(idx!(?filter!(op!(chain!(path!(@path!()))), "exists", op!(path!())))),
                  path!(idx!(?filter!(op!(chain!(path!(@,path!("abc")))), ">=", op!(10)))),
              ]);
-        test(
+        test::<Value>(
             "$..*[?(@.isbn)].title",
             vec![
                 // Root, DescentW, Index(Filter(Atom(Dynamic(Chain([Current(Chain([Field("isbn")]))])), Exists, Dynamic(Empty)))), Field("title")
@@ -375,18 +379,18 @@ mod tests {
 
     #[test]
     fn descent_test() {
-        test("..abc", vec![path!(.."abc")]);
-        test("..['abc']", vec![path!(.."abc")]);
+        test::<Value>("..abc", vec![path!(.."abc")]);
+        test::<Value>("..['abc']", vec![path!(.."abc")]);
         test_failed("...['abc']");
         test_failed("...abc");
     }
 
     #[test]
     fn field_test() {
-        test(".abc", vec![path!("abc")]);
-        test(".['abc']", vec![path!("abc")]);
-        test("['abc']", vec![path!("abc")]);
-        test(".['abc\\\"abc']", vec![path!("abc\\\"abc")]);
+        test::<Value>(".abc", vec![path!("abc")]);
+        test::<Value>(".['abc']", vec![path!("abc")]);
+        test::<Value>("['abc']", vec![path!("abc")]);
+        test::<Value>(".['abc\\\"abc']", vec![path!("abc\\\"abc")]);
         test_failed(".abc()abc");
         test_failed("..[abc]");
         test_failed(".'abc'");
@@ -394,46 +398,46 @@ mod tests {
 
     #[test]
     fn wildcard_test() {
-        test(".*", vec![path!(*)]);
-        test(".[*]", vec![path!(*)]);
-        test(".abc.*", vec![path!("abc"), path!(*)]);
-        test(".abc.[*]", vec![path!("abc"), path!(*)]);
-        test(".abc[*]", vec![path!("abc"), path!(*)]);
-        test("..*", vec![path!(..*)]);
+        test::<Value>(".*", vec![path!(*)]);
+        test::<Value>(".[*]", vec![path!(*)]);
+        test::<Value>(".abc.*", vec![path!("abc"), path!(*)]);
+        test::<Value>(".abc.[*]", vec![path!("abc"), path!(*)]);
+        test::<Value>(".abc[*]", vec![path!("abc"), path!(*)]);
+        test::<Value>("..*", vec![path!(..*)]);
         test_failed("abc*");
     }
 
     #[test]
     fn index_single_test() {
-        test("[1]", vec![path!(idx!(1))]);
+        test::<Value>("[1]", vec![path!(idx!(1))]);
         test_failed("[-1]");
         test_failed("[1a]");
     }
 
     #[test]
     fn index_slice_test() {
-        test("[1:1000:10]", vec![path!(idx!([1; 1000; 10]))]);
-        test("[:1000:10]", vec![path!(idx!([0; 1000; 10]))]);
-        test("[:1000]", vec![path!(idx!([;1000;]))]);
-        test("[:]", vec![path!(idx!([;;]))]);
-        test("[::10]", vec![path!(idx!([;;10]))]);
+        test::<Value>("[1:1000:10]", vec![path!(idx!([1; 1000; 10]))]);
+        test::<Value>("[:1000:10]", vec![path!(idx!([0; 1000; 10]))]);
+        test::<Value>("[:1000]", vec![path!(idx!([;1000;]))]);
+        test::<Value>("[:]", vec![path!(idx!([;;]))]);
+        test::<Value>("[::10]", vec![path!(idx!([;;10]))]);
         test_failed("[::-1]");
         test_failed("[:::0]");
     }
 
     #[test]
     fn index_union_test() {
-        test("[1,2,3]", vec![path!(idx!(idx 1,2,3))]);
-        test("['abc','bcd']", vec![path!(idx!("abc", "bcd"))]);
+        test::<Value>("[1,2,3]", vec![path!(idx!(idx 1,2,3))]);
+        test::<Value>("['abc','bcd']", vec![path!(idx!("abc", "bcd"))]);
         test_failed("[]");
-        test("[-1,-2]", vec![path!(idx!(idx - 1, -2))]);
+        test::<Value>("[-1,-2]", vec![path!(idx!(idx - 1, -2))]);
         test_failed("[abc,bcd]");
-        test("[\"abc\",\"bcd\"]", vec![path!(idx!("abc", "bcd"))]);
+        test::<Value>("[\"abc\",\"bcd\"]", vec![path!(idx!("abc", "bcd"))]);
     }
 
     #[test]
     fn array_start_test() {
-        test(
+        test::<Value>(
             "$.[?(@.verb== \"TEST\")]",
             vec![
                 path!($),
@@ -444,7 +448,7 @@ mod tests {
 
     #[test]
     fn logical_filter_test() {
-        test(
+        test::<Value>(
             "$.[?(@.verb == 'T' || @.size > 0 && @.size < 10)]",
             vec![
                 path!($),
@@ -460,7 +464,7 @@ mod tests {
                 ))),
             ],
         );
-        test(
+        test::<Value>(
             "$.[?((@.verb == 'T' || @.size > 0) && @.size < 10)]",
             vec![
                 path!($),
@@ -476,7 +480,7 @@ mod tests {
                 ))),
             ],
         );
-        test(
+        test::<Value>(
             "$.[?(@.verb == 'T' || @.size > 0 && @.size < 10 && @.elem == 0)]",
             vec![
                 path!($),
@@ -500,33 +504,33 @@ mod tests {
 
     #[test]
     fn index_filter_test() {
-        test(
+        test::<Value>(
             "[?('abc' == 'abc')]",
             vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
         );
-        test(
+        test::<Value>(
             "[?('abc' == 1)]",
             vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))],
         );
-        test(
+        test::<Value>(
             "[?('abc' == true)]",
             vec![path!(idx!(?filter!( op!("abc"),"==",op!(true))))],
         );
-        test(
+        test::<Value>(
             "[?('abc' == null)]",
             vec![path!(
                 idx!(?filter!( op!("abc"),"==",Operand::Static(Value::Null)))
             )],
         );
 
-        test(
+        test::<Value>(
             "[?(@.abc in ['abc','bcd'])]",
             vec![path!(
                 idx!(?filter!(op!(chain!(path!(@,path!("abc")))),"in",Operand::val(json!(["abc","bcd"]))))
             )],
         );
 
-        test(
+        test::<Value>(
             "[?(@.abc.[*] in ['abc','bcd'])]",
             vec![path!(idx!(?filter!(
                op!(chain!(path!(@,path!("abc"), path!(*)))),
@@ -534,7 +538,7 @@ mod tests {
                 op!(s json!(["abc","bcd"]))
             )))],
         );
-        test(
+        test::<Value>(
             "[?(@.[*]..next in ['abc','bcd'])]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@,path!(*), path!(.."next")))),
@@ -543,7 +547,7 @@ mod tests {
             )))],
         );
 
-        test(
+        test::<Value>(
             "[?(@[1] in ['abc','bcd'])]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@,path!(idx!(1))))),
@@ -551,19 +555,19 @@ mod tests {
                 op!(s json!(["abc","bcd"]))
             )))],
         );
-        test(
+        test::<Value>(
             "[?(@ == 'abc')]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@path!()))),"==",op!("abc")
             )))],
         );
-        test(
+        test::<Value>(
             "[?(@ subsetOf ['abc'])]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@path!()))),"subsetOf",op!(s json!(["abc"]))
             )))],
         );
-        test(
+        test::<Value>(
             "[?(@[1] subsetOf ['abc','abc'])]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@,path!(idx!(1))))),
@@ -571,7 +575,7 @@ mod tests {
                 op!(s json!(["abc","abc"]))
             )))],
         );
-        test(
+        test::<Value>(
             "[?(@ subsetOf [1,2,3])]",
             vec![path!(idx!(?filter!(
                 op!(chain!(path!(@path!()))),"subsetOf",op!(s json!([1,2,3]))
@@ -585,12 +589,12 @@ mod tests {
 
     #[test]
     fn fn_size_test() {
-        test(
+        test::<Value>(
             "$.k.length()",
             vec![path!($), path!("k"), JsonPath::Fn(Function::Length)],
         );
 
-        test(
+        test::<Value>(
             "$.k.length.field",
             vec![path!($), path!("k"), path!("length"), path!("field")],
         )
@@ -598,7 +602,7 @@ mod tests {
 
     #[test]
     fn parser_error_test_invalid_rule() {
-        let result = parse_json_path("notapath");
+        let result = parse_json_path::<Value>("notapath");
 
         assert!(result.is_err());
         assert!(result
@@ -610,7 +614,7 @@ mod tests {
 
     #[test]
     fn parser_error_test_empty_rule() {
-        let result = parse_json_path("");
+        let result = parse_json_path::<Value>("");
 
         assert!(result.is_err());
         assert!(result

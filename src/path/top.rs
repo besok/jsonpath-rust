@@ -1,11 +1,9 @@
 use std::fmt::Debug;
 
+use crate::jsp_obj;
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path};
 use crate::JsonPathValue::{NewValue, NoValue, Slice};
-use crate::{jsp_idx, jsp_obj, JsPathStr};
-use serde_json::value::Value::{Array, Object};
-use serde_json::{json, Value};
 
 use super::{JsonLike, TopPaths};
 
@@ -24,7 +22,7 @@ impl<T> Wildcard<T> {
 
 impl<'a, T> Path<'a> for Wildcard<T>
 where
-    T: JsonLike<Data = T>,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -34,20 +32,32 @@ where
 }
 
 /// empty path. Returns incoming data.
-pub struct IdentityPath {}
+pub struct IdentityPath<T> {
+    _t: std::marker::PhantomData<T>,
+}
 
-impl<'a> Path<'a> for IdentityPath {
-    type Data = Value;
+impl<T> IdentityPath<T> {
+    pub fn new() -> Self {
+        Self {
+            _t: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Path<'a> for IdentityPath<T> {
+    type Data = T;
 
     fn find(&self, data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         vec![data]
     }
 }
 
-pub(crate) struct EmptyPath {}
+pub(crate) struct EmptyPath<T> {
+    _t: std::marker::PhantomData<T>,
+}
 
-impl<'a> Path<'a> for EmptyPath {
-    type Data = Value;
+impl<'a, T> Path<'a> for EmptyPath<T> {
+    type Data = T;
 
     fn find(&self, _data: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         vec![]
@@ -99,7 +109,7 @@ impl<'a, T> Clone for ObjectField<'a, T> {
 
 impl<'a, T> Path<'a> for ObjectField<'a, T>
 where
-    T: JsonLike<Data = T> + Clone + Default + Debug,
+    T: JsonLike + Clone + Default + Debug,
 {
     type Data = T;
 
@@ -130,7 +140,7 @@ impl<T> FnPath<T> {
 
 impl<'a, T> Path<'a> for FnPath<T>
 where
-    T: JsonLike<Data = T> + 'static,
+    T: JsonLike + 'static,
 {
     type Data = T;
 
@@ -180,7 +190,7 @@ impl<T> DescentWildcard<T> {
 
 impl<'a, T> Path<'a> for DescentWildcard<T>
 where
-    T: JsonLike<Data = T>,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -188,36 +198,6 @@ where
         data.map_slice(|data, pref| data.deep_flatten(pref))
     }
 }
-
-// // todo rewrite to tail rec
-// fn deep_path_by_key<'a>(
-//     data: &'a Value,
-//     key: ObjectField<'a>,
-//     pref: JsPathStr,
-// ) -> Vec<(&'a Value, JsPathStr)> {
-//     let mut result: Vec<(&'a Value, JsPathStr)> =
-//         JsonPathValue::vec_as_pair(key.find(JsonPathValue::new_slice(data, pref.clone())));
-//     match data {
-//         Object(elems) => {
-//             let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
-//                 .into_iter()
-//                 .flat_map(|(k, v)| deep_path_by_key(v, key.clone(), jsp_obj(&pref, k)))
-//                 .collect();
-//             result.append(&mut next_levels);
-//             result
-//         }
-//         Array(elems) => {
-//             let mut next_levels: Vec<(&'a Value, JsPathStr)> = elems
-//                 .iter()
-//                 .enumerate()
-//                 .flat_map(|(i, v)| deep_path_by_key(v, key.clone(), jsp_idx(&pref, i)))
-//                 .collect();
-//             result.append(&mut next_levels);
-//             result
-//         }
-//         _ => result,
-//     }
-// }
 
 /// processes decent object like ..
 pub struct DescentObject<'a, T> {
@@ -227,7 +207,7 @@ pub struct DescentObject<'a, T> {
 
 impl<'a, T> Path<'a> for DescentObject<'a, T>
 where
-    T: JsonLike<Data = T>,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -260,7 +240,7 @@ pub struct Chain<'a, T> {
 
 impl<'a, T> Chain<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     pub fn new(chain: Vec<TopPaths<'a, T>>, is_search_length: bool) -> Self {
         Chain {
@@ -316,7 +296,7 @@ where
 
 impl<'a, T> Path<'a> for Chain<'a, T>
 where
-    T: JsonLike<Data = T> + Default + Clone + Debug,
+    T: JsonLike + Default + Clone + Debug,
 {
     type Data = T;
 

@@ -4,12 +4,10 @@ use crate::JsonPath;
 use crate::JsonPathValue;
 use crate::JsonPathValue::NoValue;
 use crate::JsonPtr;
-use crate::Value;
-use std::fmt::Debug;
 
 impl<T> JsonPath<T>
 where
-    T: JsonLike<Data = T> + Default + Debug + Clone,
+    T: JsonLike,
 {
     /// finds a slice of data in the set json.
     /// The result is a vector of references to the incoming structure.
@@ -80,13 +78,13 @@ where
     ///
     /// assert_eq!(cloned_data, Value::Array(vec![json!({"active":1})]));
     /// ```
-    pub fn find(&self, json: &T) -> Value {
+    pub fn find(&self, json: &T) -> T {
         let slice = self.find_slice(json);
         if !slice.is_empty() {
             if JsonPathValue::only_no_value(&slice) {
-                Value::Null
+                T::null()
             } else {
-                Value::Array(
+                T::array(
                     slice
                         .into_iter()
                         .filter(|v| v.has_value())
@@ -95,7 +93,7 @@ where
                 )
             }
         } else {
-            Value::Array(vec![])
+            T::array(vec![])
         }
     }
 
@@ -119,7 +117,7 @@ where
     /// assert_eq!(slice_of_data, Value::Array(vec![Value::String(expected_path)]));
     /// ```
     pub fn find_as_path(&self, json: &T) -> T {
-        Value::Array(
+        T::array(
             self.find_slice(json)
                 .into_iter()
                 .flat_map(|v| v.to_path())
@@ -558,7 +556,7 @@ mod tests {
     #[test]
     fn find_slice_test() {
         let json: Box<Value> = serde_json::from_str(template_json()).expect("to get json");
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$..book[?(@.author size 10)].title").expect("the path is correct"),
         );
         let v = path.find_slice(&json);
@@ -569,7 +567,7 @@ mod tests {
     #[test]
     fn find_in_array_test() {
         let json: Box<Value> = Box::new(json!([{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.[?(@.verb == 'TEST')]").expect("the path is correct"));
         let v = path.find_slice(&json);
         let js = json!({"verb":"TEST"});
@@ -580,7 +578,7 @@ mod tests {
     fn length_test() {
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.verb == 'TEST')].length()").expect("the path is correct"),
         );
         let v = path.find(&json);
@@ -589,14 +587,14 @@ mod tests {
 
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.length()").expect("the path is correct"));
         assert_eq!(path.find(&json), json!([3]));
 
         // length of search following the wildcard returns correct result
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST","x":3}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.verb == 'TEST')].[*].length()")
                 .expect("the path is correct"),
         );
@@ -604,33 +602,33 @@ mod tests {
 
         // length of object returns 0
         let json: Box<Value> = Box::new(json!({"verb": "TEST"}));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.length()").expect("the path is correct"));
         assert_eq!(path.find(&json), Value::Null);
 
         // length of integer returns null
         let json: Box<Value> = Box::new(json!(1));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.length()").expect("the path is correct"));
         assert_eq!(path.find(&json), Value::Null);
 
         // length of array returns correct result
         let json: Box<Value> = Box::new(json!([[1], [2], [3]]));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.length()").expect("the path is correct"));
         assert_eq!(path.find(&json), json!([3]));
 
         // path does not exist returns length null
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.not.exist.length()").expect("the path is correct"));
         assert_eq!(path.find(&json), Value::Null);
 
         // seraching one value returns correct length
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.verb == 'RUN')].length()").expect("the path is correct"),
         );
 
@@ -641,7 +639,7 @@ mod tests {
         // searching correct path following unexisting key returns length 0
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.verb == 'RUN')].key123.length()")
                 .expect("the path is correct"),
         );
@@ -653,7 +651,7 @@ mod tests {
         // fetching first object returns length null
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.[0].length()").expect("the path is correct"));
 
         let v = path.find(&json);
@@ -662,7 +660,7 @@ mod tests {
 
         // length on fetching the index after search gives length of the object (array)
         let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.prop)].prop.[0].length()").expect("the path is correct"),
         );
 
@@ -672,7 +670,7 @@ mod tests {
 
         // length on fetching the index after search gives length of the object (string)
         let json: Box<Value> = Box::new(json!([{"prop": [["a", "b", "c"], "d"]}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.prop)].prop.[1].length()").expect("the path is correct"),
         );
 
@@ -687,7 +685,7 @@ mod tests {
             "field":"field",
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field[1]").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
@@ -696,7 +694,7 @@ mod tests {
             "field":[0],
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field[1]").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
@@ -708,7 +706,7 @@ mod tests {
             "field":"field",
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field[?(@ == 0)]").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
@@ -720,7 +718,7 @@ mod tests {
             "field":[{"f":1},{"f":0}],
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field[?(@.f_ == 0)]").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
@@ -732,7 +730,7 @@ mod tests {
             "field":[{"f":1},{"f":{"f_":1}}],
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$..f_").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(
@@ -747,12 +745,12 @@ mod tests {
             "field":{"field":[1]},
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field_.field").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.field_.field[?(@ == 1)]").expect("the path is correct"),
         );
         let v = path.find_slice(&json);
@@ -764,7 +762,7 @@ mod tests {
         // searching unexisting value returns length 0
         let json: Box<Value> =
             Box::new(json!([{"verb": "TEST"},{"verb": "TEST"}, {"verb": "RUN"}]));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.verb == \"RUN1\")]").expect("the path is correct"),
         );
         let v = path.find(&json);
@@ -778,7 +776,7 @@ mod tests {
             "field":{"field":1},
         }));
 
-        let path: Box<JsonPath> =
+        let path: Box<JsonPath<Value>> =
             Box::from(JsonPath::try_from("$.field.field.length()").expect("the path is correct"));
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
@@ -786,7 +784,7 @@ mod tests {
         let json: Box<Value> = Box::new(json!({
             "field":[{"a":1},{"a":1}],
         }));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.field[?(@.a == 0)].f.length()").expect("the path is correct"),
         );
         let v = path.find_slice(&json);
@@ -817,14 +815,14 @@ mod tests {
     fn logical_exp_test() {
         let json: Box<Value> = Box::new(json!({"first":{"second":[{"active":1},{"passive":1}]}}));
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(@.does_not_exist && @.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
         let v = path.find_slice(&json);
         assert_eq!(v, vec![NoValue]);
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(@.does_not_exist >= 1.0)]").expect("the path is correct"),
         );
         let v = path.find_slice(&json);
@@ -837,7 +835,7 @@ mod tests {
             "author":"abcd(Rees)",
         }));
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.[?(@.author ~= '(?i)d\\(Rees\\)')]")
                 .expect("the path is correct"),
         );
@@ -850,7 +848,7 @@ mod tests {
     #[test]
     fn logical_not_exp_test() {
         let json: Box<Value> = Box::new(json!({"first":{"second":{"active":1}}}));
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(!@.does_not_exist >= 1.0)]")
                 .expect("the path is correct"),
         );
@@ -863,7 +861,7 @@ mod tests {
             )]
         );
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(!(@.does_not_exist >= 1.0))]")
                 .expect("the path is correct"),
         );
@@ -876,7 +874,7 @@ mod tests {
             )]
         );
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(!(@.second.active == 1) || @.second.active == 1)]")
                 .expect("the path is correct"),
         );
@@ -889,7 +887,7 @@ mod tests {
             )]
         );
 
-        let path: Box<JsonPath> = Box::from(
+        let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::try_from("$.first[?(!@.second.active == 1 && !@.second.active == 1 || !@.second.active == 2)]")
                 .expect("the path is correct"),
         );

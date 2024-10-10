@@ -1,6 +1,7 @@
+use crate::path::JsonLike;
+
 use super::errors::JsonPathParserError;
 use super::parse_json_path;
-use serde_json::Value;
 use std::fmt::{Display, Formatter};
 use std::{convert::TryFrom, str::FromStr};
 
@@ -52,7 +53,10 @@ impl<T: Display> Display for JsonPath<T> {
     }
 }
 
-impl<T> TryFrom<&str> for JsonPath<T> {
+impl<T> TryFrom<&str> for JsonPath<T>
+where
+    T: JsonLike,
+{
     type Error = JsonPathParserError;
 
     /// Parses a string into a [JsonPath].
@@ -65,7 +69,10 @@ impl<T> TryFrom<&str> for JsonPath<T> {
     }
 }
 
-impl<T> FromStr for JsonPath<T> {
+impl<T> FromStr for JsonPath<T>
+where
+    T: JsonLike,
+{
     type Err = JsonPathParserError;
 
     /// Parses a string into a [JsonPath].
