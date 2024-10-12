@@ -378,10 +378,8 @@ where
                         res.push(Slice(el, jsp_idx(&pref, i)))
                     }
                 }
-            } else {
-                if self.process(data) {
-                    res.push(Slice(data, pref))
-                }
+            } else if self.process(data) {
+                res.push(Slice(data, pref))
             }
 
             // match data {

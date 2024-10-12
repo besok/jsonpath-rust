@@ -18,7 +18,7 @@ struct JsonPathParser;
 /// # Errors
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
-pub fn parse_json_path<'a, T>(jp_str: &'a str) -> Result<JsonPath<T>, JsonPathParserError>
+pub fn parse_json_path<T>(jp_str: &str) -> Result<JsonPath<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -34,7 +34,7 @@ where
 /// # Errors
 ///
 /// Returns a variant of [JsonPathParserError] if the parsing operation failed
-fn parse_internal<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPath<T>, JsonPathParserError>
+fn parse_internal<T>(rule: Pair<'_, Rule>) -> Result<JsonPath<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -142,7 +142,7 @@ where
     Ok(JsonPathIndex::UnionIndex(keys))
 }
 
-fn parse_chain_in_operand<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
+fn parse_chain_in_operand<T>(rule: Pair<'_, Rule>) -> Result<Operand<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -168,14 +168,14 @@ where
     Ok(parsed_chain)
 }
 
-fn parse_filter_index<'a, T>(pair: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
+fn parse_filter_index<T>(pair: Pair<'_, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
     Ok(JsonPathIndex::Filter(parse_logic_or(pair.into_inner())?))
 }
 
-fn parse_logic_or<'a, T>(pairs: Pairs<'a, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
+fn parse_logic_or<T>(pairs: Pairs<'_, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -197,9 +197,7 @@ where
     Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
-fn parse_logic_and<'a, T>(
-    pairs: Pairs<'a, Rule>,
-) -> Result<FilterExpression<T>, JsonPathParserError>
+fn parse_logic_and<T>(pairs: Pairs<'_, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -221,8 +219,8 @@ where
     Ok(expr.expect("unreachable: above len() == 0 check should have catched this"))
 }
 
-fn parse_logic_not<'a, T>(
-    mut pairs: Pairs<'a, Rule>,
+fn parse_logic_not<T>(
+    mut pairs: Pairs<'_, Rule>,
 ) -> Result<FilterExpression<T>, JsonPathParserError>
 where
     T: JsonLike,
@@ -245,8 +243,8 @@ where
     }
 }
 
-fn parse_logic_atom<'a, T>(
-    mut pairs: Pairs<'a, Rule>,
+fn parse_logic_atom<T>(
+    mut pairs: Pairs<'_, Rule>,
 ) -> Result<FilterExpression<T>, JsonPathParserError>
 where
     T: JsonLike,
@@ -275,7 +273,7 @@ where
     }
 }
 
-fn parse_atom<'a, T>(rule: Pair<'a, Rule>) -> Result<Operand<T>, JsonPathParserError>
+fn parse_atom<T>(rule: Pair<'_, Rule>) -> Result<Operand<T>, JsonPathParserError>
 where
     T: JsonLike,
 {
@@ -290,7 +288,7 @@ where
     Ok(parsed_atom)
 }
 
-fn parse_index<'a, T>(rule: Pair<'a, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
+fn parse_index<T>(rule: Pair<'_, Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError>
 where
     T: JsonLike,
 {

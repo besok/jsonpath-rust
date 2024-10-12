@@ -20,6 +20,12 @@ impl<T> Wildcard<T> {
     }
 }
 
+impl<T> Default for Wildcard<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, T> Path<'a> for Wildcard<T>
 where
     T: JsonLike,
@@ -34,6 +40,12 @@ where
 /// empty path. Returns incoming data.
 pub struct IdentityPath<T> {
     _t: std::marker::PhantomData<T>,
+}
+
+impl<T> Default for IdentityPath<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> IdentityPath<T> {
@@ -77,7 +89,7 @@ impl<'a, T> RootPointer<'a, T> {
 
 impl<'a, T> Path<'a> for RootPointer<'a, T>
 where
-    T: JsonLike + Clone + core::fmt::Debug + Default + 'a,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -109,7 +121,7 @@ impl<'a, T> Clone for ObjectField<'a, T> {
 
 impl<'a, T> Path<'a> for ObjectField<'a, T>
 where
-    T: JsonLike + Clone + Default + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -178,6 +190,12 @@ where
 /// the top method of the processing ..*
 pub struct DescentWildcard<T> {
     _t: std::marker::PhantomData<T>,
+}
+
+impl<T> Default for DescentWildcard<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> DescentWildcard<T> {

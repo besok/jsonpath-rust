@@ -430,12 +430,9 @@ where
 pub(crate) type PathInstance<'a, T> = Box<dyn Path<'a, Data = T> + 'a>;
 
 /// The major method to process the top part of json part
-pub(crate) fn json_path_instance<'a, T: JsonLike>(
-    json_path: &'a JsonPath<T>,
-    root: &'a T,
-) -> TopPaths<'a, T>
+pub(crate) fn json_path_instance<'a, T>(json_path: &'a JsonPath<T>, root: &'a T) -> TopPaths<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     match json_path {
         JsonPath::Root => TopPaths::RootPointer(RootPointer::new(root)),
