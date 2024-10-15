@@ -13,6 +13,15 @@ mod index;
 /// The module is responsible for processing of the [[JsonPath]] elements
 mod top;
 
+/// The `JsonLike` trait defines a set of methods and associated types for working with JSON-like data structures.
+///
+/// It provides a common interface for accessing and manipulating JSON data,
+/// allowing for operations such as
+///  - retrieving values by key,
+///  - iterating over elements
+/// -  performing various comparisons and transformations.
+///
+/// The trait is implemented for the `serde_json::Value` type already
 pub trait JsonLike:
     Default
     + Clone
