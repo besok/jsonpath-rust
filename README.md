@@ -244,22 +244,26 @@ This is enum type which represents:
 
 - `Slice` - a point to the passed original json
 - `NewValue` - a new json data that has been generated during the path( for instance length operator)
-- `NoValue` - indicates there is no match between given json and jsonpath in the most cases due to absent fields or inconsistent data.
+- `NoValue` - indicates there is no match between given json and jsonpath in the most cases due to absent fields or
+  inconsistent data.
 
 To extract data there are two methods, provided on the `value`:
 
 ```rust
 let v:JsonPathValue<Value> =...
 v.to_data();
-v.slice_or(&some_dafault_value)
+v.slice_or( & some_dafault_value)
 ```
 
 ### Find
 
 there are 4 different functions to find data inside a `value`.
-All take references, to increase reusability. Especially json parsing and jsonpath parsing can take significant time, compared to a simple find.
+All take references, to increase reusability. Especially json parsing and jsonpath parsing can take significant time,
+compared to a simple find.
 
-The methods `find`, `find_as_path`, `find_slice` and `find_slice_ptr` take the same inputs, but handle them differently depending on your usecase. They are further described in the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/enum.JsonPath.html#implementations).
+The methods `find`, `find_as_path`, `find_slice` and `find_slice_ptr` take the same inputs, but handle them differently
+depending on your usecase. They are further described in
+the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/enum.JsonPath.html#implementations).
 
 ```rust
 use jsonpath_rust::{JsonPath, JsonPathValue};
@@ -289,12 +293,18 @@ https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPath.ht
 The internal structure of the `JsonPathIndex` can be found here:
 https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPathIndex.html
 
+### JsonLike
+
+The library provides a trait `JsonLike` that can be implemented for any type.
+This allows you to use the `JsonPath` methods on your own types.
+
 ## How to contribute
 
 TBD
 
 ## How to update version
- - update files
- - commit them
- - add tag `git tag -a v<Version> -m "message"`
- - git push origin <tag_name>
+
+- update files
+- commit them
+- add tag `git tag -a v<Version> -m "message"`
+- git push origin <tag_name>

@@ -52,3 +52,7 @@
     - Change the contract for the struct of errors
 - **`0.7.0`**
     - Bug fixes and api changes
+- **`0.7.1`**
+    - add Display to JsonPath
+- **`0.7.2`**
+    - add JsonLike trait

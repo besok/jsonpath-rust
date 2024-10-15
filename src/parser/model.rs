@@ -1,29 +1,32 @@
-use super::parse_json_path;
 use serde_json::Value;
-use std::{convert::TryFrom, str::FromStr};
+
+use crate::path::JsonLike;
 
 use super::errors::JsonPathParserError;
+use super::parse_json_path;
+use std::fmt::{Display, Formatter};
+use std::{convert::TryFrom, str::FromStr};
 
 /// The basic structures for parsing json paths.
 /// The common logic of the structures pursues to correspond the internal parsing structure.
 ///
 /// usually it's created by using [`FromStr`] or [`TryFrom<&str>`]
 #[derive(Debug, Clone)]
-pub enum JsonPath {
+pub enum JsonPath<T = Value> {
     /// The $ operator
     Root,
     /// Field represents key
     Field(String),
     /// The whole chain of the path.
-    Chain(Vec<JsonPath>),
+    Chain(Vec<JsonPath<T>>),
     /// The .. operator
     Descent(String),
     /// The ..* operator
     DescentW,
     /// The indexes for array
-    Index(JsonPathIndex),
+    Index(JsonPathIndex<T>),
     /// The @ operator
-    Current(Box<JsonPath>),
+    Current(Box<JsonPath<T>>),
     /// The * operator
     Wildcard,
     /// The item uses to define the unresolved state
@@ -32,7 +35,30 @@ pub enum JsonPath {
     Fn(Function),
 }
 
-impl TryFrom<&str> for JsonPath {
+impl<T: Display> Display for JsonPath<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            JsonPath::Root => "$".to_string(),
+            JsonPath::Field(e) => format!(".'{}'", e),
+            JsonPath::Chain(elems) => elems.iter().map(ToString::to_string).collect::<String>(),
+            JsonPath::Descent(e) => {
+                format!("..{}", e)
+            }
+            JsonPath::DescentW => "..*".to_string(),
+            JsonPath::Index(e) => e.to_string(),
+            JsonPath::Current(e) => format!("@{}", e),
+            JsonPath::Wildcard => "[*]".to_string(),
+            JsonPath::Empty => "".to_string(),
+            JsonPath::Fn(e) => format!(".{}", e),
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl<T> TryFrom<&str> for JsonPath<T>
+where
+    T: JsonLike,
+{
     type Error = JsonPathParserError;
 
     /// Parses a string into a [JsonPath].
@@ -45,7 +71,10 @@ impl TryFrom<&str> for JsonPath {
     }
 }
 
-impl FromStr for JsonPath {
+impl<T> FromStr for JsonPath<T>
+where
+    T: JsonLike,
+{
     type Err = JsonPathParserError;
 
     /// Parses a string into a [JsonPath].
@@ -63,34 +92,97 @@ pub enum Function {
     /// length()
     Length,
 }
+
+impl Display for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Function::Length => "length()".to_string(),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 #[derive(Debug, Clone)]
-pub enum JsonPathIndex {
+pub enum JsonPathIndex<T> {
     /// A single element in array
-    Single(Value),
+    Single(T),
     /// Union represents a several indexes
-    UnionIndex(Vec<Value>),
+    UnionIndex(Vec<T>),
     /// Union represents a several keys
     UnionKeys(Vec<String>),
     /// DEfault slice where the items are start/end/step respectively
     Slice(i32, i32, usize),
     /// Filter ?()
-    Filter(FilterExpression),
+    Filter(FilterExpression<T>),
+}
+
+impl<T: Display> Display for JsonPathIndex<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            JsonPathIndex::Single(e) => format!("[{}]", e),
+            JsonPathIndex::UnionIndex(elems) => {
+                format!(
+                    "[{}]",
+                    elems
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            JsonPathIndex::UnionKeys(elems) => {
+                format!(
+                    "[{}]",
+                    elems
+                        .iter()
+                        .map(|el| format!("'{}'", el))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            }
+            JsonPathIndex::Slice(s, e, st) => {
+                format!("[{}:{}:{}]", s, e, st)
+            }
+            JsonPathIndex::Filter(filter) => format!("[?({})]", filter),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum FilterExpression {
+pub enum FilterExpression<T> {
     /// a single expression like a > 2
-    Atom(Operand, FilterSign, Operand),
+    Atom(Operand<T>, FilterSign, Operand<T>),
     /// and with &&
-    And(Box<FilterExpression>, Box<FilterExpression>),
+    And(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
     /// or with ||
-    Or(Box<FilterExpression>, Box<FilterExpression>),
+    Or(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
     /// not with !
-    Not(Box<FilterExpression>),
+    Not(Box<FilterExpression<T>>),
 }
 
-impl FilterExpression {
-    pub fn exists(op: Operand) -> Self {
+impl<T: Display> Display for FilterExpression<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            FilterExpression::Atom(left, sign, right) => {
+                format!("{} {} {}", left, sign, right)
+            }
+            FilterExpression::And(left, right) => {
+                format!("{} && {}", left, right)
+            }
+            FilterExpression::Or(left, right) => {
+                format!("{} || {}", left, right)
+            }
+            FilterExpression::Not(expr) => {
+                format!("!{}", expr)
+            }
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl<T> FilterExpression<T> {
+    pub fn exists(op: Operand<T>) -> Self {
         FilterExpression::Atom(
             op,
             FilterSign::Exists,
@@ -101,14 +193,24 @@ impl FilterExpression {
 
 /// Operand for filtering expressions
 #[derive(Debug, Clone)]
-pub enum Operand {
-    Static(Value),
-    Dynamic(Box<JsonPath>),
+pub enum Operand<T> {
+    Static(T),
+    Dynamic(Box<JsonPath<T>>),
+}
+
+impl<T: Display> Display for Operand<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Operand::Static(e) => e.to_string(),
+            Operand::Dynamic(e) => e.to_string(),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[allow(dead_code)]
-impl Operand {
-    pub fn val(v: Value) -> Self {
+impl<T> Operand<T> {
+    pub fn val(v: T) -> Self {
         Operand::Static(v)
     }
 }
@@ -132,6 +234,28 @@ pub enum FilterSign {
     Exists,
 }
 
+impl Display for FilterSign {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            FilterSign::Equal => "==",
+            FilterSign::Unequal => "!=",
+            FilterSign::Less => "<",
+            FilterSign::Greater => ">",
+            FilterSign::LeOrEq => "<=",
+            FilterSign::GrOrEq => ">=",
+            FilterSign::Regex => "~=",
+            FilterSign::In => "in",
+            FilterSign::Nin => "nin",
+            FilterSign::Size => "size",
+            FilterSign::NoneOf => "noneOf",
+            FilterSign::AnyOf => "anyOf",
+            FilterSign::SubSetOf => "subsetOf",
+            FilterSign::Exists => "exists",
+        };
+        write!(f, "{}", str)
+    }
+}
+
 impl FilterSign {
     pub fn new(key: &str) -> Self {
         match key {
@@ -153,7 +277,10 @@ impl FilterSign {
     }
 }
 
-impl PartialEq for JsonPath {
+impl<T> PartialEq for JsonPath<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (JsonPath::Root, JsonPath::Root) => true,
@@ -171,7 +298,10 @@ impl PartialEq for JsonPath {
     }
 }
 
-impl PartialEq for JsonPathIndex {
+impl<T> PartialEq for JsonPathIndex<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (JsonPathIndex::Slice(s1, e1, st1), JsonPathIndex::Slice(s2, e2, st2)) => {
@@ -190,7 +320,10 @@ impl PartialEq for JsonPathIndex {
     }
 }
 
-impl PartialEq for Operand {
+impl<T> PartialEq for Operand<T>
+where
+    T: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Operand::Static(v1), Operand::Static(v2)) => v1 == v2,

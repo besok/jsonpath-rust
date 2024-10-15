@@ -72,8 +72,9 @@ macro_rules! chain {
 /// ```rust
 /// use jsonpath_rust::{path, JsonPath};
 /// use std::str::FromStr;
+/// use serde_json::Value;
 ///
-/// let path = JsonPath::from_str(".abc.*").unwrap();
+/// let path:JsonPath<Value> = JsonPath::from_str(".abc.*").unwrap();
 /// let path2 = JsonPath::Chain(vec![path!("abc"), path!(*)]);
 /// assert_eq!(path, path2);
 /// ```

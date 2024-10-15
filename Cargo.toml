@@ -1,7 +1,7 @@
 [package]
 name = "jsonpath-rust"
 description = "The library provides the basic functionality to find the set of the data according to the filtering query."
-version = "0.7.0"
+version = "0.7.2"
 authors = ["BorisZhguchev <zhguchev@gmail.com>"]
 edition = "2021"
 license = "MIT"
