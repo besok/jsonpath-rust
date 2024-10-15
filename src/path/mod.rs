@@ -29,27 +29,62 @@ pub trait JsonLike:
     + PartialEq
     + 'static
 {
+    /// Retrieves a reference to the value associated with the given key.
     fn get(&self, key: &str) -> Option<&Self>;
+
+    /// Iterates over the elements with a given prefix and returns a vector of `JsonPathValue`.
     fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self>>;
+
+    /// Returns the length of the array as a `JsonPathValue`.
     fn array_len(&self) -> JsonPathValue<'static, Self>;
+
+    /// Initializes an instance with a specific size.
     fn init_with_usize(cnt: usize) -> Self;
+
+    /// Flattens nested structures and returns a vector of tuples containing references to the elements and their paths.
     fn deep_flatten(&self, pref: String) -> Vec<(&Self, String)>;
+
+    /// Performs a deep search by key and returns a vector of tuples containing references to the elements and their paths.
     fn deep_path_by_key<'a>(
         &'a self,
         key: ObjectField<'a, Self>,
         pref: String,
     ) -> Vec<(&'a Self, String)>;
+
+    /// Converts the element to an `Option<u64>`.
     fn as_u64(&self) -> Option<u64>;
+
+    /// Checks if the element is an array.
     fn is_array(&self) -> bool;
+
+    /// Converts the element to an `Option<&Vec<Self>>`.
     fn as_array(&self) -> Option<&Vec<Self>>;
+
+    /// Compares the size of two vectors of references to elements.
     fn size(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Checks if the left vector is a subset of the right vector.
     fn sub_set_of(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Checks if any element in the left vector is present in the right vector.
     fn any_of(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Checks if the elements in the left vector match the regex pattern in the right vector.
     fn regex(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Checks if any element in the left vector is inside the right vector.
     fn inside(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Ensures the number on the left side is less than the number on the right side.
     fn less(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Compares elements for equality.
     fn eq(left: Vec<&Self>, right: Vec<&Self>) -> bool;
+
+    /// Returns a null value.
     fn null() -> Self;
+
+    /// Creates an array from a vector of elements.
     fn array(data: Vec<Self>) -> Self;
 }
 
@@ -363,7 +398,7 @@ pub enum TopPaths<'a, T> {
 
 impl<'a, T> Path<'a> for TopPaths<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -465,10 +500,141 @@ where
 /// The method processes the operand inside the filter expressions
 fn process_operand<'a, T>(op: &'a Operand<T>, root: &'a T) -> PathInstance<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     Box::new(match op {
         Operand::Static(v) => json_path_instance(&JsonPath::Root, v),
         Operand::Dynamic(jp) => json_path_instance(jp, root),
     })
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::path::JsonLike;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn value_eq_test() {
+        let left = json!({"value":42});
+        let right = json!({"value":42});
+        let right_uneq = json!([42]);
+        assert!(&left.eq(&right));
+        assert!(!&left.eq(&right_uneq));
+    }
+
+    #[test]
+    fn vec_value_test() {
+        let left = json!({"value":42});
+        let left1 = json!(42);
+        let left2 = json!([1, 2, 3]);
+        let left3 = json!({"value2":[42],"value":[42]});
+
+        let right = json!({"value":42});
+        let right1 = json!(42);
+        let right2 = json!([1, 2, 3]);
+        let right3 = json!({"value":[42],"value2":[42]});
+
+        assert!(JsonLike::eq(vec![&left], vec![&right]));
+
+        assert!(!JsonLike::eq(vec![], vec![&right]));
+        assert!(!JsonLike::eq(vec![&right], vec![]));
+
+        assert!(JsonLike::eq(
+            vec![&left, &left1, &left2, &left3],
+            vec![&right, &right1, &right2, &right3]
+        ));
+
+        assert!(!JsonLike::eq(
+            vec![&left1, &left, &left2, &left3],
+            vec![&right, &right1, &right2, &right3]
+        ));
+    }
+
+    #[test]
+    fn less_value_test() {
+        let left = json!(10);
+        let right = json!(11);
+
+        assert!(JsonLike::less(vec![&left], vec![&right]));
+        assert!(!JsonLike::less(vec![&right], vec![&left]));
+
+        let left = json!(-10);
+        let right = json!(-11);
+
+        assert!(!JsonLike::less(vec![&left], vec![&right]));
+        assert!(JsonLike::less(vec![&right], vec![&left]));
+
+        let left = json!(-10.0);
+        let right = json!(-11.0);
+
+        assert!(!JsonLike::less(vec![&left], vec![&right]));
+        assert!(JsonLike::less(vec![&right], vec![&left]));
+
+        assert!(!JsonLike::less(vec![], vec![&right]));
+        assert!(!JsonLike::less(vec![&right, &right], vec![&left]));
+    }
+
+    #[test]
+    fn regex_test() {
+        let right = json!("[a-zA-Z]+[0-9]#[0-9]+");
+        let left1 = json!("a11#");
+        let left2 = json!("a1#1");
+        let left3 = json!("a#11");
+        let left4 = json!("#a11");
+
+        assert!(JsonLike::regex(
+            vec![&left1, &left2, &left3, &left4],
+            vec![&right]
+        ));
+        assert!(!JsonLike::regex(vec![&left1, &left3, &left4], vec![&right]))
+    }
+
+    #[test]
+    fn any_of_test() {
+        let right = json!([1, 2, 3, 4, 5, 6]);
+        let left = json!([1, 100, 101]);
+        assert!(JsonLike::any_of(vec![&left], vec![&right]));
+
+        let left = json!([11, 100, 101]);
+        assert!(!JsonLike::any_of(vec![&left], vec![&right]));
+
+        let left1 = json!(1);
+        let left2 = json!(11);
+        assert!(JsonLike::any_of(vec![&left1, &left2], vec![&right]));
+    }
+
+    #[test]
+    fn sub_set_of_test() {
+        let left1 = json!(1);
+        let left2 = json!(2);
+        let left3 = json!(3);
+        let left40 = json!(40);
+        let right = json!([1, 2, 3, 4, 5, 6]);
+        assert!(JsonLike::sub_set_of(
+            vec![&Value::Array(vec![
+                left1.clone(),
+                left2.clone(),
+                left3.clone()
+            ])],
+            vec![&right]
+        ));
+        assert!(!JsonLike::sub_set_of(
+            vec![&Value::Array(vec![left1, left2, left3, left40])],
+            vec![&right]
+        ));
+    }
+
+    #[test]
+    fn size_test() {
+        let left1 = json!("abc");
+        let left2 = json!([1, 2, 3]);
+        let left3 = json!([1, 2, 3, 4]);
+        let right = json!(3);
+        let right1 = json!(4);
+        assert!(JsonLike::size(vec![&left1], vec![&right]));
+        assert!(JsonLike::size(vec![&left2], vec![&right]));
+        assert!(!JsonLike::size(vec![&left3], vec![&right]));
+        assert!(JsonLike::size(vec![&left3], vec![&right1]));
+    }
 }

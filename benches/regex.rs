@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 struct SearchData {
     json: serde_json::Value,
-    path: JsonPath<Value>,
+    path: JsonPath,
 }
 
 const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";

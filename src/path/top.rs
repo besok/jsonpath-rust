@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::jsp_obj;
 use crate::parser::model::*;
 use crate::path::{json_path_instance, JsonPathValue, Path};
@@ -258,7 +256,7 @@ pub struct Chain<'a, T> {
 
 impl<'a, T> Chain<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     pub fn new(chain: Vec<TopPaths<'a, T>>, is_search_length: bool) -> Self {
         Chain {
@@ -314,7 +312,7 @@ where
 
 impl<'a, T> Path<'a> for Chain<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 

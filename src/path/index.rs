@@ -80,7 +80,7 @@ impl<T> ArraySlice<T> {
 
 impl<'a, T> Path<'a> for ArraySlice<T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -118,7 +118,7 @@ impl<T> ArrayIndex<T> {
 
 impl<'a, T> Path<'a> for ArrayIndex<T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -140,7 +140,7 @@ pub struct Current<'a, T> {
 
 impl<'a, T> Current<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     pub(crate) fn from(jp: &'a JsonPath<T>, root: &'a T) -> Self {
         match jp {
@@ -164,7 +164,7 @@ where
 
 impl<'a, T> Path<'a> for Current<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -183,7 +183,7 @@ pub struct UnionIndex<'a, T> {
 
 impl<'a, T> UnionIndex<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     pub fn from_indexes(elems: &'a [T]) -> Self {
         let mut indexes: Vec<TopPaths<'a, T>> = vec![];
@@ -213,7 +213,7 @@ where
 
 impl<'a, T> Path<'a> for UnionIndex<'a, T>
 where
-    T: JsonLike + Default + Clone + Debug,
+    T: JsonLike,
 {
     type Data = T;
 
@@ -288,10 +288,6 @@ where
                 JsonPathValue::vec_as_data(left),
                 JsonPathValue::vec_as_data(right),
             ),
-            // eq(
-            //     JsonPathValue::vec_as_data(left),
-            //     JsonPathValue::vec_as_data(right),
-            // ),
             FilterSign::Unequal => !FilterPath::process_atom(&FilterSign::Equal, left, right),
             FilterSign::Less => <T as JsonLike>::less(
                 JsonPathValue::vec_as_data(left),

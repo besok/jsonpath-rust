@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 use crate::path::JsonLike;
 
 use super::errors::JsonPathParserError;
@@ -10,7 +12,7 @@ use std::{convert::TryFrom, str::FromStr};
 ///
 /// usually it's created by using [`FromStr`] or [`TryFrom<&str>`]
 #[derive(Debug, Clone)]
-pub enum JsonPath<T> {
+pub enum JsonPath<T = Value> {
     /// The $ operator
     Root,
     /// Field represents key
