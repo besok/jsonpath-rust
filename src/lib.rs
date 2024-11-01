@@ -99,7 +99,7 @@
 //! [`there`]: https://goessner.net/articles/JsonPath/
 
 pub use parser::model::JsonPath;
-use parser::JsonPathParserError;
+pub use parser::JsonPathParserError;
 use serde_json::Value;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -263,10 +263,10 @@ macro_rules! jp_v {
 /// Represents the path of the found json data
 type JsPathStr = String;
 
-pub(crate) fn jsp_idx(prefix: &str, idx: usize) -> String {
+pub fn jsp_idx(prefix: &str, idx: usize) -> String {
     format!("{}[{}]", prefix, idx)
 }
-pub(crate) fn jsp_obj(prefix: &str, key: &str) -> String {
+pub fn jsp_obj(prefix: &str, key: &str) -> String {
     format!("{}.['{}']", prefix, key)
 }
 

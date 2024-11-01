@@ -150,7 +150,7 @@ impl<T> FnPath<T> {
 
 impl<'a, T> Path<'a> for FnPath<T>
 where
-    T: JsonLike + 'static,
+    T: JsonLike,
 {
     type Data = T;
 

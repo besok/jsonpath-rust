@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 
 use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
 pub use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
+pub use crate::path::top::ObjectField;
 use crate::path::top::*;
 
 /// The module is in charge of processing [[JsonPathIndex]] elements
@@ -111,7 +112,7 @@ impl JsonLike for Value {
         self.get(key)
     }
 
-    fn itre(&self, pref: String) -> Vec<JsonPathValue<'_, Self>> {
+    fn itre(&self, pref: String) -> Vec<JsonPathValue<Self>> {
         let res = match self {
             Value::Array(elems) => {
                 let mut res = vec![];
@@ -135,6 +136,7 @@ impl JsonLike for Value {
             res
         }
     }
+
     fn array_len(&self) -> JsonPathValue<'static, Self> {
         match self {
             Value::Array(elems) => JsonPathValue::NewValue(json!(elems.len())),
