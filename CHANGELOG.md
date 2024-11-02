@@ -56,3 +56,5 @@
     - add Display to JsonPath
 - **`0.7.2`**
     - add JsonLike trait
+- **`0.7.3`**
+    - make some methods public
