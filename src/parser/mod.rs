@@ -8,6 +8,7 @@ pub(crate) mod model;
 pub(crate) mod parser;
 
 pub use errors::JsonPathParserError;
+pub use model::FilterExpression;
 pub use model::JsonPath;
 pub use model::JsonPathIndex;
 pub use parser::{parse_json_path, Rule};
