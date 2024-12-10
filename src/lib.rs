@@ -174,7 +174,7 @@ pub enum JsonPtr<'a, Data> {
 }
 
 /// Allow deref from json pointer to value.
-impl<'a> Deref for JsonPtr<'a, Value> {
+impl Deref for JsonPtr<'_, Value> {
     type Target = Value;
 
     fn deref(&self) -> &Self::Target {
