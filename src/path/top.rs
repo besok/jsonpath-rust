@@ -111,7 +111,7 @@ impl<'a, T> ObjectField<'a, T> {
     }
 }
 
-impl<'a, T> Clone for ObjectField<'a, T> {
+impl<T> Clone for ObjectField<'_, T> {
     fn clone(&self) -> Self {
         ObjectField::new(self.key)
     }
