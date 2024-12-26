@@ -100,12 +100,7 @@ pub trait JsonLike:
     /// The path is specified as a string and can be obtained from the query.
     ///
     /// # Arguments
-    /// * `path` - A json path to the element specified as a string.
-    /// Not all elements are supported,
-    /// namely supported only the elements with the direct access to the fields
-    /// - root
-    /// - field
-    /// - index
+    /// * `path` -  A json path to the element specified as a string (root, field, index only).
     fn reference<T>(&self, path: T) -> Result<Option<&Self>, JsonPathParserError>
     where
         T: Into<JsonPathStr>;
