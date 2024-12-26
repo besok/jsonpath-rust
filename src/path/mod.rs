@@ -114,11 +114,11 @@ pub trait JsonLike:
     ///
     /// # Arguments
     /// * `path` -  A json path to the element specified as a string.
-    ///             Not all elements are supported,
-    ///             namely supported only the elements with the direct access to the fields
-    ///                 - root
-    ///                 - field
-    ///                 - index
+    ///   Not all elements are supported,
+    ///   namely supported only the elements with the direct access to the fields
+    ///   - root
+    ///   - field
+    ///   - index
     ///
     /// # Examples
     ///
