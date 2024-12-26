@@ -113,12 +113,12 @@ pub trait JsonLike:
     /// Retrieves a mutable reference to the element at the specified path.
     ///
     /// # Arguments
-    /// * `path` - A json path to the element specified as a string.
-    /// Not all elements are supported,
-    /// namely supported only the elements with the direct access to the fields
-    /// - root
-    /// - field
-    /// - index
+    /// * `path` -  A json path to the element specified as a string.
+    ///             Not all elements are supported,
+    ///             namely supported only the elements with the direct access to the fields
+    ///                 - root
+    ///                 - field
+    ///                 - index
     ///
     /// # Examples
     ///
