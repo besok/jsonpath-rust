@@ -126,9 +126,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::path::JsonLike;
+    use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{jp_v, JsonPath, JsonPathParserError, JsonPathValue};
-    use crate::{JsonPathQuery};
     use serde_json::{json, Value};
     use std::ops::Deref;
 
