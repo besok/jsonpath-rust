@@ -298,6 +298,61 @@ https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPathInd
 The library provides a trait `JsonLike` that can be implemented for any type.
 This allows you to use the `JsonPath` methods on your own types.
 
+### Update the JsonLike structure by path
+
+The library does not provide the functionality to update the json structure in the query itself.
+Instead, the library provides the ability to update the json structure by the path.
+Thus, the user needs to find a path for the `JsonLike` structure and update it manually.
+
+There are two methods in the `JsonLike` trait:
+
+- `reference_mut` - returns a mutable reference to the element by the path
+- `reference` - returns a reference to the element by the path
+  They accept a `JsonPath` instance and return a `Option<&mut Value>` or `Option<&Value>` respectively.
+  The path is supported with the limited elements namely only the elements with the direct access:
+- root
+- field
+- index
+  The path can be obtained manually or `find_as_path` method can be used.
+
+```rust
+#[test]
+fn update_by_path_test() -> Result<(), JsonPathParserError> {
+    let mut json = json!([
+            {"verb": "RUN","distance":[1]},
+            {"verb": "TEST"},
+            {"verb": "DO NOT RUN"}
+        ]);
+
+    let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]")?);
+    let elem = path
+        .find_as_path(&json)
+        .get(0)
+        .cloned()
+        .ok_or(JsonPathParserError::InvalidJsonPath("".to_string()))?;
+
+    if let Some(v) = json
+        .reference_mut(elem)?
+        .and_then(|v| v.as_object_mut())
+        .and_then(|v| v.get_mut("distance"))
+        .and_then(|v| v.as_array_mut())
+    {
+        v.push(json!(2))
+    }
+
+    assert_eq!(
+        json,
+        json!([
+                {"verb": "RUN","distance":[1,2]},
+                {"verb": "TEST"},
+                {"verb": "DO NOT RUN"}
+            ])
+    );
+
+    Ok(())
+}
+```
+
 ## How to contribute
 
 TBD

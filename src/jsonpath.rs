@@ -1,9 +1,8 @@
 use crate::path::json_path_instance;
 use crate::path::JsonLike;
-use crate::JsonPath;
 use crate::JsonPathValue;
-use crate::JsonPathValue::NoValue;
 use crate::JsonPtr;
+use crate::{JsonPath, JsonPathStr};
 
 impl<T> JsonPath<T>
 where
@@ -39,7 +38,7 @@ where
         let has_v: Vec<JsonPathValue<'_, T>> = res.into_iter().filter(|v| v.has_value()).collect();
 
         if has_v.is_empty() {
-            vec![NoValue]
+            vec![JsonPathValue::NoValue]
         } else {
             has_v
         }
@@ -105,33 +104,31 @@ where
     ///
     /// ## Example
     /// ```rust
-    /// use jsonpath_rust::{JsonPath, JsonPathValue};
+    /// use jsonpath_rust::{JsonPathStr, JsonPath, JsonPathValue};
     /// use serde_json::{Value, json};
     /// # use std::str::FromStr;
     ///
     /// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
     /// let path = JsonPath::try_from("$.first.second[?(@.active)]").unwrap();
-    /// let slice_of_data: Value = path.find_as_path(&data);
+    /// let slice_of_data: Vec<JsonPathStr> = path.find_as_path(&data);
     ///
     /// let expected_path = "$.['first'].['second'][0]".to_string();
-    /// assert_eq!(slice_of_data, Value::Array(vec![Value::String(expected_path)]));
+    /// assert_eq!(slice_of_data, vec![expected_path]);
     /// ```
-    pub fn find_as_path(&self, json: &T) -> T {
-        T::array(
-            self.find_slice(json)
-                .into_iter()
-                .flat_map(|v| v.to_path())
-                .map(|v| v.into())
-                .collect(),
-        )
+    pub fn find_as_path(&self, json: &T) -> Vec<JsonPathStr> {
+        self.find_slice(json)
+            .into_iter()
+            .flat_map(|v| v.to_path())
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::path::JsonLike;
     use crate::JsonPathQuery;
     use crate::JsonPathValue::{NoValue, Slice};
-    use crate::{jp_v, JsonPath, JsonPathValue};
+    use crate::{jp_v, JsonPath, JsonPathParserError, JsonPathValue};
     use serde_json::{json, Value};
     use std::ops::Deref;
 
@@ -901,17 +898,39 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn no_value_len_field_test() {
-    //     let json: Box<Value> =
-    //         Box::new(json!([{"verb": "TEST","a":[1,2,3]},{"verb": "TEST","a":[1,2,3]},{"verb": "TEST"}, {"verb": "RUN"}]));
-    //     let path: Box<JsonPath> = Box::from(
-    //         JsonPath::try_from("$.[?(@.verb == 'TEST')].a.length()")
-    //             .expect("the path is correct"),
-    //     );
-    //     let finder = JsonPathFinder::new(json, path);
-    //
-    //     let v = finder.find_slice();
-    //     assert_eq!(v, vec![NewValue(json!(3))]);
-    // }
+    #[test]
+    fn update_by_path_test() -> Result<(), JsonPathParserError> {
+        let mut json = json!([
+            {"verb": "RUN","distance":[1]},
+            {"verb": "TEST"},
+            {"verb": "DO NOT RUN"}
+        ]);
+
+        let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]")?);
+        let elem = path
+            .find_as_path(&json)
+            .first()
+            .cloned()
+            .ok_or(JsonPathParserError::InvalidJsonPath("".to_string()))?;
+
+        if let Some(v) = json
+            .reference_mut(elem)?
+            .and_then(|v| v.as_object_mut())
+            .and_then(|v| v.get_mut("distance"))
+            .and_then(|v| v.as_array_mut())
+        {
+            v.push(json!(2))
+        }
+
+        assert_eq!(
+            json,
+            json!([
+                {"verb": "RUN","distance":[1,2]},
+                {"verb": "TEST"},
+                {"verb": "DO NOT RUN"}
+            ])
+        );
+
+        Ok(())
+    }
 }
