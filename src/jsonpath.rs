@@ -128,7 +128,7 @@ mod tests {
     use crate::path::JsonLike;
     use crate::JsonPathValue::{NoValue, Slice};
     use crate::{jp_v, JsonPath, JsonPathParserError, JsonPathValue};
-    use crate::{JsonPathQuery, JsonPtr};
+    use crate::{JsonPathQuery};
     use serde_json::{json, Value};
     use std::ops::Deref;
 
@@ -909,7 +909,7 @@ mod tests {
         let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]")?);
         let elem = path
             .find_as_path(&json)
-            .get(0)
+            .first()
             .cloned()
             .ok_or(JsonPathParserError::InvalidJsonPath("".to_string()))?;
 

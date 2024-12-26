@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{jsp_idx, jsp_obj, JsonPathParserError, JsonPathStr, JsonPathValue, JsonPtr};
+use crate::{jsp_idx, jsp_obj, JsonPathParserError, JsonPathStr, JsonPathValue};
 use regex::Regex;
 use serde_json::{json, Value};
 
