@@ -58,3 +58,5 @@
     - add JsonLike trait
 - **`0.7.3`**
     - make some methods public
+- **`0.7.5`**
+    - add reference and reference_mut methods

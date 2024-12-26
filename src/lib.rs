@@ -166,6 +166,7 @@ pub trait JsonPathQuery {
 
 /// Json paths may return either pointers to the original json or new data. This custom pointer type allows us to handle both cases.
 /// Unlike JsonPathValue, this type does not represent NoValue to allow the implementation of Deref.
+#[derive(Debug, PartialEq, Clone)]
 pub enum JsonPtr<'a, Data> {
     /// The slice of the initial json data
     Slice(&'a Data),
@@ -261,7 +262,7 @@ macro_rules! jp_v {
 }
 
 /// Represents the path of the found json data
-type JsPathStr = String;
+pub type JsonPathStr = String;
 
 pub fn jsp_idx(prefix: &str, idx: usize) -> String {
     format!("{}[{}]", prefix, idx)
@@ -275,7 +276,7 @@ pub fn jsp_obj(prefix: &str, key: &str) -> String {
 #[derive(Debug, PartialEq, Clone)]
 pub enum JsonPathValue<'a, Data> {
     /// The slice of the initial json data
-    Slice(&'a Data, JsPathStr),
+    Slice(&'a Data, JsonPathStr),
     /// The new data that was generated from the input data (like length operator)
     NewValue(Data),
     /// The absent value that indicates the input data is not matched to the given json path (like the absent fields)
@@ -293,7 +294,7 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
     }
 
     /// Transforms given value into path
-    pub fn to_path(self) -> Option<JsPathStr> {
+    pub fn to_path(self) -> Option<JsonPathStr> {
         match self {
             Slice(_, path) => Some(path),
             _ => None,
@@ -313,7 +314,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }
 
-    pub fn map_vec(data: Vec<(&'a Data, JsPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
+    pub fn map_vec(data: Vec<(&'a Data, JsonPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
         data.into_iter()
             .map(|(data, pref)| Slice(data, pref))
             .collect()
@@ -321,7 +322,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
     pub fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
-        F: FnOnce(&'a Data, JsPathStr) -> Vec<(&'a Data, JsPathStr)>,
+        F: FnOnce(&'a Data, JsonPathStr) -> Vec<(&'a Data, JsonPathStr)>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref)
@@ -336,7 +337,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
     pub fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
     where
-        F: FnOnce(&'a Data, JsPathStr) -> Vec<JsonPathValue<'a, Data>>,
+        F: FnOnce(&'a Data, JsonPathStr) -> Vec<JsonPathValue<'a, Data>>,
     {
         match self {
             Slice(r, pref) => mapper(r, pref),
@@ -357,7 +358,7 @@ impl<'a, Data> JsonPathValue<'a, Data> {
             })
             .collect()
     }
-    pub fn vec_as_pair(input: Vec<JsonPathValue<'a, Data>>) -> Vec<(&'a Data, JsPathStr)> {
+    pub fn vec_as_pair(input: Vec<JsonPathValue<'a, Data>>) -> Vec<(&'a Data, JsonPathStr)> {
         input
             .into_iter()
             .filter_map(|v| match v {

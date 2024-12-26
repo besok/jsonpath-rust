@@ -24,4 +24,6 @@ pub enum JsonPathParserError {
     InvalidTopLevelRule(Rule),
     #[error("Failed to get inner pairs for {0}")]
     EmptyInner(String),
+    #[error("Invalid json path: {0}")]
+    InvalidJsonPath(String),
 }

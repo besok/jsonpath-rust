@@ -1,10 +1,11 @@
 use std::fmt::Debug;
 
-use crate::{jsp_idx, jsp_obj, JsonPathValue};
+use crate::{jsp_idx, jsp_obj, JsonPathParserError, JsonPathStr, JsonPathValue, JsonPtr};
 use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::parser::model::{Function, JsonPath, JsonPathIndex, Operand};
+use crate::parser::parse_json_path;
 pub use crate::path::index::{ArrayIndex, ArraySlice, Current, FilterPath, UnionIndex};
 pub use crate::path::top::ObjectField;
 use crate::path::top::*;
@@ -94,24 +95,78 @@ pub trait JsonLike:
 
     /// Creates an array from a vector of elements.
     fn array(data: Vec<Self>) -> Self;
+
+    /// Retrieves a reference to the element at the specified path.
+    /// The path is specified as a string and can be obtained from the query.
+    ///
+    /// # Arguments
+    /// * `path` - A json path to the element specified as a string.
+    /// Not all elements are supported,
+    /// namely supported only the elements with the direct access to the fields
+    /// - root
+    /// - field
+    /// - index
+    fn reference<T>(&self, path: T) -> Result<Option<&Self>, JsonPathParserError>
+    where
+        T: Into<JsonPathStr>;
+
+    /// Retrieves a mutable reference to the element at the specified path.
+    ///
+    /// # Arguments
+    /// * `path` - A json path to the element specified as a string.
+    /// Not all elements are supported,
+    /// namely supported only the elements with the direct access to the fields
+    /// - root
+    /// - field
+    /// - index
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use serde_json::json;
+    /// use jsonpath_rust::{JsonPath, JsonPathParserError};
+    /// use jsonpath_rust::path::JsonLike;
+    ///
+    /// let mut json = json!([
+    ///     {"verb": "RUN","distance":[1]},
+    ///     {"verb": "TEST"},
+    ///     {"verb": "DO NOT RUN"}
+    /// ]);
+    ///
+    /// let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]").unwrap());
+    /// let elem = path
+    ///     .find_as_path(&json)
+    ///     .get(0)
+    ///     .cloned()
+    ///     .ok_or(JsonPathParserError::InvalidJsonPath("".to_string())).unwrap();
+    ///
+    /// if let Some(v) = json
+    ///     .reference_mut(elem).unwrap()
+    ///     .and_then(|v| v.as_object_mut())
+    ///     .and_then(|v| v.get_mut("distance"))
+    ///     .and_then(|v| v.as_array_mut())
+    /// {
+    ///     v.push(json!(2))
+    /// }
+    ///
+    /// assert_eq!(
+    ///     json,
+    ///     json!([
+    ///         {"verb": "RUN","distance":[1,2]},
+    ///         {"verb": "TEST"},
+    ///         {"verb": "DO NOT RUN"}
+    ///     ])
+    /// );
+    /// ```
+    fn reference_mut<T>(&mut self, path: T) -> Result<Option<&mut Self>, JsonPathParserError>
+    where
+        T: Into<JsonPathStr>;
 }
 
 impl JsonLike for Value {
-    fn is_array(&self) -> bool {
-        self.is_array()
-    }
-    fn array(data: Vec<Self>) -> Self {
-        Value::Array(data)
-    }
-
-    fn null() -> Self {
-        Value::Null
-    }
-
     fn get(&self, key: &str) -> Option<&Self> {
         self.get(key)
     }
-
     fn itre(&self, pref: String) -> Vec<JsonPathValue<Self>> {
         let res = match self {
             Value::Array(elems) => {
@@ -147,6 +202,7 @@ impl JsonLike for Value {
     fn init_with_usize(cnt: usize) -> Self {
         json!(cnt)
     }
+
     fn deep_flatten(&self, pref: String) -> Vec<(&Self, String)> {
         let mut acc = vec![];
         match self {
@@ -168,6 +224,7 @@ impl JsonLike for Value {
         }
         acc
     }
+
     fn deep_path_by_key<'a>(
         &'a self,
         key: ObjectField<'a, Self>,
@@ -200,7 +257,9 @@ impl JsonLike for Value {
     fn as_u64(&self) -> Option<u64> {
         self.as_u64()
     }
-
+    fn is_array(&self) -> bool {
+        self.is_array()
+    }
     fn as_array(&self) -> Option<&Vec<Self>> {
         self.as_array()
     }
@@ -362,6 +421,46 @@ impl JsonLike for Value {
             left.iter().zip(right).map(|(a, b)| a.eq(&b)).all(|a| a)
         }
     }
+
+    fn null() -> Self {
+        Value::Null
+    }
+
+    fn array(data: Vec<Self>) -> Self {
+        Value::Array(data)
+    }
+
+    fn reference<T>(&self, path: T) -> Result<Option<&Self>, JsonPathParserError>
+    where
+        T: Into<JsonPathStr>,
+    {
+        Ok(self.pointer(&path_to_json_path(path.into())?))
+    }
+
+    fn reference_mut<T>(&mut self, path: T) -> Result<Option<&mut Self>, JsonPathParserError>
+    where
+        T: Into<JsonPathStr>,
+    {
+        Ok(self.pointer_mut(&path_to_json_path(path.into())?))
+    }
+}
+
+fn path_to_json_path(path: JsonPathStr) -> Result<String, JsonPathParserError> {
+    convert_part(&parse_json_path::<Value>(path.as_str())?)
+}
+
+fn convert_part(path: &JsonPath) -> Result<String, JsonPathParserError> {
+    match path {
+        JsonPath::Chain(elems) => elems
+            .iter()
+            .map(convert_part)
+            .collect::<Result<String, JsonPathParserError>>(),
+
+        JsonPath::Index(JsonPathIndex::Single(v)) => Ok(format!("/{}", v)),
+        JsonPath::Field(e) => Ok(format!("/{}", e)),
+        JsonPath::Root => Ok("".to_string()),
+        e => Err(JsonPathParserError::InvalidJsonPath(e.to_string())),
+    }
 }
 
 /// The trait defining the behaviour of processing every separated element.
@@ -519,8 +618,9 @@ where
 
 #[cfg(test)]
 mod tests {
-
-    use crate::path::JsonLike;
+    use crate::path::JsonPathIndex;
+    use crate::path::{convert_part, JsonLike};
+    use crate::{idx, path, JsonPath, JsonPathParserError};
     use serde_json::{json, Value};
 
     #[test]
@@ -645,5 +745,78 @@ mod tests {
         assert!(JsonLike::size(vec![&left2], vec![&right]));
         assert!(!JsonLike::size(vec![&left3], vec![&right]));
         assert!(JsonLike::size(vec![&left3], vec![&right1]));
+    }
+
+    #[test]
+    fn convert_paths() -> Result<(), JsonPathParserError> {
+        let r = convert_part(&JsonPath::Chain(vec![
+            path!($),
+            path!("abc"),
+            path!(idx!(1)),
+        ]))?;
+        assert_eq!(r, "/abc/1");
+
+        assert!(convert_part(&JsonPath::Chain(vec![path!($), path!(.."abc")])).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_references() -> Result<(), JsonPathParserError> {
+        let mut json = json!({
+            "a": {
+                "b": {
+                    "c": 42
+                }
+            }
+        });
+
+        let path_str = convert_part(&JsonPath::Chain(vec![path!("a"), path!("b"), path!("c")]))?;
+
+        if let Some(v) = json.pointer_mut(&path_str) {
+            *v = json!(43);
+        }
+
+        assert_eq!(
+            json,
+            json!({
+                "a": {
+                    "b": {
+                        "c": 43
+                    }
+                }
+            })
+        );
+
+        Ok(())
+    }
+    #[test]
+    fn test_js_reference() -> Result<(), JsonPathParserError> {
+        let mut json = json!({
+            "a": {
+                "b": {
+                    "c": 42
+                }
+            }
+        });
+
+        let path = "$.a.b.c";
+
+        if let Some(v) = json.reference_mut(path)? {
+            *v = json!(43);
+        }
+
+        assert_eq!(
+            json,
+            json!({
+                "a": {
+                    "b": {
+                        "c": 43
+                    }
+                }
+            })
+        );
+
+        Ok(())
     }
 }
