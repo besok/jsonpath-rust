@@ -379,10 +379,27 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 #[cfg(test)]
 mod tests {
+    use colored::Colorize;
     use serde_json::Value;
 
     use crate::JsonPath;
     use std::str::FromStr;
+
+    #[derive(serde::Deserialize)]
+    struct RFC9535Test {
+        name: String,
+        selector: String,
+        document: Option<Value>,
+        result: Option<Value>,
+        results: Option<Vec<Value>>,
+        #[serde(default)]
+        invalid_selector: bool,
+    }
+
+    struct RFC9535Failure {
+        name: String,
+        message: String,
+    }
 
     #[test]
     fn to_string_test() {
@@ -397,5 +414,75 @@ mod tests {
             path.to_string(),
             "$.'a'.'a'..book[1:3:1][*][1]['a','b'][?(@ exists )][?(@.'verb' == \"TEST\")].'a'.length()"
         );
+    }
+
+    #[test]
+    fn rfc9535_compliance_test() {
+        let file = std::fs::File::open("./src/fixtures/rfc9535-cts.json")
+            .expect("src/fixtures/rfc9535-cts.json must exist");
+
+        let reader = std::io::BufReader::new(file);
+
+        let suite: Vec<RFC9535Test> = serde_json::from_reader(reader)
+            .expect("compliance test suite file has valid structure");
+
+        let failures = suite
+            .iter()
+            .filter_map(|test| match rfc9535_compliance_test_case(test) {
+                Ok(_) => None,
+                Err(message) => Some(RFC9535Failure {
+                    name: test.name.clone(),
+                    message,
+                }),
+            })
+            .inspect(|failure| {
+                println!(
+                    "{}: {}",
+                    failure.name.red().bold(),
+                    failure.message.replace("\n", "\\n")
+                );
+            })
+            .count();
+
+        println!(
+            "\n{}:\n{}\n{}",
+            "RFC9535 Compliance tests".underline().bold(),
+            format!("Passed: {}", suite.len() - failures).green().bold(),
+            format!("Failed: {}", failures).red().bold()
+        );
+
+        assert!(failures != 0, "compliance test should be failing for now");
+    }
+
+    fn rfc9535_compliance_test_case(test: &RFC9535Test) -> Result<(), String> {
+        let path = JsonPath::<Value>::try_from(test.selector.as_str());
+        if test.invalid_selector && path.is_ok() {
+            return Err(format!(
+                "path should have been considered invalid: {}",
+                test.selector
+            ));
+        }
+
+        let path = path.map_err(|e| e.to_string())?;
+        let doc = test.document.as_ref().ok_or("document is required")?;
+        let actual = std::panic::catch_unwind(|| path.find(doc));
+        if let Err(e) = &actual {
+            return Err(format!("panicked: {:?}", e));
+        }
+        let actual = actual.unwrap();
+
+        if let Some(expected) = &test.result {
+            if actual != *expected {
+                return Err("actual did not match expected".to_string());
+            }
+        } else if let Some(expected) = &test.results {
+            if !expected.iter().any(|exp| actual == *exp) {
+                return Err("actual result did not match any expected alternatives".to_string());
+            }
+        } else {
+            return Err("no assertions were specified".to_string());
+        }
+
+        Ok(())
     }
 }
