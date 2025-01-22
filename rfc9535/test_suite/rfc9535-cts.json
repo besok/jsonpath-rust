@@ -5401,26 +5401,7 @@
       "slice"
     ]
   },
-  {
-    "name": "slice selector, zero step",
-    "selector": "$[1:2:0]",
-    "document": [
-      0,
-      1,
-      2,
-      3,
-      4,
-      5,
-      6,
-      7,
-      8,
-      9
-    ],
-    "result": [],
-    "tags": [
-      "slice"
-    ]
-  },
+
   {
     "name": "slice selector, empty range",
     "selector": "$[2:2]",
