@@ -58,22 +58,22 @@ impl<T> ArraySlice<T> {
 
     fn process<'a, F>(&self, elements: &'a [F]) -> Vec<(&'a F, usize)> {
         let len = elements.len() as i32;
-        let mut filtered_elems: Vec<(&'a F, usize)> = vec![];
-        match (self.start(len), self.end(len)) {
-            (Some(start_idx), Some(end_idx)) => {
+
+        match (self.start(len), self.end(len), self.step) {
+            (_, _, 0) => vec![],
+            (Some(start_idx), Some(end_idx), step) => {
                 let end_idx = if end_idx == 0 {
                     elements.len()
                 } else {
                     end_idx
                 };
-                for idx in (start_idx..end_idx).step_by(self.step) {
-                    if let Some(v) = elements.get(idx) {
-                        filtered_elems.push((v, idx))
-                    }
-                }
-                filtered_elems
+
+                (start_idx..end_idx)
+                    .step_by(step)
+                    .filter_map(|idx| elements.get(idx).map(|v| (v, idx)))
+                    .collect()
             }
-            _ => filtered_elems,
+            _ => vec![],
         }
     }
 }
@@ -88,13 +88,14 @@ where
         input.flat_map_slice(|data, pref| {
             data.as_array()
                 .map(|elems| self.process(elems))
-                .and_then(|v| {
-                    if v.is_empty() {
-                        None
-                    } else {
-                        let v = v.into_iter().map(|(e, i)| (e, jsp_idx(&pref, i))).collect();
-                        Some(JsonPathValue::map_vec(v))
-                    }
+                .map(|v| {
+                    JsonPathValue::map_vec(
+                        v
+                            .into_iter()
+                            .map(|(e, i)| (e, jsp_idx(&pref, i)))
+                            .collect()
+                    )
+
                 })
                 .unwrap_or_else(|| vec![NoValue])
         })
@@ -476,7 +477,7 @@ mod tests {
 
         assert_eq!(
             slice.find(JsonPathValue::new_slice(&array, "a".to_string())),
-            vec![NoValue]
+            vec![]
         );
 
         slice.start_index = -10;

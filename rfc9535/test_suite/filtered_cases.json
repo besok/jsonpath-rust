@@ -1,0 +1,10 @@
+[
+  {
+    "name": "basic, no leading whitespace",
+    "reason": "Why is it a problem?"
+  },
+  {
+    "name": "basic, no trailing whitespace",
+    "reason": "Why is it a problem?"
+  }
+]

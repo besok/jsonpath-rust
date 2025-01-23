@@ -188,8 +188,7 @@ impl Deref for JsonPtr<'_, Value> {
 
 impl JsonPathQuery for Value {
     fn path(self, query: &str) -> Result<Value, JsonPathParserError> {
-        let p = JsonPath::try_from(query)?;
-        Ok(p.find(&self))
+        Ok(JsonPath::try_from(query)?.find(&self))
     }
 }
 
@@ -379,7 +378,6 @@ impl<'a, Data> JsonPathValue<'a, Data> {
 
 #[cfg(test)]
 mod tests {
-    use colored::Colorize;
     use serde_json::Value;
 
     use crate::JsonPath;

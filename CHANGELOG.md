@@ -60,3 +60,6 @@
     - make some methods public
 - **`0.7.5`**
     - add reference and reference_mut methods
+- **`1.0.0`**
+    - Breaking changes to the API to make it compliant with the RFC9535 
+    - Slice returns an empty vec when it has no matching value (before it was [NoValue]) and at the end Json::Null 
