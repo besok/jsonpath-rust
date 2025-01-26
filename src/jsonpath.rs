@@ -20,7 +20,7 @@ where
     /// # use std::str::FromStr;
     ///
     /// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    /// let path = JsonPath::try_from("$.first.second[?(@.active)]").unwrap();
+    /// let path = JsonPath::try_from("$.first.second[?@.active]").unwrap();
     /// let slice_of_data = path.find_slice(&data);
     ///
     /// let expected_value = json!({"active":1});
@@ -68,7 +68,7 @@ where
     /// # use std::str::FromStr;
     ///
     /// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    /// let path = JsonPath::try_from("$.first.second[?(@.active)]").unwrap();
+    /// let path = JsonPath::try_from("$.first.second[?@.active]").unwrap();
     /// let cloned_data = path.find(&data);
     ///
     /// assert_eq!(cloned_data, Value::Array(vec![json!({"active":1})]));
@@ -105,7 +105,7 @@ where
     /// # use std::str::FromStr;
     ///
     /// let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    /// let path = JsonPath::try_from("$.first.second[?(@.active)]").unwrap();
+    /// let path = JsonPath::try_from("$.first.second[?@.active]").unwrap();
     /// let slice_of_data: Vec<JsonPathStr> = path.find_as_path(&data);
     ///
     /// let expected_path = "$.['first'].['second'][0]".to_string();
@@ -402,7 +402,7 @@ mod tests {
         let rings = json!("The Lord of the Rings");
         test(
             template_json(),
-            "$..book[?(@.isbn)].title",
+            "$..book[?@.isbn].title",
             jp_v![
                 &moby;"$.['store'].['book'][2].['title']",
                 &rings;"$.['store'].['book'][3].['title']",],
@@ -776,7 +776,7 @@ mod tests {
             "field":[{"a":1},{"a":1}],
         }));
         let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.field[?(@.a == 0)].f.length()").expect("the path is correct"),
+            JsonPath::try_from("$.field[?@.a == 0].f.length()").expect("the path is correct"),
         );
         let v = path.find_slice(&json);
         assert_eq!(v, vec![]);

@@ -8,7 +8,7 @@ struct SearchData {
     path: JsonPath,
 }
 
-const PATH: &str = "$.[?(@.author == 'abcd(Rees)')]";
+const PATH: &str = "$.[?@.author == 'abcd(Rees)']";
 
 fn equal_perf_test_with_reuse(cfg: &SearchData) {
     let _v = cfg.path.find(&cfg.json);

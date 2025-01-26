@@ -17,7 +17,8 @@ pip install jsonpath-rust-bindings
 ```
 
 ## The compliance with RFC 9535
-The library is compliant with the [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535) 
+
+The library is compliant with the [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535)
 
 ## Simple examples
 
@@ -47,7 +48,7 @@ Let's suppose we have a following json:
  ```
 
 And we pursue to find all orders id having the field 'active'. We can construct the jsonpath instance like
-that  ```$.shop.orders[?(@.active)].id``` and get the result ``` [1,4] ```
+that  ```$.shop.orders[?@.active].id``` and get the result ``` [1,4] ```
 
 ## The jsonpath description
 
@@ -76,34 +77,34 @@ It works with arrays, therefore it returns a length of a given array, otherwise 
 | `[<number>]`               | the filter getting the element by its index.                                                                                                                 |                                                                                                                                             |
 | `[<number> (, <number>)]`  | the list if elements of array according to their indexes representing these numbers.                                                                         |                                                                                                                                             |
 | `[<start>:<end>:<step>]`   | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]``` |                                                                                                                                             |
-| `[?(<expression>)]`        | the logical expression to filter elements in the list.                                                                                                       | It is used with arrays preliminary.                                                                                                         |
+| `[?<expression>]`          | the logical expression to filter elements in the list.                                                                                                       | It is used with arrays preliminary.                                                                                                         |
 
 ### Filter expressions
 
-The expressions appear in the filter operator like that `[?(@.len > 0)]`. The expression in general consists of the
+The expressions appear in the filter operator like that `[?@.len > 0]`. The expression in general consists of the
 following elements:
 
 - Left and right operands, that is ,in turn, can be a static value,representing as a primitive type like a number,
   string value `'value'`, array of them or another json path instance.
 - Expression sign, denoting what action can be performed
 
-| Expression sign | Description                                                                                | Where to use                                                                                             |
-|-----------------|--------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `!`             | Not                                                                                        | To negate the expression                                                                                 |
-| `==`            | Equal                                                                                      | To compare numbers or string literals                                                                    |
-| `!=`            | Unequal                                                                                    | To compare numbers or string literals in opposite way to equals                                          |
-| `<`             | Less                                                                                       | To compare numbers                                                                                       |
-| `>`             | Greater                                                                                    | To compare numbers                                                                                       |
-| `<=`            | Less or equal                                                                              | To compare numbers                                                                                       |
-| `>=`            | Greater or equal                                                                           | To compare numbers                                                                                       |
-| `~=`            | Regular expression                                                                         | To find the incoming right side in the left side.                                                        |
-| `in`            | Find left element in the list of right elements.                                           |                                                                                                          |
-| `nin`           | The same one as saying above but carrying the opposite sense.                              |                                                                                                          |
-| `size`          | The size of array on the left size should be corresponded to the number on the right side. |                                                                                                          |
-| `noneOf`        | The left size has no intersection with right                                               |                                                                                                          |
-| `anyOf`         | The left size has at least one intersection with right                                     |                                                                                                          |
-| `subsetOf`      | The left is a subset of the right side                                                     |                                                                                                          |
-| `?`             | Exists operator.                                                                           | The operator checks the existence of the field depicted on the left side like that `[?(@.key.isActive)]` |
+| Expression sign | Description                                                                                | Where to use                                                                                           |
+|-----------------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `!`             | Not                                                                                        | To negate the expression                                                                               |
+| `==`            | Equal                                                                                      | To compare numbers or string literals                                                                  |
+| `!=`            | Unequal                                                                                    | To compare numbers or string literals in opposite way to equals                                        |
+| `<`             | Less                                                                                       | To compare numbers                                                                                     |
+| `>`             | Greater                                                                                    | To compare numbers                                                                                     |
+| `<=`            | Less or equal                                                                              | To compare numbers                                                                                     |
+| `>=`            | Greater or equal                                                                           | To compare numbers                                                                                     |
+| `~=`            | Regular expression                                                                         | To find the incoming right side in the left side.                                                      |
+| `in`            | Find left element in the list of right elements.                                           |                                                                                                        |
+| `nin`           | The same one as saying above but carrying the opposite sense.                              |                                                                                                        |
+| `size`          | The size of array on the left size should be corresponded to the number on the right side. |                                                                                                        |
+| `noneOf`        | The left size has no intersection with right                                               |                                                                                                        |
+| `anyOf`         | The left size has at least one intersection with right                                     |                                                                                                        |
+| `subsetOf`      | The left is a subset of the right side                                                     |                                                                                                        |
+| `?`             | Exists operator.                                                                           | The operator checks the existence of the field depicted on the left side like that `[?@.key.isActive]` |
 
 Filter expressions can be chained using `||` and `&&` (logical or and logical and correspondingly) in the following way:
 
@@ -149,7 +150,7 @@ Filter expressions can be chained using `||` and `&&` (logical or and logical an
 }
 ```
 
-The path ``` $.key[?(@.capital == false || @size == 'small')].city ``` will give the following result:
+The path ``` $.key[?@.capital == false || @size == 'small'].city ``` will give the following result:
 
 ```json
 [
@@ -159,7 +160,7 @@ The path ``` $.key[?(@.capital == false || @size == 'small')].city ``` will give
 ]
 ```
 
-And the path ``` $.key[?(@.capital == false && @size != 'small')].city ``` ,in its turn, will give the following result:
+And the path ``` $.key[?@.capital == false && @size != 'small'].city ``` ,in its turn, will give the following result:
 
 ```json
 [
@@ -169,7 +170,7 @@ And the path ``` $.key[?(@.capital == false && @size != 'small')].city ``` ,in i
 
 By default, the operators have the different priority so `&&` has a higher priority so to change it the brackets can be
 used.
-``` $.[?((@.f == 0 || @.f == 1) && ($.x == 15))].city ```
+``` $.[?@.f == 0 || @.f == 1) && ($.x == 15)].city ```
 
 ## Examples
 
@@ -215,24 +216,24 @@ Given the json
 }
  ```
 
-| JsonPath                             | Result                                                       |
-|--------------------------------------|:-------------------------------------------------------------|
-| `$.store.book[*].author`             | The authors of all books                                     |
-| `$..book[?(@.isbn)]`                 | All books with an ISBN number                                |
-| `$.store.*`                          | All things, both books and bicycles                          |
-| `$..author`                          | All authors                                                  |
-| `$.store..price`                     | The price of everything                                      |
-| `$..book[2]`                         | The third book                                               |
-| `$..book[-2]`                        | The second to last book                                      |
-| `$..book[0,1]`                       | The first two books                                          |
-| `$..book[:2]`                        | All books from index 0 (inclusive) until index 2 (exclusive) |
-| `$..book[1:2]`                       | All books from index 1 (inclusive) until index 2 (exclusive) |
-| `$..book[-2:]`                       | Last two books                                               |
-| `$..book[2:]`                        | Book number two from tail                                    |
-| `$.store.book[?(@.price < 10)]`      | All books in store cheaper than 10                           |
-| `$..book[?(@.price <= $.expensive)]` | All books in store that are not "expensive"                  |
-| `$..book[?(@.author ~= '(?i)REES')]` | All books matching regex (ignore case)                       |
-| `$..*`                               | Give me every thing                                          |
+| JsonPath                           | Result                                                       |
+|------------------------------------|:-------------------------------------------------------------|
+| `$.store.book[*].author`           | The authors of all books                                     |
+| `$..book[?@.isbn]`                 | All books with an ISBN number                                |
+| `$.store.*`                        | All things, both books and bicycles                          |
+| `$..author`                        | All authors                                                  |
+| `$.store..price`                   | The price of everything                                      |
+| `$..book[2]`                       | The third book                                               |
+| `$..book[-2]`                      | The second to last book                                      |
+| `$..book[0,1]`                     | The first two books                                          |
+| `$..book[:2]`                      | All books from index 0 (inclusive) until index 2 (exclusive) |
+| `$..book[1:2]`                     | All books from index 1 (inclusive) until index 2 (exclusive) |
+| `$..book[-2:]`                     | Last two books                                               |
+| `$..book[2:]`                      | Book number two from tail                                    |
+| `$.store.book[?@.price < 10]`      | All books in store cheaper than 10                           |
+| `$..book[?@.price <= $.expensive]` | All books in store that are not "expensive"                  |
+| `$..book[?@.author ~= '(?i)REES']` | All books matching regex (ignore case)                       |
+| `$..*`                             | Give me every thing                                          |
 
 ## Library Usage
 
@@ -275,7 +276,7 @@ use std::str::FromStr;
 
 fn main() {
     let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    let path = JsonPath::from_str("$.first.second[?(@.active)]").unwrap();
+    let path = JsonPath::from_str("$.first.second[?@.active]").unwrap();
     let slice_of_data = path.find_slice(&data);
 
     let expected_value = json!({"active":1});
@@ -327,7 +328,7 @@ fn update_by_path_test() -> Result<(), JsonPathParserError> {
             {"verb": "DO NOT RUN"}
         ]);
 
-    let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]")?);
+    let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?@.verb == 'RUN']")?);
     let elem = path
         .find_as_path(&json)
         .get(0)

@@ -388,14 +388,14 @@ mod tests {
     fn to_string_test() {
         let path: Box<JsonPath<Value>> = Box::from(
             JsonPath::from_str(
-                "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?(@.verb == 'TEST')].a.length()",
+                "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?@.verb == 'TEST'].a.length()",
             )
             .unwrap(),
         );
 
         assert_eq!(
             path.to_string(),
-            "$.'a'.'a'..book[1:3:1][*][1]['a','b'][?(@ exists )][?(@.'verb' == \"TEST\")].'a'.length()"
+            "$.'a'.'a'..book[1:3:1][*][1]['a','b'][?@ exists ][?@.'verb' == \"TEST\"].'a'.length()"
         );
     }
 

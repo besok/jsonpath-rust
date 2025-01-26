@@ -8,7 +8,7 @@ struct SearchData {
     path: JsonPath,
 }
 
-const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
+const PATH: &str = "$.[?@.author ~= '.*(?i)d\\(Rees\\)']";
 
 fn regex_perf_test_with_reuse(cfg: &SearchData) {
     let _v = cfg.path.find(&cfg.json);

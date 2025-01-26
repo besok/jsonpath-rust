@@ -226,7 +226,7 @@ where
     }
 }
 
-/// process filter element like [?(op sign op)]
+/// process filter element like [?op sign op]
 pub enum FilterPath<'a, T> {
     Filter {
         left: PathInstance<'a, T>,

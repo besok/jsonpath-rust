@@ -123,7 +123,7 @@ pub trait JsonLike:
     ///     {"verb": "DO NOT RUN"}
     /// ]);
     ///
-    /// let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?(@.verb == 'RUN')]").unwrap());
+    /// let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?@.verb == 'RUN']").unwrap());
     /// let elem = path
     ///     .find_as_path(&json)
     ///     .get(0)
