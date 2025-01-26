@@ -4,9 +4,9 @@ use colored::Colorize;
 use std::fs::OpenOptions;
 use std::io::Error;
 use std::io::Write;
-pub fn process_results(results: Vec<TestResult>) -> Result<(), Error> {
+pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result<(), Error> {
     let (passed, failed): (Vec<_>, Vec<_>) = results.into_iter().partition(TestResult::is_ok);
-    let total = passed.len() + failed.len();
+    let total = passed.len() + failed.len() + skipped_cases;
     let passed_count = passed.len();
     let failed_count = failed.len();
     let date = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -22,8 +22,6 @@ pub fn process_results(results: Vec<TestResult>) -> Result<(), Error> {
         }
     }
 
-
-
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -34,14 +32,14 @@ pub fn process_results(results: Vec<TestResult>) -> Result<(), Error> {
         total, passed_count, failed_count, date
     )?;
     println!(
-        "\n{}:\n{}\n{}\n{}",
+        "\n{}:\n{}\n{}\n{}\n{}",
         format!("RFC9535 Compliance tests").underline().bold(),
         format!("Total: {}", total).bold(),
         format!("Passed: {}", passed_count).green().bold(),
-        format!("Failed: {}", failed_count).red().bold()
+        format!("Failed: {}", failed_count).red().bold(),
+        format!("Skipped: {}", skipped_cases).bold()
     );
     Ok(())
 }
 
 pub type TestResult<'a> = Result<(), TestFailure<'a>>;
-

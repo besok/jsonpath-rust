@@ -16,6 +16,9 @@ pypi:
 pip install jsonpath-rust-bindings
 ```
 
+## The compliance with RFC 9535
+The library is compliant with the [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535) 
+
 ## Simple examples
 
 Let's suppose we have a following json:

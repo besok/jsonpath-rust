@@ -1,23 +1,24 @@
+mod console;
 mod suite;
 mod tests;
-mod console;
 
 use crate::suite::{get_suite, TestCase, TestFailure};
 use colored::Colorize;
-use std::io::Write;
-use std::io::Error;
-use std::str::FromStr;
 use console::TestResult;
 use jsonpath_rust::JsonPath;
 use serde_json::Value;
+use std::io::Error;
+use std::io::Write;
+use std::str::FromStr;
 
 fn main() -> Result<(), Error> {
-
+    let (cases, skipped) = get_suite()?;
     console::process_results(
-        get_suite()?
+        cases
             .iter()
             .map(handle_test_case)
             .collect::<Vec<TestResult>>(),
+        skipped,
     )
 }
 

@@ -2,27 +2,35 @@ use colored::Colorize;
 use jsonpath_rust::JsonPathParserError;
 use serde_json::Value;
 
-pub fn get_suite() -> Result<Vec<TestCase>, std::io::Error> {
-    let file = std::fs::File::open("test_suite/rfc9535-cts.json")?;
-    let suite: Vec<TestCase> = serde_json::from_reader(std::io::BufReader::new(file))?;
+type SkippedCases = usize;
+
+pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
+    let file = std::fs::File::open("test_suite/jsonpath-compliance-test-suite/cts.json")?;
+    let suite: TestCases = serde_json::from_reader(std::io::BufReader::new(file))?;
+    let suite: Vec<TestCase> = suite.tests;
 
     let filter = std::fs::File::open("test_suite/filtered_cases.json")?;
     let filter: Vec<FilterCase> = serde_json::from_reader(std::io::BufReader::new(filter))?;
-
-    Ok(suite
-        .into_iter()
-        .filter(|case| {
-            if let Some(f) = filter.iter().find(|filter| case.name == filter.name) {
-                println!(
-                    "Skipping test case: `{}` because of reason: `{}`",
-                    case.name.green(), f.reason.green()
-                );
-                false
-            } else {
-                true
-            }
-        })
-        .collect())
+    let mut skipped_cases = 0;
+    Ok((
+        suite
+            .into_iter()
+            .filter(|case| {
+                if let Some(f) = filter.iter().find(|filter| case.name == filter.name) {
+                    println!(
+                        "Skipping test case: `{}` because of reason: `{}`",
+                        case.name.green(),
+                        f.reason.green()
+                    );
+                    skipped_cases += 1;
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect(),
+        skipped_cases,
+    ))
 }
 
 #[derive(serde::Deserialize)]
@@ -40,6 +48,11 @@ pub struct TestCase {
     pub(crate) results: Option<Vec<Value>>,
     #[serde(default)]
     pub(crate) invalid_selector: bool,
+}
+#[derive(serde::Deserialize)]
+pub struct TestCases {
+    pub(crate) description: String,
+    pub(crate) tests: Vec<TestCase>,
 }
 
 pub struct TestFailure<'a>(pub &'a TestCase, pub String);
