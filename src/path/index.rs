@@ -453,7 +453,15 @@ mod tests {
         slice.end_index = -5;
         assert_eq!(slice.end(len).unwrap(), 1);
     }
+    #[test]
+    fn array_slice_end_out() {
+        let array = [1, 2, 3, 4, 5, 6];
+        let mut slice: ArraySlice<Value> = ArraySlice::new(1, 5, 2);
 
+        let res  =slice.process(&array);
+        assert_eq!(res, vec![(&2, 1), (&4, 3)]);
+
+    }
     #[test]
     fn slice_test() {
         let array = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);

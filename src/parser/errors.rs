@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use thiserror::Error;
 
 use super::parser::Rule;
@@ -26,4 +27,10 @@ pub enum JsonPathParserError {
     EmptyInner(String),
     #[error("Invalid json path: {0}")]
     InvalidJsonPath(String),
+}
+
+impl From<(ParseIntError, &str)> for JsonPathParserError {
+    fn from((err, val): (ParseIntError, &str)) -> Self {
+        JsonPathParserError::InvalidNumber(format!("{:?} for `{}`", err, val))
+    }
 }

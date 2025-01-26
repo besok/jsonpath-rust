@@ -1,4 +1,4 @@
-WHITESPACE = _{ " " | "\t" | "\r\n" | "\n"}
+WHITESPACE = _{ " " | "\t" | "\r\n" | "\n" | "\r"}
 
 boolean = {"true" | "false"}
 null = {"null"}

@@ -87,9 +87,18 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
     let mut step = 1;
     for in_pair in pairs {
         match in_pair.as_rule() {
-            Rule::start_slice => start = in_pair.as_str().parse::<i32>().unwrap_or(start),
-            Rule::end_slice => end = in_pair.as_str().parse::<i32>().unwrap_or(end),
-            Rule::step_slice => step = down(in_pair)?.as_str().parse::<usize>().unwrap_or(step),
+            Rule::start_slice => {
+                let parsed_val = in_pair.as_str().trim();
+                start = parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?
+            }
+            Rule::end_slice => {
+                let parsed_val = in_pair.as_str().trim();
+                end = parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?
+            }
+            Rule::step_slice => {
+                let parsed_val = down(in_pair)?.as_str().trim();
+                step = parsed_val.parse::<usize>().map_err(|e| (e, parsed_val))?
+            }
             _ => (),
         }
     }
@@ -421,6 +430,15 @@ mod tests {
         test::<Value>("[::10]", vec![path!(idx!([;;10]))]);
         test_failed("[::-1]");
         test_failed("[:::0]");
+    }
+
+    #[test]
+    fn index_slice_symbols_test() {
+        test::<Value>("[1:\r]", vec![path!(idx!([1; 0; 1]))]);
+        test::<Value>("[1:1\r:2\t]", vec![path!(idx!([1; 1; 2]))]);
+        test::<Value>("[\n:1\r:1]", vec![path!(idx!([0; 1; 1]))]);
+        test::<Value>("[1:2\r:2\n]", vec![path!(idx!([1; 2; 2]))]);
+        test::<Value>("[1:1\r:2]", vec![path!(idx!([1; 1; 2]))]);
     }
 
     #[test]
