@@ -63,4 +63,5 @@
 - **`1.0.0`**
     - Breaking changes to the API to make it compliant with the RFC9535 
     - Slice returns an empty vec when it has no matching value (before it was [NoValue]) and at the end Json::Null 
-    - Change the filter expression from `? (<expression>)` into `? <expression>` (remove brackets)
+    - Change the filter expression from `? (<expression>)` into `? <expression>` 
+      (removing brackets should not break the compatability due to their presence on the expression ). 
