@@ -10,7 +10,7 @@ word = _{ ('a'..'z' | 'A'..'Z')+ }
 specs = _{ "_" | "-" | "/" | "\\" | "#" }
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
 
-string_qt = ${ ("\'" ~ inner ~ "\'") | ("\"" ~ inner ~ "\"") }
+string_qt = ${ WHITESPACE? ~ ("\'" ~ inner ~ "\'") | ("\"" ~ inner ~ "\"") ~ WHITESPACE?}
 inner = @{ char* }
 char = _{
     !("\"" | "\\" | "\'") ~ ANY
@@ -21,7 +21,7 @@ root = {"$"}
 sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
 not = {"!"}
 key_lim = {!"length()" ~ (word | ASCII_DIGIT | specs)+}
-key_unlim = {"[" ~ string_qt ~ "]"}
+key_unlim = {"["  ~ string_qt ~ WHITESPACE?~ "]"}
 key = ${key_lim | key_unlim}
 
 descent = {dot ~ dot ~ key}

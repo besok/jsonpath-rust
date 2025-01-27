@@ -350,7 +350,17 @@ mod tests {
     }
 
     #[test]
+    fn path_test_extra(){
+        test::<Value>("$ [ 'k' ]",
+                      vec![ path!($),path!("k")
+                      ]);
+        test::<Value>("$..[ 'k']",
+                      vec![ path!($),path!(.."k")
+                      ]);
+    }
+    #[test]
     fn path_test() {
+
         test::<Value>("$.k.['k']['k']..k..['k'].*.[*][*][1][1,2]['k','k'][:][10:][:10][10:10:10][?(@)][?(@.abc >= 10)]",
              vec![
                  path!($),
@@ -521,11 +531,11 @@ mod tests {
     #[test]
     fn index_filter_test() {
         test::<Value>(
-            "[?('abc' == 'abc')]",
+            "[?'abc' == 'abc']",
             vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
         );
         test::<Value>(
-            "[?('abc' == 1)]",
+            "[?'abc' == 1]",
             vec![path!(idx!(?filter!( op!("abc"),"==",op!(1))))],
         );
         test::<Value>(
