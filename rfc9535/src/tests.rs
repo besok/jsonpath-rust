@@ -8,7 +8,11 @@ fn slice_selector_zero_step() -> Result<(),JsonPathParserError> {
     Ok(())
 }
 
-
+#[test]
+fn slice_selector_with_neg_step() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$[::-1]")?, json!([]));
+    Ok(())
+}
 #[test]
 fn slice_selector_with_last() -> Result<(),JsonPathParserError> {
     assert_eq!(json!([1, 2, 3, 4, 5, 6]).path("$[1:5\r:2]")?, json!([2,4]));

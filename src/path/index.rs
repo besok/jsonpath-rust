@@ -1,25 +1,26 @@
+use std::cmp;
+use std::cmp::{max, min};
 use std::fmt::Debug;
 
 use crate::jsp_idx;
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 
+use super::{JsonLike, TopPaths};
 use crate::path::top::ObjectField;
 use crate::path::{json_path_instance, process_operand, JsonPathValue, Path, PathInstance};
 use crate::JsonPathValue::{NoValue, Slice};
 
-use super::{JsonLike, TopPaths};
-
 /// process the slice like [start:end:step]
 #[derive(Debug)]
 pub struct ArraySlice<T> {
-    start_index: i32,
-    end_index: i32,
-    step: usize,
+    start_index: Option<i32>,
+    end_index: Option<i32>,
+    step: Option<i32>,
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T> ArraySlice<T> {
-    pub(crate) fn new(start_index: i32, end_index: i32, step: usize) -> Self {
+    pub(crate) fn new(start_index: Option<i32>, end_index: Option<i32>, step: Option<i32>) -> Self {
         ArraySlice {
             start_index,
             end_index,
@@ -27,51 +28,58 @@ impl<T> ArraySlice<T> {
             _t: std::marker::PhantomData,
         }
     }
-
-    fn end(&self, len: i32) -> Option<usize> {
-        if self.end_index >= 0 {
-            if self.end_index > len {
-                None
-            } else {
-                Some(self.end_index as usize)
-            }
-        } else if self.end_index < -len {
-            None
-        } else {
-            Some((len - (-self.end_index)) as usize)
-        }
-    }
-
-    fn start(&self, len: i32) -> Option<usize> {
-        if self.start_index >= 0 {
-            if self.start_index > len {
-                None
-            } else {
-                Some(self.start_index as usize)
-            }
-        } else if self.start_index < -len {
-            None
-        } else {
-            Some((len - -self.start_index) as usize)
+    pub(crate) fn new_raw(start_index: i32, end_index: i32, step: i32) -> Self {
+        ArraySlice {
+            start_index: Some(start_index),
+            end_index: Some(end_index),
+            step: Some(step),
+            _t: std::marker::PhantomData,
         }
     }
 
     fn process<'a, F>(&self, elements: &'a [F]) -> Vec<(&'a F, usize)> {
         let len = elements.len() as i32;
+        let norm = |i: i32| {
+            if i >= 0 {
+                i
+            } else {
+                len + i
+            }
+        };
 
-        match (self.start(len), self.end(len), self.step) {
-            (_, _, 0) => vec![],
-            (Some(start_idx), Some(end_idx), step) => {
-                let end_idx = if end_idx == 0 {
-                    elements.len()
-                } else {
-                    end_idx
-                };
+        match self.step.unwrap_or(1) {
+            e if e > 0 => {
+                let n_start = norm(self.start_index.unwrap_or(0));
+                let n_end = norm(self.end_index.unwrap_or(len));
+                let lower = min(max(n_start, 0), len);
+                let upper = min(max(n_end, 0), len);
 
-                (start_idx..end_idx)
-                    .step_by(step)
-                    .filter_map(|idx| elements.get(idx).map(|v| (v, idx)))
-                    .collect()
+                let mut idx = lower;
+                let mut res = vec![];
+                while idx < upper {
+                    let i = idx as usize;
+                    if let Some(elem) = elements.get(i) {
+                        res.push((elem, i));
+                    }
+                    idx += e;
+                }
+                res
+            }
+            e if e < 0 => {
+                let n_start = norm(self.start_index.unwrap_or(len - 1));
+                let n_end = norm(self.end_index.unwrap_or(-len - 1));
+                let lower = min(max(n_end, -1), len - 1);
+                let upper  = min(max(n_start, -1), len - 1);
+                let mut idx = upper;
+                let mut res = vec![];
+                while lower < idx {
+                    let i = idx as usize;
+                    if let Some(elem) = elements.get(i) {
+                        res.push((elem, i));
+                    }
+                    idx += e;
+                }
+                res
             }
             _ => vec![],
         }
@@ -90,12 +98,8 @@ where
                 .map(|elems| self.process(elems))
                 .map(|v| {
                     JsonPathValue::map_vec(
-                        v
-                            .into_iter()
-                            .map(|(e, i)| (e, jsp_idx(&pref, i)))
-                            .collect()
+                        v.into_iter().map(|(e, i)| (e, jsp_idx(&pref, i))).collect(),
                     )
-
                 })
                 .unwrap_or_else(|| vec![NoValue])
         })
@@ -416,57 +420,18 @@ mod tests {
     use serde_json::{json, Value};
 
     #[test]
-    fn array_slice_end_start_test() {
-        let array = [0, 1, 2, 3, 4, 5];
-        let len = array.len() as i32;
-        let mut slice: ArraySlice<Value> = ArraySlice::new(0, 0, 0);
-
-        assert_eq!(slice.start(len).unwrap(), 0);
-        slice.start_index = 1;
-
-        assert_eq!(slice.start(len).unwrap(), 1);
-
-        slice.start_index = 2;
-        assert_eq!(slice.start(len).unwrap(), 2);
-
-        slice.start_index = 5;
-        assert_eq!(slice.start(len).unwrap(), 5);
-
-        slice.start_index = 7;
-        assert_eq!(slice.start(len), None);
-
-        slice.start_index = -1;
-        assert_eq!(slice.start(len).unwrap(), 5);
-
-        slice.start_index = -5;
-        assert_eq!(slice.start(len).unwrap(), 1);
-
-        slice.end_index = 0;
-        assert_eq!(slice.end(len).unwrap(), 0);
-
-        slice.end_index = 5;
-        assert_eq!(slice.end(len).unwrap(), 5);
-
-        slice.end_index = -1;
-        assert_eq!(slice.end(len).unwrap(), 5);
-
-        slice.end_index = -5;
-        assert_eq!(slice.end(len).unwrap(), 1);
-    }
-    #[test]
     fn array_slice_end_out() {
         let array = [1, 2, 3, 4, 5, 6];
-        let mut slice: ArraySlice<Value> = ArraySlice::new(1, 5, 2);
+        let mut slice: ArraySlice<Value> = ArraySlice::new_raw(1, 5, 2);
 
-        let res  =slice.process(&array);
+        let res = slice.process(&array);
         assert_eq!(res, vec![(&2, 1), (&4, 3)]);
-
     }
     #[test]
     fn slice_test() {
         let array = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-        let mut slice = ArraySlice::new(0, 6, 2);
+        let mut slice = ArraySlice::new_raw(0, 6, 2);
         let j1 = json!(0);
         let j2 = json!(2);
         let j4 = json!(4);
@@ -475,21 +440,21 @@ mod tests {
             jp_v![&j1;"a[0]", &j2;"a[2]", &j4;"a[4]"]
         );
 
-        slice.step = 3;
+        slice.step = Some(3);
         let j0 = json!(0);
         let j3 = json!(3);
         assert_eq!(slice.find(jp_v!(&array)), jp_v![&j0;"[0]", &j3;"[3]"]);
 
-        slice.start_index = -1;
-        slice.end_index = 1;
+        slice.start_index = Some(-1);
+        slice.end_index = Some(1);
 
         assert_eq!(
             slice.find(JsonPathValue::new_slice(&array, "a".to_string())),
             vec![]
         );
 
-        slice.start_index = -10;
-        slice.end_index = 10;
+        slice.start_index = Some(-10);
+        slice.end_index = Some(10);
 
         let j1 = json!(1);
         let j4 = json!(4);
@@ -912,5 +877,28 @@ mod tests {
             path_inst.find(JsonPathValue::from_root(&json)),
             vec![NoValue]
         )
+    }
+
+    #[test]
+    fn process_slice_happy() {
+        let slice: ArraySlice<i32> = ArraySlice::new(None, None, None);
+        let res = slice.process(&[1, 2, 3, 4, 5]);
+        assert_eq!(res, vec![(&1, 0), (&2, 1), (&3, 2), (&4, 3), (&5, 4)]);
+
+        let slice: ArraySlice<i32> = ArraySlice::new(Some(1), Some(4), Some(2));
+        let res = slice.process(&[1, 2, 3, 4, 5]);
+        assert_eq!(res, vec![(&2, 1), (&4, 3)]);
+
+        let slice: ArraySlice<i32> = ArraySlice::new(None, None, Some(-2));
+        let res = slice.process(&[1, 2, 3, 4, 5]);
+        assert_eq!(res, vec![(&5, 4), (&3, 2), (&1, 0)]);
+
+        let slice: ArraySlice<i32> = ArraySlice::new(None, None, Some(0));
+        let res = slice.process(&[1, 2, 3, 4, 5]);
+        assert_eq!(res, vec![]);
+
+        let slice: ArraySlice<i32> = ArraySlice::new(Some(4), Some(1), Some(-1));
+        let res = slice.process(&[1, 2, 3, 4, 5]);
+        assert_eq!(res, vec![(&5, 4), (&4, 3), (&3, 2)]);
     }
 }

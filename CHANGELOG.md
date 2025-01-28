@@ -65,3 +65,4 @@
     - Slice returns an empty vec when it has no matching value (before it was [NoValue]) and at the end Json::Null 
     - Change the filter expression from `? (<expression>)` into `? <expression>` 
       (removing brackets should not break the compatability due to their presence on the expression ). 
+    - Align the slice expressions with the standard (RFC9535#2.3.4)

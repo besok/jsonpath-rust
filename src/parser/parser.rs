@@ -82,22 +82,22 @@ fn parse_key(rule: Pair<Rule>) -> Result<Option<String>, JsonPathParserError> {
 }
 
 fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParserError> {
-    let mut start = 0;
-    let mut end = 0;
-    let mut step = 1;
+    let mut start = None;
+    let mut end = None;
+    let mut step = None;
     for in_pair in pairs {
         match in_pair.as_rule() {
             Rule::start_slice => {
                 let parsed_val = in_pair.as_str().trim();
-                start = parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?
+                start = Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
             }
             Rule::end_slice => {
                 let parsed_val = in_pair.as_str().trim();
-                end = parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?
+                end = Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
             }
             Rule::step_slice => {
                 let parsed_val = down(in_pair)?.as_str().trim();
-                step = parsed_val.parse::<usize>().map_err(|e| (e, parsed_val))?
+                step =Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
             }
             _ => (),
         }
@@ -328,6 +328,8 @@ mod tests {
     use crate::path;
     use serde_json::{json, Value};
     use std::panic;
+    use crate::JsonPath::Index;
+    use crate::parser::JsonPathIndex::Slice;
 
     fn test_failed(input: &str) {
         match parse_json_path::<Value>(input) {
@@ -434,21 +436,18 @@ mod tests {
     #[test]
     fn index_slice_test() {
         test::<Value>("[1:1000:10]", vec![path!(idx!([1; 1000; 10]))]);
-        test::<Value>("[:1000:10]", vec![path!(idx!([0; 1000; 10]))]);
         test::<Value>("[:1000]", vec![path!(idx!([;1000;]))]);
         test::<Value>("[:]", vec![path!(idx!([;;]))]);
         test::<Value>("[::10]", vec![path!(idx!([;;10]))]);
-        test_failed("[::-1]");
         test_failed("[:::0]");
     }
 
     #[test]
     fn index_slice_symbols_test() {
-        test::<Value>("[1:\r]", vec![path!(idx!([1; 0; 1]))]);
-        test::<Value>("[1:1\r:2\t]", vec![path!(idx!([1; 1; 2]))]);
-        test::<Value>("[\n:1\r:1]", vec![path!(idx!([0; 1; 1]))]);
-        test::<Value>("[1:2\r:2\n]", vec![path!(idx!([1; 2; 2]))]);
-        test::<Value>("[1:1\r:2]", vec![path!(idx!([1; 1; 2]))]);
+        test::<Value>("[1:\r]", vec![Index(Slice(Some(1), None, None))]);
+        test::<Value>("[1:1\r:2\t]", vec![Index(Slice(Some(1), Some(1), Some(2)))]);
+        test::<Value>("[\n:1\r:1]", vec![Index(Slice(None, Some(1), Some(1)))]);
+        test::<Value>("[1:2\r:2\n]", vec![Index(Slice(Some(1), Some(2), Some(2)))]);
     }
 
     #[test]

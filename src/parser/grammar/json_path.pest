@@ -34,7 +34,7 @@ unsigned = {("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
 signed = {min? ~ unsigned}
 start_slice = {signed}
 end_slice = {signed}
-step_slice = {col ~ unsigned}
+step_slice = {col ~ signed}
 slice = {start_slice? ~ col ~ end_slice? ~ step_slice? }
 
 unit_keys = { string_qt ~ ("," ~ string_qt)+ }

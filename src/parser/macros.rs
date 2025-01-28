@@ -45,14 +45,14 @@ macro_rules! idx {
    }};
    ( $s:literal) => {JsonPathIndex::Single(json!($s))};
    ( ? $s:expr) => {JsonPathIndex::Filter($s)};
-   ( [$l:literal;$m:literal;$r:literal]) => {JsonPathIndex::Slice($l,$m,$r)};
+   ( [$l:literal;$m:literal;$r:literal]) => {JsonPathIndex::Slice(Some($l),Some($m),Some($r))};
    ( [$l:literal;$m:literal;]) => {JsonPathIndex::Slice($l,$m,1)};
    ( [$l:literal;;$m:literal]) => {JsonPathIndex::Slice($l,0,$m)};
    ( [;$l:literal;$m:literal]) => {JsonPathIndex::Slice(0,$l,$m)};
-   ( [;;$m:literal]) => {JsonPathIndex::Slice(0,0,$m)};
-   ( [;$m:literal;]) => {JsonPathIndex::Slice(0,$m,1)};
-   ( [$m:literal;;]) => {JsonPathIndex::Slice($m,0,1)};
-   ( [;;]) => {JsonPathIndex::Slice(0,0,1)};
+   ( [;;$m:literal]) => {JsonPathIndex::Slice(None,None,Some($m))};
+   ( [;$m:literal;]) => {JsonPathIndex::Slice(None,Some($m),None)};
+   ( [$m:literal;;]) => {JsonPathIndex::Slice(Some($m),None,None)};
+   ( [;;]) => {JsonPathIndex::Slice(None,None,None)};
 }
 
 #[macro_export]

@@ -111,7 +111,7 @@ pub enum JsonPathIndex<T> {
     /// Union represents a several keys
     UnionKeys(Vec<String>),
     /// DEfault slice where the items are start/end/step respectively
-    Slice(i32, i32, usize),
+    Slice(Option<i32>, Option<i32>, Option<i32>),
     /// Filter ? <expression>
     Filter(FilterExpression<T>),
 }
@@ -141,7 +141,12 @@ impl<T: Display> Display for JsonPathIndex<T> {
                 )
             }
             JsonPathIndex::Slice(s, e, st) => {
-                format!("[{}:{}:{}]", s, e, st)
+                format!(
+                    "[{}:{}:{}]",
+                    s.unwrap_or(0),
+                    e.unwrap_or(0),
+                    st.unwrap_or(1)
+                )
             }
             JsonPathIndex::Filter(filter) => format!("[?{}]", filter),
         };
