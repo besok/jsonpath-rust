@@ -85,19 +85,37 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
     let mut start = None;
     let mut end = None;
     let mut step = None;
+    fn validate_min_0(val: &str) -> Result<(), JsonPathParserError> {
+        if val == "-0" {
+            Err(JsonPathParserError::InvalidJsonPath("-0 is not a valid value for a slice".to_string()))
+        }else {
+            Ok(())
+        }
+    }
+
     for in_pair in pairs {
         match in_pair.as_rule() {
             Rule::start_slice => {
                 let parsed_val = in_pair.as_str().trim();
-                start = Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
+                validate_min_0(parsed_val)?;
+                start = Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
             }
             Rule::end_slice => {
                 let parsed_val = in_pair.as_str().trim();
-                end = Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
+                validate_min_0(parsed_val)?;
+                end = Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
             }
             Rule::step_slice => {
-                let parsed_val = down(in_pair)?.as_str().trim();
-                step =Some(parsed_val.parse::<i32>().map_err(|e| (e, parsed_val))?);
+                if let Some(parsed_val) = in_pair
+                    .into_inner()
+                    .next()
+                    .map(|v| v.as_str().trim())
+                {
+                    validate_min_0(parsed_val)?;
+                    step =Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
+                }
+
+
             }
             _ => (),
         }

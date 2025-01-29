@@ -13,14 +13,14 @@ use crate::JsonPathValue::{NoValue, Slice};
 /// process the slice like [start:end:step]
 #[derive(Debug)]
 pub struct ArraySlice<T> {
-    start_index: Option<i32>,
-    end_index: Option<i32>,
-    step: Option<i32>,
+    start_index: Option<i64>,
+    end_index: Option<i64>,
+    step: Option<i64>,
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T> ArraySlice<T> {
-    pub(crate) fn new(start_index: Option<i32>, end_index: Option<i32>, step: Option<i32>) -> Self {
+    pub(crate) fn new(start_index: Option<i64>, end_index: Option<i64>, step: Option<i64>) -> Self {
         ArraySlice {
             start_index,
             end_index,
@@ -28,7 +28,7 @@ impl<T> ArraySlice<T> {
             _t: std::marker::PhantomData,
         }
     }
-    pub(crate) fn new_raw(start_index: i32, end_index: i32, step: i32) -> Self {
+    pub(crate) fn new_raw(start_index: i64, end_index: i64, step: i64) -> Self {
         ArraySlice {
             start_index: Some(start_index),
             end_index: Some(end_index),
@@ -38,8 +38,8 @@ impl<T> ArraySlice<T> {
     }
 
     fn process<'a, F>(&self, elements: &'a [F]) -> Vec<(&'a F, usize)> {
-        let len = elements.len() as i32;
-        let norm = |i: i32| {
+        let len = elements.len() as i64;
+        let norm = |i: i64| {
             if i >= 0 {
                 i
             } else {

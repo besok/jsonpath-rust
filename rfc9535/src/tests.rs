@@ -14,6 +14,21 @@ fn slice_selector_with_neg_step() -> Result<(),JsonPathParserError> {
     Ok(())
 }
 #[test]
+fn slice_selector_with_max() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$[:9007199254740992:1]")?, json!([]));
+    Ok(())
+}
+#[test]
+fn exclude_embedded_character() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$[\"\"]")?, json!([]));
+    Ok(())
+}
+#[test]
+fn slice_selector_leading_m0() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$[-0::]")?, json!([]));
+    Ok(())
+}
+#[test]
 fn slice_selector_with_last() -> Result<(),JsonPathParserError> {
     assert_eq!(json!([1, 2, 3, 4, 5, 6]).path("$[1:5\r:2]")?, json!([2,4]));
     Ok(())

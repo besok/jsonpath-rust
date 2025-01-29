@@ -111,7 +111,7 @@ pub enum JsonPathIndex<T> {
     /// Union represents a several keys
     UnionKeys(Vec<String>),
     /// DEfault slice where the items are start/end/step respectively
-    Slice(Option<i32>, Option<i32>, Option<i32>),
+    Slice(Option<i64>, Option<i64>, Option<i64>),
     /// Filter ? <expression>
     Filter(FilterExpression<T>),
 }

@@ -66,3 +66,6 @@
     - Change the filter expression from `? (<expression>)` into `? <expression>` 
       (removing brackets should not break the compatability due to their presence on the expression ). 
     - Align the slice expressions with the standard (RFC9535#2.3.4)
+    - add a validation for slices -0
+    - extend the values for slices to i64
+    - add a validation for non-printable embedded characters

@@ -5,7 +5,7 @@
 [![Rust CI](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml)
 
 The library provides the basic functionality to find the set of the data according to the filtering query. The idea
-comes from XPath for XML structures. The details can be found [there](https://goessner.net/articles/JsonPath/)
+comes from XPath for XML structures. The details can be found [there](https://datatracker.ietf.org/doc/html/rfc9535)
 Therefore JsonPath is a query language for JSON, similar to XPath for XML. The JsonPath query is a set of assertions to
 specify the JSON fields that need to be verified.
 
@@ -18,7 +18,7 @@ pip install jsonpath-rust-bindings
 
 ## The compliance with RFC 9535
 
-The library is compliant with the [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535)
+The library is fully compliant with the standard [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535)
 
 ## Simple examples
 
@@ -66,18 +66,18 @@ It works with arrays, therefore it returns a length of a given array, otherwise 
 
 ### Operators
 
-| Operator                   | Description                                                                                                                                                  | Where to use                                                                                                                                |
-|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| `$`                        | Pointer to the root of the json.                                                                                                                             | It is gently advising to start every jsonpath from the root. Also, inside the filters to point out that the path is starting from the root. |
-| `@`                        | Pointer to the current element inside the filter operations.                                                                                                 | It is used inside the filter operations to iterate the collection.                                                                          |
-| `*` or `[*]`               | Wildcard. It brings to the list all objects and elements regardless their names.                                                                             | It is analogue a flatmap operation.                                                                                                         |
-| `<..>`                     | Descent operation. It brings to the list all objects, children of that objects and etc                                                                       | It is analogue a flatmap operation.                                                                                                         |
-| `.<name>` or `.['<name>']` | the key pointing to the field of the object                                                                                                                  | It is used to obtain the specific field.                                                                                                    |
-| `['<name>' (, '<name>')]`  | the list of keys                                                                                                                                             | the same usage as for a single key but for list                                                                                             |
-| `[<number>]`               | the filter getting the element by its index.                                                                                                                 |                                                                                                                                             |
-| `[<number> (, <number>)]`  | the list if elements of array according to their indexes representing these numbers.                                                                         |                                                                                                                                             |
-| `[<start>:<end>:<step>]`   | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]``` |                                                                                                                                             |
-| `[?<expression>]`          | the logical expression to filter elements in the list.                                                                                                       | It is used with arrays preliminary.                                                                                                         |
+| Operator                   | Description                                                                                                                                                   | Where to use                                                                                                                                |
+|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `$`                        | Pointer to the root of the json.                                                                                                                              | It is gently advising to start every jsonpath from the root. Also, inside the filters to point out that the path is starting from the root. |
+| `@`                        | Pointer to the current element inside the filter operations.                                                                                                  | It is used inside the filter operations to iterate the collection.                                                                          |
+| `*` or `[*]`               | Wildcard. It brings to the list all objects and elements regardless their names.                                                                              | It is analogue a flatmap operation.                                                                                                         |
+| `<..>`                     | Descent operation. It brings to the list all objects, children of that objects and etc                                                                        | It is analogue a flatmap operation.                                                                                                         |
+| `.<name>` or `.['<name>']` | the key pointing to the field of the object                                                                                                                   | It is used to obtain the specific field.                                                                                                    |
+| `['<name>' (, '<name>')]`  | the list of keys                                                                                                                                              | the same usage as for a single key but for list                                                                                             |
+| `[<number>]`               | the filter getting the element by its index.                                                                                                                  |                                                                                                                                             |
+| `[<number> (, <number>)]`  | the list if elements of array according to their indexes representing these numbers.                                                                          |                                                                                                                                             |
+| `[<start>:<end>:<step>]`   | slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[::]``` |                                                                                                                                             |
+| `[?<expression>]`          | the logical expression to filter elements in the list.                                                                                                        | It is used with arrays preliminary.                                                                                                         |
 
 ### Filter expressions
 
