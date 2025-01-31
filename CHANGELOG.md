@@ -69,3 +69,4 @@
     - add a validation for slices -0
     - extend the values for slices to i64
     - add a validation for non-printable embedded characters
+    - add iteration over object keys for filters

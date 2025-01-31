@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use crate::{jsp_idx, jsp_obj, JsonPathParserError, JsonPathStr, JsonPathValue};
@@ -68,6 +69,11 @@ pub trait JsonLike:
 
     /// Converts the element to an `Option<&Vec<Self>>`.
     fn as_array(&self) -> Option<&Vec<Self>>;
+
+    fn is_object(&self) -> bool;
+
+    /// Converts the element to an `Option<&Vec<Self>>`.
+    fn as_object(&self) -> Option<Vec<(&String, &Self)>>;
 
     /// Compares the size of two vectors of references to elements.
     fn size(left: Vec<&Self>, right: Vec<&Self>) -> bool;
@@ -253,6 +259,18 @@ impl JsonLike for Value {
     fn as_array(&self) -> Option<&Vec<Self>> {
         self.as_array()
     }
+    fn is_object(&self) -> bool {
+        self.is_object()
+    }
+
+    fn as_object(&self) -> Option<Vec<(&String, &Self)>> {
+        self.as_object()
+            .map(|v| v
+                .into_iter()
+                .map(|(k, v)| (k, v))
+                .collect())
+    }
+
 
     fn size(left: Vec<&Self>, right: Vec<&Self>) -> bool {
         if let Some(Value::Number(n)) = right.first() {

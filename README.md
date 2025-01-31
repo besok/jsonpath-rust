@@ -81,6 +81,8 @@ It works with arrays, therefore it returns a length of a given array, otherwise 
 
 ### Filter expressions
 
+Filter expressions are used to filter the elements in the list or values in the object.
+
 The expressions appear in the filter operator like that `[?@.len > 0]`. The expression in general consists of the
 following elements:
 

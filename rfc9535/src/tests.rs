@@ -39,3 +39,8 @@ fn extra_symbols() -> Result<(),JsonPathParserError> {
     Ok(())
 }
 
+#[test]
+fn filter() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!({"a": 1,"b": null}).path("$[?@]")?, json!([ 1, null]));
+    Ok(())
+}

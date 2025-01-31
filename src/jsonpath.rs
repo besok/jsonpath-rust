@@ -282,16 +282,16 @@ mod tests {
 
     #[test]
     fn descendent_wildcard_test() {
-        let js1 = json!("Moby Dick");
-        let js2 = json!("The Lord of the Rings");
+        let js1 = json!("0-553-21311-3");
+        let js2 = json!("0-395-19395-8");
         test(
             template_json(),
-            "$..*.[?(@.isbn)].title",
+            "$..*.[?@].isbn",
             jp_v![
-                &js1;"$.['store'].['book'][2].['title']",
-                &js2;"$.['store'].['book'][3].['title']",
-                &js1;"$.['store'].['book'][2].['title']",
-                &js2;"$.['store'].['book'][3].['title']"],
+                &js1;"$.['store'].['book'][2].['isbn']",
+                &js2;"$.['store'].['book'][3].['isbn']",
+
+            ],
         );
     }
 
@@ -827,12 +827,12 @@ mod tests {
         }));
 
         let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.[?(@.author ~= '(?i)d\\(Rees\\)')]")
+            JsonPath::try_from("$.[?@ ~= '(?i)d\\(Rees\\)']")
                 .expect("the path is correct"),
         );
         assert_eq!(
             path.find_slice(&json.clone()),
-            vec![Slice(&json!({"author":"abcd(Rees)"}), "$".to_string())]
+            vec![Slice(&json!("abcd(Rees)"), "$.['author']".to_string())]
         );
     }
 
@@ -840,54 +840,42 @@ mod tests {
     fn logical_not_exp_test() {
         let json: Box<Value> = Box::new(json!({"first":{"second":{"active":1}}}));
         let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.first[?(!@.does_not_exist >= 1.0)]")
+            JsonPath::try_from("$.first[?(!@.active > 1.0)]")
                 .expect("the path is correct"),
         );
         let v = path.find_slice(&json);
         assert_eq!(
             v,
             vec![Slice(
-                &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                &json!({"active": 1}),
+                "$.['first'].['second']".to_string()
+            )]
+        );
+
+
+        let path: Box<JsonPath<Value>> = Box::from(
+            JsonPath::try_from("$.first[?(!(@.active == 1) || @.active == 1)]")
+                .expect("the path is correct"),
+        );
+        let v = path.find_slice(&json);
+        assert_eq!(
+            v,
+            vec![Slice(
+                &json!({"active": 1}),
+                "$.['first'].['second']".to_string()
             )]
         );
 
         let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.first[?(!(@.does_not_exist >= 1.0))]")
+            JsonPath::try_from("$.first[?(!@.active == 1 && !@.active == 1 || !@.active == 2)]")
                 .expect("the path is correct"),
         );
         let v = path.find_slice(&json);
         assert_eq!(
             v,
             vec![Slice(
-                &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
-            )]
-        );
-
-        let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.first[?(!(@.second.active == 1) || @.second.active == 1)]")
-                .expect("the path is correct"),
-        );
-        let v = path.find_slice(&json);
-        assert_eq!(
-            v,
-            vec![Slice(
-                &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
-            )]
-        );
-
-        let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::try_from("$.first[?(!@.second.active == 1 && !@.second.active == 1 || !@.second.active == 2)]")
-                .expect("the path is correct"),
-        );
-        let v = path.find_slice(&json);
-        assert_eq!(
-            v,
-            vec![Slice(
-                &json!({"second":{"active": 1}}),
-                "$.['first']".to_string()
+                &json!({"active": 1}),
+                "$.['first'].['second']".to_string()
             )]
         );
     }

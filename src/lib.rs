@@ -308,7 +308,7 @@ impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
     }
 }
 
-impl<'a, Data> JsonPathValue<'a, Data> {
+impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
     pub fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
         !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
     }

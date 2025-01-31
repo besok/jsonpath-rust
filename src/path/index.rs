@@ -2,7 +2,7 @@ use std::cmp;
 use std::cmp::{max, min};
 use std::fmt::Debug;
 
-use crate::jsp_idx;
+use crate::{jsp_idx, jsp_obj};
 use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
 
 use super::{JsonLike, TopPaths};
@@ -379,24 +379,20 @@ where
                         res.push(Slice(el, jsp_idx(&pref, i)))
                     }
                 }
-            } else if self.process(data) {
+            }
+                // empty pref means this is not top object
+            else if data.is_object() && !pref.is_empty() {
+                let pairs = data.as_object().unwrap_or_default();
+                for (i, el) in pairs.into_iter() {
+                    if self.process(el) {
+                        res.push(Slice(el, jsp_obj(&pref, i)))
+                    }
+                }
+            }
+            else if self.process(data) {
                 res.push(Slice(data, pref))
             }
 
-            // match data {
-            //     Array(elems) => {
-            //         for (i, el) in elems.iter().enumerate() {
-            //             if self.process(el) {
-            //                 res.push(Slice(el, jsp_idx(&pref, i)))
-            //             }
-            //         }
-            //     }
-            //     el => {
-            //         if self.process(el) {
-            //             res.push(Slice(el, pref))
-            //         }
-            //     }
-            // }
             if res.is_empty() {
                 vec![NoValue]
             } else {
@@ -710,18 +706,14 @@ mod tests {
             }
         });
         let index = idx!(?filter!(
-            op!(path!(@,path!("not_id"))), "==",op!(2)
+            op!(path!(@)), "==",op!(2)
         ));
         let chain = chain!(path!($), path!("obj"), path!(index));
         let path_inst = json_path_instance(&chain, &json);
-        let js = json!({
-            "id":1,
-            "not_id": 2,
-            "more_then_id" :3
-        });
+
         assert_eq!(
             path_inst.find(JsonPathValue::from_root(&json)),
-            jp_v![&js;"$.['obj']",]
+            jp_v![&json!(2);"$.['obj'].['not_id']",]
         )
     }
 
@@ -768,17 +760,17 @@ mod tests {
             }
         });
         let index = idx!(?filter!(
-            filter!(op!(path!(@,path!("name"))), "==", op!("a")),
+            filter!(op!(path!(@)), "==", op!("a")),
             ||,
-            filter!(op!(path!(@,path!("another"))), "==", op!("b"))
+            filter!(op!(path!(@)), "==", op!("b"))
         )
         );
-        let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
+        let chain = chain!(path!($), path!("key"), path!(index));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
         assert_eq!(
             path_inst.find(JsonPathValue::from_root(&json)),
-            jp_v![&j1;"$.['key'].['id']",]
+            jp_v![&json!("b");"$.['key'].['another']",&json!("a");"$.['key'].['name']" ]
         )
     }
 
@@ -792,17 +784,17 @@ mod tests {
             }
         });
         let index = idx!(?filter!(
-            filter!(op!(path!(@,path!("name"))), "==", op!("c")),
+            filter!(op!(path!(@)), "==", op!("c")),
             ||,
-            filter!(op!(path!(@,path!("another"))), "==", op!("d"))
+            filter!(op!(path!(@)), "==", op!("d"))
         )
         );
-        let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
+        let chain = chain!(path!($), path!("key"), path!(index));
         let path_inst = json_path_instance(&chain, &json);
-        let j1 = json!(1);
+        let j1 = json!("d");
         assert_eq!(
             path_inst.find(JsonPathValue::from_root(&json)),
-            jp_v![&j1;"$.['key'].['id']",]
+            jp_v![&j1;"$.['key'].['another']",]
         )
     }
 
@@ -847,7 +839,7 @@ mod tests {
             filter!(op!(path!(@,path!("another"))), "==", op!("b"))
         )
         );
-        let chain = chain!(path!($), path!("key"), path!(index), path!("id"));
+        let chain = chain!(path!($), path!(index), path!("id"));
         let path_inst = json_path_instance(&chain, &json);
         let j1 = json!(1);
         assert_eq!(
