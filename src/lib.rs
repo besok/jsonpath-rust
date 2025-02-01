@@ -192,15 +192,6 @@ impl JsonPathQuery for Value {
     }
 }
 
-/*
-impl<T> JsonPathQuery for T
-    where T: Deref<Target=Value> {
-    fn path(self, query: &str) -> Result<Value, String> {
-        let p = JsonPath::from_str(query)?;
-        Ok(p.find(self.deref()))
-    }
-}
- */
 
 /// just to create a json path value of data
 /// Example:

@@ -1,8 +1,8 @@
 use crate::suite::TestFailure;
 use chrono::Local;
 use colored::Colorize;
-use std::fs::OpenOptions;
-use std::io::Error;
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Error};
 use std::io::Write;
 pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result<(), Error> {
     let (passed, failed): (Vec<_>, Vec<_>) = results.into_iter().partition(TestResult::is_ok);
@@ -31,6 +31,9 @@ pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result
         "{}; {}; {}; {}",
         total, passed_count, failed_count, date
     )?;
+
+    clean_file(5)?;
+
     println!(
         "\n{}:\n{}\n{}\n{}\n{}",
         format!("RFC9535 Compliance tests").underline().bold(),
@@ -41,5 +44,25 @@ pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result
     );
     Ok(())
 }
+
+fn clean_file(limit:usize) -> Result<(), Error> {
+    let file_path = "test_suite/results.csv";
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+    let lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
+
+    if lines.len() > limit {
+        let header = &lines[0];
+        let trimmed_lines = [&[header.clone()], &lines[lines.len() - limit..]].concat();
+
+        let mut file = OpenOptions::new().write(true).truncate(true).open(file_path)?;
+        for line in trimmed_lines {
+            writeln!(file, "{}", line)?;
+        }
+    }
+
+    Ok(())
+}
+
 
 pub type TestResult<'a> = Result<(), TestFailure<'a>>;

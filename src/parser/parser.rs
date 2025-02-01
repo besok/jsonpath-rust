@@ -85,10 +85,20 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
     let mut start = None;
     let mut end = None;
     let mut step = None;
+    const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
+    const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
     fn validate_min_0(val: &str) -> Result<(), JsonPathParserError> {
         if val == "-0" {
             Err(JsonPathParserError::InvalidJsonPath("-0 is not a valid value for a slice".to_string()))
         }else {
+            Ok(())
+        }
+    }
+
+    fn validate_range(val: i64) -> Result<(), JsonPathParserError> {
+        if val > MAX_VAL || val < MIN_VAL {
+            Err(JsonPathParserError::InvalidJsonPath(format!("Value {} is out of range", val)))
+        } else {
             Ok(())
         }
     }
@@ -98,12 +108,16 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
             Rule::start_slice => {
                 let parsed_val = in_pair.as_str().trim();
                 validate_min_0(parsed_val)?;
-                start = Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
+                let v = parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?;
+                validate_range(v)?;
+                start = Some(v);
             }
             Rule::end_slice => {
                 let parsed_val = in_pair.as_str().trim();
                 validate_min_0(parsed_val)?;
-                end = Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
+                let v = parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?;
+                validate_range(v)?;
+                end = Some(v);
             }
             Rule::step_slice => {
                 if let Some(parsed_val) = in_pair
@@ -112,7 +126,9 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
                     .map(|v| v.as_str().trim())
                 {
                     validate_min_0(parsed_val)?;
-                    step =Some(parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?);
+                    let v = parsed_val.parse::<i64>().map_err(|e| (e, parsed_val))?;
+                    validate_range(v)?;
+                    step =Some(v);
                 }
 
 

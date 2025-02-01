@@ -68,5 +68,6 @@
     - Align the slice expressions with the standard (RFC9535#2.3.4)
     - add a validation for slices -0
     - extend the values for slices to i64
+    - restrict the values with max and min js int values
     - add a validation for non-printable embedded characters
     - add iteration over object keys for filters
