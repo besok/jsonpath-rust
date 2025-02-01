@@ -71,3 +71,6 @@
     - restrict the values with max and min js int values
     - add a validation for non-printable embedded characters
     - add iteration over object keys for filters
+    - fix a bug with quotes - now it is allowed to have single quotes in double quotes and vice versa
+      for instance "abc ' bcd"
+    - The parser rejects the escaped quotes in the string with different types of quotes (e.g. 'abc \\\" bcd' or "abc \\\' bcd")

@@ -10,20 +10,32 @@ word = _{ ('a'..'z' | 'A'..'Z')+ }
 specs = _{ "_" | "-" | "/" | "\\" | "#" }
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT+)? ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?}
 
-string_qt = ${ WHITESPACE? ~ ("\'" ~ inner ~ "\'") | ("\"" ~ inner ~ "\"") ~ WHITESPACE?}
-inner = @{ char* }
-char = _{
-    !(
-    "\"" | "\\" | "\'"
-    | "\u{0000}" | "\u{0001}" | "\u{0002}" | "\u{0003}" | "\u{0004}" | "\u{0005}" | "\u{0006}" | "\u{0007}"
+string_qt = ${ WHITESPACE? ~ (single_quoted | double_quoted) ~ WHITESPACE? }
+single_quoted = _{ "\'" ~ !double_rejected ~ inner_with_single ~ "\'" }
+double_quoted = _{ "\"" ~ !single_rejected ~ inner_with_double ~ "\"" }
+
+inner_with_single = @{ single_char* }
+inner_with_double = @{ double_char* }
+
+single_char = _{ !single_rejected ~ ANY | escaped_char }
+double_char = _{ !double_rejected ~ ANY | escaped_char }
+
+single_rejected = _{ "\'" | "\\" | control_char }
+double_rejected = _{ "\"" | "\\" | control_char }
+
+escaped_char = _{
+    "\\" ~ ("\"" | "\'" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "(" | ")")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+control_char = _{
+    "\u{0000}" | "\u{0001}" | "\u{0002}" | "\u{0003}" | "\u{0004}" | "\u{0005}" | "\u{0006}" | "\u{0007}"
     | "\u{0008}" | "\u{0009}" | "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{000E}" | "\u{000F}"
     | "\u{0010}" | "\u{0011}" | "\u{0012}" | "\u{0013}" | "\u{0014}" | "\u{0015}" | "\u{0016}" | "\u{0017}"
     | "\u{0018}" | "\u{0019}" | "\u{001A}" | "\u{001B}" | "\u{001C}" | "\u{001D}" | "\u{001E}" | "\u{001F}"
     | "\u{007F}"
-    ) ~ ANY
-    | "\\" ~ ("\"" | "\'" |  "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "(" | ")")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
+
 root = {"$"}
 sign = { "==" | "!=" | "~=" | ">=" | ">" | "<=" | "<" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
 not = {"!"}

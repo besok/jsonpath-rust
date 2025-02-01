@@ -75,7 +75,9 @@ where
 fn parse_key(rule: Pair<Rule>) -> Result<Option<String>, JsonPathParserError> {
     let parsed_key = match rule.as_rule() {
         Rule::key | Rule::key_unlim | Rule::string_qt => parse_key(down(rule)?),
-        Rule::key_lim | Rule::inner => Ok(Some(String::from(rule.as_str()))),
+        Rule::key_lim
+        | Rule::inner_with_single
+        | Rule::inner_with_double => Ok(Some(String::from(rule.as_str()))),
         _ => Ok(None),
     };
     parsed_key

@@ -50,3 +50,18 @@ fn filter() -> Result<(),JsonPathParserError> {
     assert_eq!(json!({"a": 1,"b": null}).path("$[?@]")?, json!([ 1, null]));
     Ok(())
 }
+#[test]
+fn filter_quoted_lit() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([
+        "quoted' literal",
+        "a",
+        "quoted\\' literal"
+      ]).path("$[?@ == \"quoted' literal\"]")?, json!(["quoted' literal"]));
+    Ok(())
+}
+
+#[test]
+fn invalid_esc_single_q() -> Result<(),JsonPathParserError> {
+    assert!(json!([]).path("$['\\\"']").is_err());
+    Ok(())
+}
