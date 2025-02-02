@@ -67,7 +67,7 @@ logic_atom = {atom ~ (sign ~ atom)? | "(" ~ logic_or ~ ")"}
 
 atom = {chain | string_qt | number | boolean | null}
 
-index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | unsigned |filter) ~ "]" }
+index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | signed |filter) ~ "]" }
 
 chain = {(root | descent | descent_w | wildcard | current | field | index | function)+}
 

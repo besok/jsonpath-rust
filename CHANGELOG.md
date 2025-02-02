@@ -61,16 +61,18 @@
 - **`0.7.5`**
     - add reference and reference_mut methods
 - **`1.0.0`**
-    - Breaking changes to the API to make it compliant with the RFC9535 
-    - Slice returns an empty vec when it has no matching value (before it was [NoValue]) and at the end Json::Null 
-    - Change the filter expression from `? (<expression>)` into `? <expression>` 
+    - introduced breaking changes to the API to make it compliant with the RFC9535 
+    - changed the signature for slice return on an empty vec 
+      when it has no matching value (before it was [NoValue]) and at the end Json::Null 
+    - changed the filter expression from `? (<expression>)` into `? <expression>` 
       (removing brackets should not break the compatability due to their presence on the expression ). 
-    - Align the slice expressions with the standard (RFC9535#2.3.4)
-    - add a validation for slices -0
-    - extend the values for slices to i64
-    - restrict the values with max and min js int values
-    - add a validation for non-printable embedded characters
-    - add iteration over object keys for filters
-    - fix a bug with quotes - now it is allowed to have single quotes in double quotes and vice versa
+    - aligned the slice expressions with the standard (RFC9535#2.3.4)
+    - added a validation for slices -0
+    - extended the values for slices to i64
+    - restricted the values with max and min js int values
+    - added a validation for non-printable embedded characters
+    - added iteration over object keys for filters
+    - fixed a bug with quotes - now it is allowed to have single quotes in double quotes and vice versa
       for instance "abc ' bcd"
     - The parser rejects the escaped quotes in the string with different types of quotes (e.g. 'abc \\\" bcd' or "abc \\\' bcd")
+    - added the negative indexes for arrays

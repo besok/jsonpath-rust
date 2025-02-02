@@ -108,12 +108,12 @@ where
 
 /// process the simple index like [index]
 pub struct ArrayIndex<T> {
-    index: usize,
+    index: i64,
     _t: std::marker::PhantomData<T>,
 }
 
 impl<T> ArrayIndex<T> {
-    pub(crate) fn new(index: usize) -> Self {
+    pub(crate) fn new(index: i64) -> Self {
         ArrayIndex {
             index,
             _t: std::marker::PhantomData,
@@ -130,8 +130,15 @@ where
     fn find(&self, input: JsonPathValue<'a, Self::Data>) -> Vec<JsonPathValue<'a, Self::Data>> {
         input.flat_map_slice(|data, pref| {
             data.as_array()
-                .and_then(|elems| elems.get(self.index))
-                .map(|e| vec![JsonPathValue::new_slice(e, jsp_idx(&pref, self.index))])
+                .and_then(|elems| {
+                    let idx = if self.index >= 0 {
+                        self.index as usize
+                    } else {
+                        (elems.len() as i64 + self.index) as usize
+                    };
+                   elems.get(idx).map(|e|(e, idx))
+                })
+                .map(|(e,idx)| vec![JsonPathValue::new_slice(e, jsp_idx(&pref, idx))])
                 .unwrap_or_else(|| vec![NoValue])
         })
     }
@@ -195,7 +202,7 @@ where
 
         for idx in elems.iter() {
             indexes.push(TopPaths::ArrayIndex(ArrayIndex::new(
-                idx.as_u64().unwrap() as usize
+                idx.as_i64().unwrap()
             )))
         }
 
@@ -472,6 +479,16 @@ mod tests {
         assert_eq!(
             index.find(JsonPathValue::new_slice(&array, "a".to_string())),
             jp_v![&j0;"a[0]",]
+        );
+        index.index = -1;
+        assert_eq!(
+            index.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            jp_v![&j10;"a[10]",]
+        );
+        index.index = -100;
+        assert_eq!(
+            index.find(JsonPathValue::new_slice(&array, "a".to_string())),
+            vec![NoValue]
         );
         index.index = 10;
         assert_eq!(

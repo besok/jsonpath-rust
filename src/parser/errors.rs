@@ -29,6 +29,7 @@ pub enum JsonPathParserError {
     InvalidJsonPath(String),
 }
 
+
 impl From<(ParseIntError, &str)> for JsonPathParserError {
     fn from((err, val): (ParseIntError, &str)) -> Self {
         JsonPathParserError::InvalidNumber(format!("{:?} for `{}`", err, val))

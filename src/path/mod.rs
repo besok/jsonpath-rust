@@ -62,7 +62,7 @@ pub trait JsonLike:
     ) -> Vec<(&'a Self, String)>;
 
     /// Converts the element to an `Option<u64>`.
-    fn as_u64(&self) -> Option<u64>;
+    fn as_i64(&self) -> Option<i64>;
 
     /// Checks if the element is an array.
     fn is_array(&self) -> bool;
@@ -250,8 +250,8 @@ impl JsonLike for Value {
         }
     }
 
-    fn as_u64(&self) -> Option<u64> {
-        self.as_u64()
+    fn as_i64(&self) -> Option<i64> {
+        self.as_i64()
     }
     fn is_array(&self) -> bool {
         self.is_array()
@@ -594,7 +594,7 @@ where
         JsonPath::DescentW => TopPaths::DescentWildcard(DescentWildcard::new()),
         JsonPath::Current(value) => TopPaths::Current(Current::from(value, root)),
         JsonPath::Index(JsonPathIndex::Single(index)) => {
-            TopPaths::ArrayIndex(ArrayIndex::new(index.as_u64().unwrap() as usize))
+            TopPaths::ArrayIndex(ArrayIndex::new(index.as_i64().unwrap()))
         }
         JsonPath::Index(JsonPathIndex::Slice(s, e, step)) => {
             TopPaths::ArraySlice(ArraySlice::new(*s, *e, *step))

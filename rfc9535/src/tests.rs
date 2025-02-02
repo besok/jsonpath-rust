@@ -65,3 +65,9 @@ fn invalid_esc_single_q() -> Result<(),JsonPathParserError> {
     assert!(json!([]).path("$['\\\"']").is_err());
     Ok(())
 }
+
+#[test]
+fn index_neg() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$[-9007199254740991]")?, json!([]) );
+    Ok(())
+}

@@ -1,5 +1,6 @@
 #![allow(clippy::empty_docs)]
 
+use std::num::ParseIntError;
 use crate::parser::errors::JsonPathParserError;
 use crate::parser::model::FilterExpression::{And, Not, Or};
 use crate::parser::model::{
@@ -12,7 +13,8 @@ use pest::Parser;
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path.pest"]
 struct JsonPathParser;
-
+const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
+const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 /// Parses a string into a [JsonPath].
 ///
 /// # Errors
@@ -87,8 +89,7 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
     let mut start = None;
     let mut end = None;
     let mut step = None;
-    const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
-    const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
+
     fn validate_min_0(val: &str) -> Result<(), JsonPathParserError> {
         if val == "-0" {
             Err(JsonPathParserError::InvalidJsonPath("-0 is not a valid value for a slice".to_string()))
@@ -97,13 +98,7 @@ fn parse_slice<T>(pairs: Pairs<Rule>) -> Result<JsonPathIndex<T>, JsonPathParser
         }
     }
 
-    fn validate_range(val: i64) -> Result<(), JsonPathParserError> {
-        if val > MAX_VAL || val < MIN_VAL {
-            Err(JsonPathParserError::InvalidJsonPath(format!("Value {} is out of range", val)))
-        } else {
-            Ok(())
-        }
-    }
+
 
     for in_pair in pairs {
         match in_pair.as_rule() {
@@ -339,7 +334,7 @@ where
 {
     let next = down(rule)?;
     let parsed_index = match next.as_rule() {
-        Rule::unsigned => JsonPathIndex::Single(number_to_value(next.as_str())?),
+        Rule::signed => JsonPathIndex::Single(number_to_value(next.as_str())?),
         Rule::slice => parse_slice(next.into_inner())?,
         Rule::unit_indexes => parse_unit_indexes(next.into_inner())?,
         Rule::unit_keys => parse_unit_keys(next.into_inner())?,
@@ -348,7 +343,13 @@ where
     };
     Ok(parsed_index)
 }
-
+fn validate_range(val: i64) -> Result<(), JsonPathParserError> {
+    if val > MAX_VAL || val < MIN_VAL {
+        Err(JsonPathParserError::InvalidJsonPath(format!("Value {} is out of range", val)))
+    } else {
+        Ok(())
+    }
+}
 fn down(rule: Pair<Rule>) -> Result<Pair<Rule>, JsonPathParserError> {
     let error_message = rule.to_string();
     match rule.into_inner().next() {
@@ -465,7 +466,6 @@ mod tests {
     #[test]
     fn index_single_test() {
         test::<Value>("[1]", vec![path!(idx!(1))]);
-        test_failed("[-1]");
         test_failed("[1a]");
     }
 
