@@ -66,6 +66,7 @@ where
         Rule::descent_w => Ok(JsonPath::DescentW),
         Rule::function => Ok(JsonPath::Fn(Function::Length)),
         Rule::field => parse_key(down(rule)?)?
+            .and_then(|key| key.parse::<f64>().err().map(|_| key))
             .map(JsonPath::Field)
             .ok_or(JsonPathParserError::NoJsonPathField),
         Rule::index => parse_index(rule).map(JsonPath::Index),
@@ -647,7 +648,13 @@ mod tests {
         test_failed("[?(@ >< ['abc','abc'])]");
         test_failed("[?(@ in {\"abc\":1})]");
     }
-
+    #[test]
+    fn fn_filter_test(){
+        test::<Value>(
+            "[?'abc' == 'abc']",
+            vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
+        );
+    }
     #[test]
     fn fn_size_test() {
         test::<Value>(
@@ -660,7 +667,10 @@ mod tests {
             vec![path!($), path!("k"), path!("length"), path!("field")],
         )
     }
-
+    #[test]
+    fn field_num() {
+        test_failed("$.1")
+    }
     #[test]
     fn parser_error_test_invalid_rule() {
         let result = parse_json_path::<Value>("notapath");

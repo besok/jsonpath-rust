@@ -71,3 +71,13 @@ fn index_neg() -> Result<(),JsonPathParserError> {
     assert_eq!(json!([]).path("$[-9007199254740991]")?, json!([]) );
     Ok(())
 }
+#[test]
+fn field_num() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$.1")?, json!([]) );
+    Ok(())
+}
+#[test]
+fn field_surrogate_pair() -> Result<(),JsonPathParserError> {
+    assert_eq!(json!([]).path("$['\\uD834\\uDD1E']")?, json!([]) );
+    Ok(())
+}
