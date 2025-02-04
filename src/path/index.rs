@@ -279,6 +279,9 @@ where
             FilterExpression::Not(exp) => FilterPath::Not {
                 exp: Box::new(FilterPath::new(exp, root)),
             },
+            FilterExpression::Extension(_,els) => FilterPath::new(
+                els.get(0).unwrap(), root
+            ),
         }
     }
     fn compound(

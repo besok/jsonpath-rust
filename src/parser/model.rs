@@ -164,6 +164,42 @@ pub enum FilterExpression<T> {
     Or(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
     /// not with !
     Not(Box<FilterExpression<T>>),
+    Extension(FilterExt, Vec<FilterExpression<T>>),
+}
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterExt{
+    Length,
+    Count,
+    Value,
+    Search,
+    Match
+}
+
+impl Display for FilterExt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            FilterExt::Length => "length",
+            FilterExt::Count => "count",
+            FilterExt::Value => "value",
+            FilterExt::Search => "search",
+            FilterExt::Match => "match",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl FilterExt {
+    pub fn new(val:&str) -> Result<Self, JsonPathParserError> {
+        match val {
+            "length" => Ok(FilterExt::Length),
+            "count" => Ok(FilterExt::Count),
+            "value" => Ok(FilterExt::Value),
+            "search" => Ok(FilterExt::Search),
+            "match" => Ok(FilterExt::Match),
+            _ => Err(JsonPathParserError::UnexpectedNoneLogicError(val.to_string(),
+                                                                   "filter extensions".to_string()))
+        }
+    }
 }
 
 impl<T: Display> Display for FilterExpression<T> {
@@ -180,6 +216,15 @@ impl<T: Display> Display for FilterExpression<T> {
             }
             FilterExpression::Not(expr) => {
                 format!("!{}", expr)
+            }
+            FilterExpression::Extension(e, elems) => {
+                format!("{}({})",
+                        e,
+                        elems
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(","))
             }
         };
         write!(f, "{}", str)

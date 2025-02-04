@@ -3,9 +3,7 @@
 use std::num::ParseIntError;
 use crate::parser::errors::JsonPathParserError;
 use crate::parser::model::FilterExpression::{And, Not, Or};
-use crate::parser::model::{
-    FilterExpression, FilterSign, Function, JsonPath, JsonPathIndex, Operand,
-};
+use crate::parser::model::{FilterExpression, FilterExt, FilterSign, Function, JsonPath, JsonPathIndex, Operand};
 use crate::path::JsonLike;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
@@ -304,6 +302,10 @@ where
                     Ok(FilterExpression::Atom(left, sign, right))
                 }
             }
+            Rule::filter_ext => {
+                parse_filter_ext(pairs.next()
+                    .ok_or(JsonPathParserError::EmptyInner("".to_string()))?)
+            }
             rule => Err(JsonPathParserError::UnexpectedRuleLogicError(rule, pairs.get_input().to_string(), pairs.as_str().to_string())),
         }
     } else {
@@ -312,6 +314,25 @@ where
             pairs.as_str().to_string(),
         ))
     }
+}
+
+
+fn parse_filter_ext<T>(rule: Pair<'_, Rule>) -> Result<FilterExpression<T>, JsonPathParserError>
+where
+    T: JsonLike,
+{
+    let mut pairs = rule.into_inner();
+
+    let name = pairs
+        .next()
+        .ok_or(JsonPathParserError::EmptyInner("".to_string()))
+        .and_then(|x|FilterExt::new(x.as_str()))?;
+
+    let mut filters = vec![];
+    for pair in pairs {
+        filters.push(parse_logic_or::<T>(pair.into_inner())?);
+    }
+   Ok(FilterExpression::Extension(name, filters))
 }
 
 fn parse_atom<T>(rule: Pair<'_, Rule>) -> Result<Operand<T>, JsonPathParserError>
@@ -651,7 +672,7 @@ mod tests {
     #[test]
     fn fn_filter_test(){
         test::<Value>(
-            "[?'abc' == 'abc']",
+            "[?count(@.a)]",
             vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
         );
     }

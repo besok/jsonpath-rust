@@ -6,6 +6,11 @@ macro_rules! filter {
    };
    ( $left:expr,||, $right:expr) => {FilterExpression::Or(Box::new($left),Box::new($right)) };
    ( $left:expr,&&, $right:expr) => {FilterExpression::And(Box::new($left),Box::new($right)) };
+   ( count $inner:expr  ) => { FilterExpression::Extension(FilterExt::Count, vec![$inner])};
+   ( length $inner:expr  ) => { FilterExpression::Extension(FilterExt::Length,vec![$inner])};
+   ( value $inner:expr  ) => { FilterExpression::Extension(FilterExt::Value,vec![$inner])};
+   ( search $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Search,vec![$inner1, $inner2])};
+   ( match_  $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Match,vec![$inner1, $inner2])};
 }
 
 #[macro_export]
