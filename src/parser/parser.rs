@@ -673,7 +673,15 @@ mod tests {
     fn fn_filter_test(){
         test::<Value>(
             "[?count(@.a)]",
-            vec![path!(idx!(?filter!(op!("abc"),"==",op!("abc") )))],
+            vec![path!(idx!(?filter!(count chain!(path!(@,path!("a"))))))],
+        );
+        test::<Value>(
+            "[?value(@..a)]",
+            vec![path!(idx!(?filter!(value chain!(path!(@,path!(.. "a"))))))],
+        );
+        test::<Value>(
+            "[?match(@.a , @.b)]",
+            vec![path!(idx!(?filter!(match_ chain!(path!(@,path!("a"))), chain!(path!(@,path!( "b"))))  ))],
         );
     }
     #[test]

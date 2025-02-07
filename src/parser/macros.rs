@@ -6,11 +6,17 @@ macro_rules! filter {
    };
    ( $left:expr,||, $right:expr) => {FilterExpression::Or(Box::new($left),Box::new($right)) };
    ( $left:expr,&&, $right:expr) => {FilterExpression::And(Box::new($left),Box::new($right)) };
-   ( count $inner:expr  ) => { FilterExpression::Extension(FilterExt::Count, vec![$inner])};
-   ( length $inner:expr  ) => { FilterExpression::Extension(FilterExt::Length,vec![$inner])};
-   ( value $inner:expr  ) => { FilterExpression::Extension(FilterExt::Value,vec![$inner])};
-   ( search $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Search,vec![$inner1, $inner2])};
-   ( match_  $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Match,vec![$inner1, $inner2])};
+   ( count $inner:expr  ) => { FilterExpression::Extension(FilterExt::Count, vec![filter!(op!($inner),"exists",op!())])};
+   ( length $inner:expr  ) =>  { FilterExpression::Extension(FilterExt::Length, vec![filter!(op!($inner),"exists",op!())])};
+   ( value $inner:expr  ) => { FilterExpression::Extension(FilterExt::Value, vec![filter!(op!($inner),"exists",op!())])};
+   ( search  $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Search,vec![
+       filter!(op!($inner1),"exists",op!()),
+       filter!(op!($inner2),"exists",op!())
+   ])};
+   ( match_  $inner1:expr,$inner2:expr  ) => { FilterExpression::Extension(FilterExt::Match,vec![
+       filter!(op!($inner1),"exists",op!()),
+       filter!(op!($inner2),"exists",op!())
+   ])};
 }
 
 #[macro_export]
