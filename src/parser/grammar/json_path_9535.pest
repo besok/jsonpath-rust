@@ -1,11 +1,13 @@
 main = { SOI ~ js_query ~ EOI }
 js_query = {root ~ segments}
 segments = {(S ~ segment)*}
-
-WHITESPACE = _{ " " | "\t" | "\r\n" | "\n" | "\r"}
-S = _{ WHITESPACE* }
-root = {"$"}
+segment = { child_segment | descendant_segment }
+child_segment = { bracketed_selection | ("." ~ (wildcard_selector | member_name_shorthand)) }
+bracketed_selection = { "[" ~ S ~ selector ~ (S ~ "," ~ S ~ selector)* ~ S ~ "]" }
+descendant_segment = { ".."}
 selector = {name_selector | wildcard_selector | index_selector | slice_selector | filter_selector}
+
+root = {"$"}
 name_selector = {string_literal}
 wildcard_selector   = _{"*"}
 index_selector   = {int}
@@ -41,11 +43,6 @@ single_quoted = _{ unescaped | "\"" | ESC ~ "\'" | ESC ~ escapable }
 escapable = _{
     "b" | "f" | "n" | "r" | "t" | "/" | "\\" | ("u" ~ hexchar)
 }
-segment = { child_segment | descendant_segment }
-descendant_segment = { ".."}
-child_segment = { bracketed_selection | ("." ~ (wildcard_selector | member_name_shorthand)) }
-
-bracketed_selection = { "[" ~ S ~ selector ~ (S ~ "," ~ S ~ selector)* ~ S ~ "]" }
 
 member_name_shorthand = { name_first ~ name_char* }
 name_first = { ALPHA | "_" | '\u{0080}'..'\u{D7FF}' | '\u{E000}'..'\u{10FFFF}' }
@@ -61,6 +58,7 @@ unescaped = _{
     '\u{E000}'..'\u{10FFFF}'
 }
 
+S = _{ WHITESPACE* }
 hexchar = _{ non_surrogate | (high_surrogate ~ "\\" ~ "u" ~ low_surrogate) }
 number = { (int | "-0") ~ frac? ~ exp? }
 frac = { "." ~ DIGIT+ }
@@ -72,6 +70,7 @@ high_surrogate = _{ "D" ~ ("8" | "9" | "A" | "B") ~ HEXDIG{2} }
 low_surrogate = _{ "D" ~ ("C" | "D" | "E" | "F") ~ HEXDIG{2} }
 
 HEXDIG = _{ DIGIT | "A" | "B" | "C" | "D" | "E" | "F" }
-DIGIT = _{ '0'..'9' }
-DIGIT1 = _{ '1'..'9' }
-ALPHA = { 'A'..'Z' | 'a'..'z' }
+DIGIT = _{ ASCII_DIGIT }
+DIGIT1 = _{ ASCII_NONZERO_DIGIT}
+ALPHA = { ASCII_ALPHA }
+WHITESPACE = _{ " " | "\t" | "\r\n" | "\n" | "\r"}

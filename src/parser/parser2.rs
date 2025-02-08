@@ -36,7 +36,7 @@ mod tests {
         }
     }
 
-    fn assert<T>(input: &str, expected: JsonPath<T>)
+    fn assert_jspath<T>(input: &str, expected: JsonPath<T>)
     where
         T: JsonLike,
     {
@@ -48,4 +48,26 @@ mod tests {
         }
     }
 
+
+    fn assert_rule(rule:Rule, input:&str, expected:&str){
+        match JSPathParser::parse(rule, input) {
+            Ok(e) => assert_eq!(e.as_str(), expected),
+            Err(e) => {
+                panic!("parsing error {}", e);
+            }
+        }
+    }
+    fn fail_rule(rule:Rule, input:&str){
+        match JSPathParser::parse(rule, input) {
+            Ok(e) =>  panic!("should be false but got {:?}", e),
+            Err(e) => {}
+        }
+    }
+
+
+    #[test]
+    fn root_test(){
+        assert_rule(Rule::root, "$", "$");
+        fail_rule(Rule::root, "a");
+    }
 }
