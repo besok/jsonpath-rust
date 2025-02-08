@@ -165,10 +165,10 @@ pub enum FilterExpression<T> {
     /// not with !
     Not(Box<FilterExpression<T>>),
     /// Extensions
-    Extension(FilterExt, Vec<FilterExpression<T>>),
+    Extension(ExtensionImpl, Vec<FilterExpression<T>>),
 }
 #[derive(Debug, Clone, PartialEq)]
-pub enum FilterExt{
+pub enum ExtensionImpl {
     Length,
     Count,
     Value,
@@ -176,27 +176,27 @@ pub enum FilterExt{
     Match
 }
 
-impl Display for FilterExt {
+impl Display for ExtensionImpl {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            FilterExt::Length => "length",
-            FilterExt::Count => "count",
-            FilterExt::Value => "value",
-            FilterExt::Search => "search",
-            FilterExt::Match => "match",
+            ExtensionImpl::Length => "length",
+            ExtensionImpl::Count => "count",
+            ExtensionImpl::Value => "value",
+            ExtensionImpl::Search => "search",
+            ExtensionImpl::Match => "match",
         };
         write!(f, "{}", str)
     }
 }
 
-impl FilterExt {
+impl ExtensionImpl {
     pub fn new(val:&str) -> Result<Self, JsonPathParserError> {
         match val {
-            "length" => Ok(FilterExt::Length),
-            "count" => Ok(FilterExt::Count),
-            "value" => Ok(FilterExt::Value),
-            "search" => Ok(FilterExt::Search),
-            "match" => Ok(FilterExt::Match),
+            "length" => Ok(ExtensionImpl::Length),
+            "count" => Ok(ExtensionImpl::Count),
+            "value" => Ok(ExtensionImpl::Value),
+            "search" => Ok(ExtensionImpl::Search),
+            "match" => Ok(ExtensionImpl::Match),
             _ => Err(JsonPathParserError::UnexpectedNoneLogicError(val.to_string(),
                                                                    "filter extensions".to_string()))
         }

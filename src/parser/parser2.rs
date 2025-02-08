@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn root_test(){
-        assert_rule(Rule::root, "$", "$");
+        assert_rule(Rule::root, "$", "");
         fail_rule(Rule::root, "a");
     }
 }

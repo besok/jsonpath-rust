@@ -1,5 +1,5 @@
-main = { SOI ~ js_query ~ EOI }
-js_query = {root ~ segments}
+main = { SOI ~ jp_query ~ EOI }
+jp_query = {root ~ segments}
 segments = {(S ~ segment)*}
 segment = { child_segment | descendant_segment }
 child_segment = { bracketed_selection | ("." ~ (wildcard_selector | member_name_shorthand)) }
@@ -7,7 +7,7 @@ bracketed_selection = { "[" ~ S ~ selector ~ (S ~ "," ~ S ~ selector)* ~ S ~ "]"
 descendant_segment = { ".."}
 selector = {name_selector | wildcard_selector | index_selector | slice_selector | filter_selector}
 
-root = {"$"}
+root = _{"$"}
 name_selector = {string_literal}
 wildcard_selector   = _{"*"}
 index_selector   = {int}
@@ -18,12 +18,14 @@ logical_expr_or = {logical_expr_and ~ S ~ ("||" ~ S ~ logical_expr_and)*}
 logical_expr_and = {atom_expr ~ S ~ ("&&" ~ S ~ atom_expr)*}
 atom_expr = {paren_expr | comp_expr| test_expr}
 paren_expr = {not_op? ~ S ~ "(" ~ S ~ logical_expr_or ~ S ~ ")"}
-test_expr = {not_op? ~ S ~ (filter_query | function_expr)}
-filter_query = {rel_query | js_query}
-rel_query = {curr ~ S ~ segments}
 comp_expr = { comparable ~ S ~ comp_op ~ S ~ comparable }
-literal = { number | string_literal | "true" | "false" | "null" }
+test_expr = {not_op? ~ S ~ (filter_query | function_expr)}
+function_expr = { function_name ~ "(" ~ S ~ (function_argument ~ (S ~ "," ~ S ~ function_argument)*)? ~ S ~ ")" }
+function_argument = { literal | filter_query | logical_expr_or | function_expr }
+filter_query = {rel_query | jp_query}
+rel_query = {curr ~ S ~ segments}
 comparable = { literal | singular_query | function_expr }
+literal = { number | string_literal | "true" | "false" | "null" }
 singular_query = { rel_singular_query | abs_singular_query }
 rel_singular_query = { curr ~ singular_query_segments }
 abs_singular_query = { root ~ singular_query_segments }
@@ -35,8 +37,8 @@ function_name = { function_name_first ~ function_name_char* }
 function_name_first = { LCALPHA }
 function_name_char = { function_name_first | "_" | DIGIT }
 LCALPHA = { 'a'..'z' }
-function_expr = { function_name ~ "(" ~ S ~ (function_argument ~ (S ~ "," ~ S ~ function_argument)*)? ~ S ~ ")" }
-function_argument = { literal | filter_query | logical_expr_or | function_expr }
+
+
 string_literal = _{ "\"" ~ double_quoted* ~ "\"" | "\'" ~ single_quoted* ~ "\'" }
 double_quoted = _{ unescaped | "\'" | ESC ~ "\"" | ESC ~ escapable }
 single_quoted = _{ unescaped | "\"" | ESC ~ "\'" | ESC ~ escapable }

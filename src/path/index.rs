@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 
 use crate::{jsp_idx, jsp_obj};
-use crate::parser::model::{FilterExpression, FilterExt, FilterSign, JsonPath};
+use crate::parser::model::{FilterExpression, ExtensionImpl, FilterSign, JsonPath};
 
 use super::{JsonLike, TopPaths};
 use crate::path::top::ObjectField;
@@ -268,13 +268,13 @@ pub enum FilterExtension<'a, T>{
 }
 
 impl<'a, T> FilterExtension<'a, T> where  T: JsonLike, {
-    pub fn new(tpe:&FilterExt,els:&'a Vec<FilterExpression<T>>, root: &'a T) -> Self{
+    pub fn new(tpe:&ExtensionImpl, els:&'a Vec<FilterExpression<T>>, root: &'a T) -> Self{
           match tpe {
-              FilterExt::Length => FilterExtension::Length(FilterPath::new(els.first().unwrap(), root)),
-              FilterExt::Count => { FilterExtension::Count(FilterPath::new(els.first().unwrap(), root)) }
-              FilterExt::Value => { FilterExtension::Value(FilterPath::new(els.first().unwrap(), root)) }
-              FilterExt::Search => { FilterExtension::Search(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root)) }
-              FilterExt::Match => { FilterExtension::Match(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root))}
+              ExtensionImpl::Length => FilterExtension::Length(FilterPath::new(els.first().unwrap(), root)),
+              ExtensionImpl::Count => { FilterExtension::Count(FilterPath::new(els.first().unwrap(), root)) }
+              ExtensionImpl::Value => { FilterExtension::Value(FilterPath::new(els.first().unwrap(), root)) }
+              ExtensionImpl::Search => { FilterExtension::Search(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root)) }
+              ExtensionImpl::Match => { FilterExtension::Match(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root))}
           }
     }
 }
