@@ -302,10 +302,7 @@ where
                     Ok(FilterExpression::Atom(left, sign, right))
                 }
             }
-            Rule::filter_ext => {
-                parse_filter_ext(pairs.next()
-                    .ok_or(JsonPathParserError::EmptyInner("".to_string()))?)
-            }
+
             rule => Err(JsonPathParserError::UnexpectedRuleLogicError(rule, pairs.get_input().to_string(), pairs.as_str().to_string())),
         }
     } else {
@@ -345,6 +342,9 @@ where
         Rule::string_qt => Operand::Static(T::from(down(atom)?.as_str())),
         Rule::chain => parse_chain_in_operand(down(rule)?)?,
         Rule::boolean => Operand::Static(bool_to_value(rule.as_str())),
+        // Rule::filter_ext => {
+        //     parse_filter_ext(atom)?
+        // }
         _ => Operand::Static(T::null()),
     };
     Ok(parsed_atom)
@@ -671,6 +671,10 @@ mod tests {
     }
     #[test]
     fn fn_filter_test(){
+        test::<Value>(
+            "[?count(@.a)>2]",
+            vec![path!(idx!(?filter!(count chain!(path!(@,path!("a"))))))],
+        );
         test::<Value>(
             "[?count(@.a)]",
             vec![path!(idx!(?filter!(count chain!(path!(@,path!("a"))))))],

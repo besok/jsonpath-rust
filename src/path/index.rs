@@ -3,7 +3,7 @@ use std::cmp::{max, min};
 use std::fmt::Debug;
 
 use crate::{jsp_idx, jsp_obj};
-use crate::parser::model::{FilterExpression, FilterSign, JsonPath};
+use crate::parser::model::{FilterExpression, FilterExt, FilterSign, JsonPath};
 
 use super::{JsonLike, TopPaths};
 use crate::path::top::ObjectField;
@@ -238,7 +238,7 @@ where
 }
 
 /// process filter element like [?op sign op]
-pub enum FilterPath<'a, T> {
+pub enum  FilterPath<'a, T> {
     Filter {
         left: PathInstance<'a, T>,
         right: PathInstance<'a, T>,
@@ -255,6 +255,28 @@ pub enum FilterPath<'a, T> {
     Not {
         exp: PathInstance<'a, T>,
     },
+    Extension(Box<FilterExtension<'a, T>>),
+}
+
+
+pub enum FilterExtension<'a, T>{
+    Value(FilterPath<'a, T>),
+    Length(FilterPath<'a, T>),
+    Count(FilterPath<'a, T>),
+    Search(FilterPath<'a, T>, FilterPath<'a, T>),
+    Match(FilterPath<'a, T>, FilterPath<'a, T>),
+}
+
+impl<'a, T> FilterExtension<'a, T> where  T: JsonLike, {
+    pub fn new(tpe:&FilterExt,els:&'a Vec<FilterExpression<T>>, root: &'a T) -> Self{
+          match tpe {
+              FilterExt::Length => FilterExtension::Length(FilterPath::new(els.first().unwrap(), root)),
+              FilterExt::Count => { FilterExtension::Count(FilterPath::new(els.first().unwrap(), root)) }
+              FilterExt::Value => { FilterExtension::Value(FilterPath::new(els.first().unwrap(), root)) }
+              FilterExt::Search => { FilterExtension::Search(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root)) }
+              FilterExt::Match => { FilterExtension::Match(FilterPath::new(els.get(0).unwrap(), root), FilterPath::new(els.get(1).unwrap(), root))}
+          }
+    }
 }
 
 impl<'a, T> FilterPath<'a, T>
@@ -279,9 +301,9 @@ where
             FilterExpression::Not(exp) => FilterPath::Not {
                 exp: Box::new(FilterPath::new(exp, root)),
             },
-            FilterExpression::Extension(_,els) => FilterPath::new(
-                els.get(0).unwrap(), root
-            ),
+            FilterExpression::Extension(tpe,els) => {
+                FilterPath::Extension(Box::new(FilterExtension::new(tpe, els, root)))
+            },
         }
     }
     fn compound(
@@ -369,6 +391,9 @@ where
             FilterPath::Not { exp } => {
                 JsonPathValue::vec_as_data(exp.find(Slice(curr_el, pref))).is_empty()
             }
+            FilterPath::Extension(f) => {
+                false
+            }
         }
     }
 }
@@ -414,7 +439,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::jp_v;
+    use crate::{jp_v, JsonPathQuery};
     use crate::parser::macros::{chain, filter, idx, op};
     use crate::parser::model::{FilterExpression, FilterSign, JsonPath, JsonPathIndex, Operand};
     use crate::path::index::{ArrayIndex, ArraySlice};
@@ -912,5 +937,18 @@ mod tests {
         let slice: ArraySlice<i32> = ArraySlice::new(Some(4), Some(1), Some(-1));
         let res = slice.process(&[1, 2, 3, 4, 5]);
         assert_eq!(res, vec![(&5, 4), (&4, 3), (&3, 2)]);
+    }
+
+
+    #[test]
+    fn length_smoke() {
+        let json = json!({
+             "id":1,
+             "name":"a",
+             "another":"abc"
+            });
+
+        let res = json.path("$[?length(@) > 2]").unwrap();
+        assert_eq!(res,json!(["abc"]));
     }
 }

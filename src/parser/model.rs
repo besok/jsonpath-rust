@@ -164,6 +164,7 @@ pub enum FilterExpression<T> {
     Or(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
     /// not with !
     Not(Box<FilterExpression<T>>),
+    /// Extensions
     Extension(FilterExt, Vec<FilterExpression<T>>),
 }
 #[derive(Debug, Clone, PartialEq)]

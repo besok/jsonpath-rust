@@ -64,8 +64,8 @@ logic_and = {logic_not ~ ("&&" ~ logic_not)*}
 logic_not = {not? ~ logic_atom}
 filter_ext_name = {"length" | "count" | "match" | "search" | "value"}
 filter_ext = {filter_ext_name ~ "(" ~ logic_or ~ ("," ~ logic_or)? ~ ")"}
-logic_atom = {filter_ext | atom ~ (sign ~ atom)? | "(" ~ logic_or ~ ")"  }
-atom = {chain | string_qt | number | boolean | null}
+logic_atom = {atom ~ (sign ~ atom)? | "(" ~ logic_or ~ ")"  }
+atom = {filter_ext | chain | string_qt | number | boolean | null}
 
 index = {dot? ~ "["~ (unit_keys | unit_indexes | slice | signed |filter) ~ "]" }
 
