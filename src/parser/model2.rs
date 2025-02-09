@@ -279,8 +279,8 @@ impl Display for FnArg {
 }
 
 /// Enum representing different types of literal values in a JSONPath query.
-#[derive(Debug, Clone)]
-enum Literal {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
     /// Represents an integer literal.
     Int(i64),
     /// Represents a floating-point literal.

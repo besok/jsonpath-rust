@@ -8,7 +8,7 @@ descendant_segment = { ".."}
 selector = {name_selector | wildcard_selector | index_selector | slice_selector | filter_selector}
 
 root = _{"$"}
-name_selector = {string_literal}
+name_selector = {string}
 wildcard_selector   = _{"*"}
 index_selector   = {int}
 int = _{ "0" | ("-"? ~ DIGIT1 ~ DIGIT*) }
@@ -25,7 +25,9 @@ function_argument = { literal | filter_query | logical_expr_or | function_expr }
 filter_query = {rel_query | jp_query}
 rel_query = {curr ~ S ~ segments}
 comparable = { literal | singular_query | function_expr }
-literal = { number | string_literal | "true" | "false" | "null" }
+literal = { number | string | bool | null }
+bool = {"true" | "false"}
+null = {"null"}
 singular_query = { rel_singular_query | abs_singular_query }
 rel_singular_query = { curr ~ singular_query_segments }
 abs_singular_query = { root ~ singular_query_segments }
@@ -39,7 +41,7 @@ function_name_char = { function_name_first | "_" | DIGIT }
 LCALPHA = { 'a'..'z' }
 
 
-string_literal = _{ "\"" ~ double_quoted* ~ "\"" | "\'" ~ single_quoted* ~ "\'" }
+string = { "\"" ~ double_quoted* ~ "\"" | "\'" ~ single_quoted* ~ "\'" }
 double_quoted = _{ unescaped | "\'" | ESC ~ "\"" | ESC ~ escapable }
 single_quoted = _{ unescaped | "\"" | ESC ~ "\'" | ESC ~ escapable }
 escapable = _{

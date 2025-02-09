@@ -9,6 +9,8 @@ pub(crate) mod parser;
 #[allow(clippy::module_inception)]
 mod parser2;
 mod model2;
+mod errors2;
+mod macros2;
 
 pub use errors::JsonPathParserError;
 pub use model::FilterExpression;
