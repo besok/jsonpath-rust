@@ -37,3 +37,31 @@ macro_rules! singular_query {
         SingularQuery::Root(q_segments!($($segment)*))
     };
 }
+
+#[macro_export]
+macro_rules! slice {
+    () => {
+        (None, None, None)
+    };
+    ($start:expr) => {
+        (Some($start), None, None)
+    };
+    ($start:expr, $end:expr) => {
+        (Some($start), Some($end), None)
+    };
+    ($start:expr,, $step:expr) => {
+        (Some($start), None, Some($step))
+    };
+    (,, $step:expr) => {
+        (None, None, Some($step))
+    };
+    (, $end:expr) => {
+        (None, Some($end), None)
+    };
+    (, $end:expr,$step:expr ) => {
+        (None, Some($end), Some($step))
+    };
+    ($start:expr, $end:expr, $step:expr) => {
+        (Some($start), Some($end), Some($step))
+    }
+}

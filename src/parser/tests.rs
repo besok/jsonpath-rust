@@ -5,8 +5,8 @@ use std::fmt::Debug;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
-use crate::{lit, q_segments, q_segment, singular_query};
-use crate::parser::parser2::{literal, singular_query, singular_query_segments, Rule};
+use crate::{lit, q_segments, q_segment, singular_query, slice};
+use crate::parser::parser2::{literal, singular_query, singular_query_segments, slice_selector, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -110,6 +110,23 @@ fn singular_query_test(){
         .assert("$",SingularQuery::Root(vec![]))
         .assert("$.a.b.c",singular_query!(a b c))
         .assert("$[\"a\"].b[3]",singular_query!([a] b [3]))
+
+    ;
+}
+
+#[test]
+fn slice_selector_test(){
+    TestPair::new(Rule::slice_selector, slice_selector)
+        .assert(":",slice!())
+        .assert("::",slice!())
+        .assert("1:",slice!(1))
+        .assert("1:1",slice!(1,1))
+        .assert("1:1:1",slice!(1,1,1))
+        .assert(":1:1",slice!(,1,1))
+        .assert("::1",slice!(,,1))
+        .assert("1::1",slice!(1,,1))
+        .assert_fail("-0:")
+        .assert_fail("9007199254740995")
 
     ;
 }

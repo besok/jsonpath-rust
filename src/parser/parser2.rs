@@ -47,6 +47,36 @@ pub fn singular_query_segments(rule:Pair<Rule>) -> Parsed<Vec<SingularQuerySegme
     }
     Ok(segments)
 }
+fn validate_range(val: i64) -> Result<i64, JsonPathParserError> {
+    if val > MAX_VAL || val < MIN_VAL {
+        Err(JsonPathParserError::InvalidJsonPath(format!("Value {} is out of range", val)))
+    } else {
+        Ok(val)
+    }
+}
+pub fn slice_selector(rule:Pair<Rule>) -> Parsed<(Option<i64>, Option<i64>, Option<i64>)> {
+    let mut start = None;
+    let mut end = None;
+    let mut step = None;
+    let get_int = |r:Pair<Rule>| r.as_str().parse::<i64>().map_err(|e|(e,"int"));
+
+    for r in rule.into_inner(){
+        match r.as_rule(){
+            Rule::start => start = Some(validate_range(get_int(r)?)?),
+            Rule::end => end = Some(validate_range(get_int(r)?)?),
+            Rule::step => step ={
+                if let Some(int) =  r.into_inner().next(){
+                    Some(validate_range(get_int(int)?)?)
+                } else {
+                    None
+                }
+            },
+
+            _ => return Err(r.into())
+        }
+    }
+    Ok((start,end,step))
+}
 
 pub fn singular_query(rule:Pair<Rule>) -> Parsed<SingularQuery>{
     let query = child(rule)?;
@@ -91,6 +121,7 @@ fn child(rule:Pair<Rule>) -> Parsed<Pair<Rule>> {
     let rule_as_str = rule.as_str().to_string();
     rule.into_inner().next().ok_or(JsonPathParserError::EmptyInner(rule_as_str))
 }
+
 fn children(rule:Pair<Rule>) -> Pairs<Rule> {
     rule.into_inner()
 }
