@@ -11,6 +11,7 @@ mod parser2;
 mod model2;
 mod errors2;
 mod macros2;
+mod tests;
 
 pub use errors::JsonPathParserError;
 pub use model::FilterExpression;

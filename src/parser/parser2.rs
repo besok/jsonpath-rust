@@ -9,11 +9,11 @@ use crate::parser::model2::Literal;
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path_9535.pest"]
-struct JSPathParser;
+pub(super) struct JSPathParser;
 const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 
-type Parsed<T> = Result<T, JsonPathParserError>;
+pub(super) type Parsed<T> = Result<T, JsonPathParserError>;
 
 /// Parses a string into a [JsonPath].
 ///
@@ -74,86 +74,5 @@ mod tests {
     use pest::error::Error;
     use crate::lit;
 
-    struct TestPair<T> {
-        rule: Rule,
-        parse_fn: fn(Pair<Rule>) -> Parsed<T>,
-    }
 
-    impl<T:PartialEq + Debug> TestPair<T> {
-        fn new(rule: Rule, parse_fn: fn(Pair<Rule>) -> Parsed<T>) -> Self {
-            Self {
-                rule,
-                parse_fn
-            }
-        }
-        fn assert(self,input:&str, expected:T) -> Self {
-            match parse(input, self.rule){
-                Ok(e) => {
-                    assert((self.parse_fn)(e), expected);
-                },
-                Err(e) => {
-                    panic!("parsing error `{}`", e);
-                }
-            }
-            self
-        }
-        fn assert_fail(self,input:&str) -> Self {
-            match parse(input, self.rule){
-                Ok(e) => {
-                    if let Ok(r) = (self.parse_fn)(e) {
-                        panic!("expected error, got {:?}", r);
-                    }
-                },
-                Err(_) => {}
-            }
-            self
-        }
-    }
-
-    fn parse(input:&str,rule:Rule) -> Result<Pair<Rule>, Error<Rule>> {
-        match JSPathParser::parse(rule, input){
-            Ok(e) => {
-                Ok(e.into_iter().next().expect("no pairs found"))
-            },
-            Err(e) => {
-                Err(e)
-            }
-        }
-    }
-
-    fn assert<T>(result: Parsed<T>, expected:T)
-    where T:PartialEq + Debug {
-        match result {
-            Ok(e) => assert_eq!(e, expected),
-            Err(e) => {
-                panic!("parsing error `{}`", e);
-            }
-        }
-    }
-
-
-    #[test]
-    fn literals(){
-
-        TestPair::new(Rule::literal, literal)
-            .assert("null", lit!())
-            .assert("false", lit!(b false))
-            .assert("true", lit!(b true))
-            .assert("\"hello\"", lit!(s "\"hello\""))
-            .assert("\'hello\'", lit!(s "\'hello\'"))
-            .assert("\'hel\\'lo\'", lit!(s "\'hel\\'lo\'"))
-            .assert("\'hel\"lo\'", lit!(s "\'hel\"lo\'"))
-            .assert("\'hel\nlo\'", lit!(s "\'hel\nlo\'"))
-            .assert("\'\"\'", lit!(s "\'\"\'"))
-            .assert_fail("\'hel\\\"lo\'")
-            .assert("1", lit!(i 1))
-            .assert("0", lit!(i 0))
-            .assert("-0", lit!(i 0))
-            .assert("1.2", lit!(f 1.2))
-            .assert("9007199254740990", lit!(i 9007199254740990))
-            .assert_fail("9007199254740995")
-        ;
-
-
-    }
 }
