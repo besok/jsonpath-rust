@@ -1,4 +1,6 @@
 use std::fmt::{Display, Formatter};
+use crate::parser::errors2::JsonPathParserError;
+use crate::parser::parser2::Parsed;
 
 /// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone)]
@@ -171,8 +173,8 @@ impl Display for Comparable {
 }
 
 /// Enum representing different types of singular queries in a JSONPath query.
-#[derive(Debug, Clone)]
-enum SingularQuery {
+#[derive(Debug, Clone, PartialEq)]
+pub enum SingularQuery {
     /// Represents a current node query.
     Current(Vec<SingularQuerySegment>),
     /// Represents a root node query.
@@ -189,8 +191,8 @@ impl Display for SingularQuery {
 }
 
 /// Enum representing different types of singular query segments in a JSONPath query.
-#[derive(Debug, Clone)]
-enum SingularQuerySegment {
+#[derive(Debug, Clone, PartialEq)]
+pub enum SingularQuerySegment {
     /// Represents an index segment.
     Index(i64),
     /// Represents a name segment.
@@ -242,6 +244,21 @@ enum TestFunction {
     Search(FnArg, FnArg),
     /// Represents a match function.
     Match(FnArg, FnArg),
+}
+
+impl TestFunction {
+    pub fn new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
+        match (name,args.as_slice()) {
+            ("length",[a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
+            ("value",[a]) => Ok(TestFunction::Value(a.clone())),
+            ("count",[a]) => Ok(TestFunction::Count(a.clone())),
+            ("search",[a,b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
+            ("match", [a,b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
+            ("length" | "value" | "count" | "match" | "search", args ) =>
+                Err(JsonPathParserError::InvalidJsonPath(format!("Invalid number of arguments for the function `{}`: got {}", name, args.len()))),
+            (custom,_) => Ok(TestFunction::Custom(custom.to_string(), args)),
+        }
+    }
 }
 
 impl Display for TestFunction {

@@ -21,6 +21,9 @@ paren_expr = {not_op? ~ S ~ "(" ~ S ~ logical_expr_or ~ S ~ ")"}
 comp_expr = { comparable ~ S ~ comp_op ~ S ~ comparable }
 test_expr = {not_op? ~ S ~ (filter_query | function_expr)}
 function_expr = { function_name ~ "(" ~ S ~ (function_argument ~ (S ~ "," ~ S ~ function_argument)*)? ~ S ~ ")" }
+function_name = { function_name_first ~ function_name_char* }
+function_name_first = { LCALPHA }
+function_name_char = { function_name_first | "_" | DIGIT }
 function_argument = { literal | filter_query | logical_expr_or | function_expr }
 filter_query = {rel_query | jp_query}
 rel_query = {curr ~ S ~ segments}
@@ -35,9 +38,7 @@ singular_query_segments = { (S ~ (name_segment | index_segment))* }
 name_segment = { ("[" ~ name_selector ~ "]") | ("." ~ member_name_shorthand) }
 index_segment = { "[" ~ index_selector ~ "]" }
 comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
-function_name = { function_name_first ~ function_name_char* }
-function_name_first = { LCALPHA }
-function_name_char = { function_name_first | "_" | DIGIT }
+
 LCALPHA = { 'a'..'z' }
 
 
@@ -52,7 +53,7 @@ member_name_shorthand = { name_first ~ name_char* }
 name_first = { ALPHA | "_" | '\u{0080}'..'\u{D7FF}' | '\u{E000}'..'\u{10FFFF}' }
 name_char = { name_first | DIGIT }
 not_op = {"!"}
-curr = {"@"}
+curr = _{"@"}
 ESC = _{ "\\" }
 unescaped = _{
     '\u{0020}'..'\u{0021}' |

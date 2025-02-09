@@ -1,10 +1,12 @@
+use crate::parser::model2::SingularQuery;
+use crate::parser::model2::SingularQuerySegment;
 use crate::parser::model2::Literal;
 use std::fmt::Debug;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
-use crate::lit;
-use crate::parser::parser2::{literal, Rule};
+use crate::{lit, q_segments, q_segment, singular_query};
+use crate::parser::parser2::{literal, singular_query, singular_query_segments, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -88,4 +90,26 @@ fn literals(){
     ;
 
 
+}
+
+#[test]
+fn singular_query_segment_test(){
+    TestPair::new(Rule::singular_query_segments, singular_query_segments)
+        .assert("[\"b\"][\"b\"]",q_segments!([b][b]))
+        .assert("[2][1]",q_segments!([2][1]))
+        .assert("[2][\"a\"]",q_segments!([2][a]))
+        .assert(".a.b",q_segments!(a b))
+        .assert(".a.b[\"c\"][1]",q_segments!(a b [c][1]))
+    ;
+}
+#[test]
+fn singular_query_test(){
+    TestPair::new(Rule::singular_query, singular_query)
+        .assert("@.a.b",singular_query!(@ a b))
+        .assert("@",SingularQuery::Current(vec![]))
+        .assert("$",SingularQuery::Root(vec![]))
+        .assert("$.a.b.c",singular_query!(a b c))
+        .assert("$[\"a\"].b[3]",singular_query!([a] b [3]))
+
+    ;
 }
