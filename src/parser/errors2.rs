@@ -30,6 +30,17 @@ pub enum JsonPathParserError {
     InvalidJsonPath(String),
 }
 
+impl JsonPathParserError {
+    pub fn empty(v:&str) -> Self {
+        JsonPathParserError::EmptyInner(v.to_string())
+    }
+}
+
+impl From<&str> for JsonPathParserError {
+    fn from(val: &str) -> Self {
+        JsonPathParserError::EmptyInner(val.to_string())
+    }
+}
 
 impl From<(ParseIntError, &str)> for JsonPathParserError {
     fn from((err, val): (ParseIntError, &str)) -> Self {

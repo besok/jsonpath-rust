@@ -4,8 +4,16 @@ use crate::parser::parser2::Parsed;
 
 /// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone)]
-struct JpQuery  {
+pub struct JpQuery  {
     segments: Vec<Segment>
+}
+
+impl JpQuery {
+    pub fn new(segments: Vec<Segment>) -> Self {
+        JpQuery {
+            segments
+        }
+    }
 }
 
 impl Display for JpQuery {
@@ -15,7 +23,7 @@ impl Display for JpQuery {
 }
 /// Enum representing different types of segments in a JSONPath query.
 #[derive(Debug, Clone)]
-enum Segment {
+pub enum Segment {
     /// Represents a descendant segment.
     Descendant,
     /// Represents a selector segment.
@@ -61,7 +69,7 @@ impl Display for Selector {
 }
 /// Enum representing different types of filters in a JSONPath query.
 #[derive(Debug, Clone)]
-enum Filter {
+pub enum Filter {
     /// Represents a logical OR filter.
     Or(Box<Filter>, Box<Filter>),
     /// Represents a logical AND filter.
@@ -85,7 +93,7 @@ impl Display for Filter {
 
 /// Enum representing different types of atomic filters in a JSONPath query.
 #[derive(Debug, Clone)]
-enum FilterAtom {
+pub enum FilterAtom {
     /// Represents a nested filter with an optional NOT flag.
     Filter {
         expr: Box<Filter>,
@@ -98,6 +106,20 @@ enum FilterAtom {
     },
     /// Represents a comparison filter.
     Comparison(Box<Comparison>),
+}
+
+impl FilterAtom {
+    pub fn filter(expr: Filter, not: bool) -> Self {
+        FilterAtom::Filter { expr:Box::new(expr), not }
+    }
+
+    pub fn test(expr: Test, not: bool) -> Self {
+        FilterAtom::Test { expr:Box::new(expr), not }
+    }
+
+    pub fn cmp(cmp: Box<Comparison>) -> Self {
+        FilterAtom::Comparison(cmp)
+    }
 }
 
 impl Display for FilterAtom {
@@ -123,7 +145,7 @@ impl Display for FilterAtom {
 }
 /// Enum representing different types of comparisons in a JSONPath query.
 #[derive(Debug, Clone)]
-enum Comparison {
+pub enum Comparison {
     /// Represents an equality comparison.
     Eq(Comparable, Comparable),
     /// Represents a non-equality comparison.
@@ -136,6 +158,20 @@ enum Comparison {
     Lt(Comparable, Comparable),
     /// Represents a less-than-or-equal-to comparison.
     Lte(Comparable, Comparable),
+}
+
+impl Comparison {
+    pub fn try_new(op: &str, left: Comparable, right: Comparable) -> Parsed<Self> {
+        match op {
+            "==" => Ok(Comparison::Eq(left, right)),
+            "!=" => Ok(Comparison::Ne(left, right)),
+            ">" => Ok(Comparison::Gt(left, right)),
+            ">=" => Ok(Comparison::Gte(left, right)),
+            "<" => Ok(Comparison::Lt(left, right)),
+            "<=" => Ok(Comparison::Lte(left, right)),
+            _ => Err(JsonPathParserError::InvalidJsonPath(format!("Invalid comparison operator: {}", op))),
+        }
+    }
 }
 
 impl Display for Comparison {
@@ -153,7 +189,7 @@ impl Display for Comparison {
 
 /// Enum representing different types of comparable values in a JSONPath query.
 #[derive(Debug, Clone)]
-enum Comparable {
+pub enum Comparable {
     /// Represents a literal value.
     Literal(Literal),
     /// Represents a function.
@@ -210,7 +246,7 @@ impl Display for SingularQuerySegment {
 
 /// Enum representing different types of tests in a JSONPath query.
 #[derive(Debug, Clone)]
-enum Test {
+pub enum Test {
     /// Represents a relative query.
     RelQuery(Vec<Segment>),
     /// Represents an absolute query.
@@ -231,7 +267,7 @@ impl Display for Test {
 
 /// Enum representing different types of test functions in a JSONPath query.
 #[derive(Debug, Clone)]
-enum TestFunction {
+pub enum TestFunction {
     /// Represents a custom function.
     Custom(String, Vec<FnArg>),
     /// Represents a length function.
@@ -247,7 +283,7 @@ enum TestFunction {
 }
 
 impl TestFunction {
-    pub fn new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
+    pub fn try_new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
         match (name,args.as_slice()) {
             ("length",[a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
             ("value",[a]) => Ok(TestFunction::Value(a.clone())),
@@ -276,7 +312,7 @@ impl Display for TestFunction {
 
 /// Enum representing different types of function arguments in a JSONPath query.
 #[derive(Debug, Clone)]
-enum FnArg {
+pub enum FnArg {
     /// Represents a literal argument.
     Literal(Literal),
     /// Represents a test argument.
