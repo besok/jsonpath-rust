@@ -1,7 +1,7 @@
 #![allow(clippy::empty_docs)]
 
 use crate::parser::errors2::JsonPathParserError;
-use crate::parser::model2::{Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, SingularQuery, SingularQuerySegment, Test, TestFunction};
+use crate::parser::model2::{Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector, SingularQuery, SingularQuerySegment, Test, TestFunction};
 use crate::path::JsonLike;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
@@ -22,15 +22,58 @@ pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
 }
 
 pub fn segments(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
-    rule.into_inner().map(segment).collect()
+    next_down(rule)?.into_inner().map(segment).collect()
 }
 
 pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
-    unimplemented!()
+    let child = next_down(rule)?;
+    match child.as_rule() {
+        Rule::child_segment => {
+            let next = next_down(child)?;
+            match next.as_rule() {
+                Rule::wildcard_selector => Ok(Segment::Selector(Selector::Wildcard)),
+                Rule::member_name_shorthand => Ok(Segment::name(next.as_str())),
+                Rule::bracketed_selection => {
+                    let mut selectors = vec![];
+                    for r in next.into_inner() {
+                        selectors.push(selector(r)?);
+                    }
+                    if selectors.len() == 1 {
+                        Ok(Segment::Selector(
+                            selectors.into_iter()
+                            .next()
+                            .ok_or(JsonPathParserError::empty("selector"))?))
+                    } else {
+                        Ok(Segment::Selectors(selectors))
+                    }
+                }
+                _ => Err(next.into()),
+            }
+        }
+        Rule::descendant_segment => Ok(Segment::Descendant),
+        _ => Err(child.into()),
+    }
+}
+
+pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
+    let child = next_down(rule)?;
+    match child.as_rule() {
+        Rule::name_selector => Ok(Selector::Name(child.as_str().to_string())),
+        Rule::wildcard_selector => Ok(Selector::Wildcard),
+        Rule::index_selector => Ok(Selector::Index(
+            child.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
+        )),
+        Rule::slice_selector => {
+            let (start, end, step) = slice_selector(child)?;
+            Ok(Selector::Slice(start, end, step))
+        }
+        Rule::filter_selector => Ok(Selector::Filter(logical_expr(child)?)),
+        _ => Err(child.into()),
+    }
 }
 
 pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
-    let mut elems = children(rule);
+    let mut elems = rule.into_inner();
     let name = elems
         .next()
         .map(|e| e.as_str())
@@ -38,12 +81,13 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
         ;
     let mut args = vec![];
     for arg in elems {
-        match arg.as_rule() {
-            Rule::literal => args.push(FnArg::Literal(literal(arg)?)),
-            Rule::test => args.push(FnArg::Test(Box::new(test(arg)?))),
-            Rule::logical_expr_or => args.push(FnArg::Filter(logical_expr(arg)?)),
+        let next = next_down(arg)?;
+        match next.as_rule() {
+            Rule::literal => args.push(FnArg::Literal(literal(next)?)),
+            Rule::test => args.push(FnArg::Test(Box::new(test(next)?))),
+            Rule::logical_expr => args.push(FnArg::Filter(logical_expr(next)?)),
 
-            _ => return Err(arg.into()),
+            _ => return Err(next.into()),
         }
     }
 
@@ -51,7 +95,7 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
 }
 
 pub fn test(rule: Pair<Rule>) -> Parsed<Test> {
-    let child = child(rule)?;
+    let child = next_down(rule)?;
     match child.as_rule() {
         Rule::jp_query => Ok(Test::AbsQuery(jp_query(child)?)),
         Rule::rel_query => Ok(Test::RelQuery(rel_query(child)?)),
@@ -61,7 +105,19 @@ pub fn test(rule: Pair<Rule>) -> Parsed<Test> {
 }
 
 pub fn logical_expr(rule: Pair<Rule>) -> Parsed<Filter> {
-    unimplemented!()
+    let mut ors = vec![];
+    for r in rule.into_inner(){
+        ors.push(logical_expr_and(r)?);
+    }
+    Ok(Filter::Or(ors))
+}
+
+pub fn logical_expr_and(rule: Pair<Rule>) -> Parsed<Filter> {
+    let mut ands = vec![];
+    for r in rule.into_inner(){
+        ands.push(Filter::Atom(filter_atom(r)?));
+    }
+    Ok(Filter::And(ands))
 }
 
 pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegment>> {
@@ -69,11 +125,11 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     for r in rule.into_inner() {
         match r.as_rule() {
             Rule::name_segment => {
-                segments.push(SingularQuerySegment::Name(child(r)?.as_str().to_string()));
+                segments.push(SingularQuerySegment::Name(next_down(r)?.as_str().to_string()));
             }
             Rule::index_segment => {
                 segments.push(SingularQuerySegment::Index(
-                    child(r)?.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
+                    next_down(r)?.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
                 ));
             }
             _ => return Err(r.into()),
@@ -118,8 +174,8 @@ pub fn slice_selector(rule: Pair<Rule>) -> Parsed<(Option<i64>, Option<i64>, Opt
 }
 
 pub fn singular_query(rule: Pair<Rule>) -> Parsed<SingularQuery> {
-    let query = child(rule)?;
-    let segments = singular_query_segments(child(query.clone())?)?;
+    let query = next_down(rule)?;
+    let segments = singular_query_segments(next_down(query.clone())?)?;
     match query.as_rule() {
         Rule::rel_singular_query => Ok(SingularQuery::Current(segments)),
         Rule::abs_singular_query => Ok(SingularQuery::Root(segments)),
@@ -153,7 +209,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
             }
         }
     }
-    let first = child(rule)?;
+    let first = next_down(rule)?;
 
     match first.as_rule() {
         Rule::string => Ok(Literal::String(first.as_str().to_string())),
@@ -166,7 +222,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
 }
 
 pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
-    let rule = child(pair)?;
+    let rule = next_down(pair)?;
     match rule.as_rule() {
         Rule::paren_expr =>  {
             let mut not = false;
@@ -174,7 +230,7 @@ pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
             for r in rule.into_inner(){
                 match r.as_rule(){
                     Rule::not_op => not = true,
-                    Rule::logical_expr_or =>  logic_expr = Some(logical_expr(r)?),
+                    Rule::logical_expr =>  logic_expr = Some(logical_expr(r)?),
                     _ => (),
                 }
             }
@@ -206,7 +262,7 @@ pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
 }
 
 pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable>{
-    let rule = child(rule)?;
+    let rule = next_down(rule)?;
     match rule.as_rule(){
         Rule::literal => Ok(Comparable::Literal(literal(rule)?)),
         Rule::singular_query => Ok(Comparable::SingularQuery(singular_query(rule)?)),
@@ -215,13 +271,10 @@ pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable>{
     }
 }
 
-fn child(rule: Pair<Rule>) -> Parsed<Pair<Rule>> {
+fn next_down(rule: Pair<Rule>) -> Parsed<Pair<Rule>> {
     let rule_as_str = rule.as_str().to_string();
     rule.into_inner()
         .next()
         .ok_or(JsonPathParserError::EmptyInner(rule_as_str))
 }
 
-fn children(rule: Pair<Rule>) -> Pairs<Rule> {
-    rule.into_inner()
-}

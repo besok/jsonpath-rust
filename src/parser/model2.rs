@@ -3,7 +3,7 @@ use crate::parser::errors2::JsonPathParserError;
 use crate::parser::parser2::Parsed;
 
 /// Represents a JSONPath query with a list of segments.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct JpQuery  {
     segments: Vec<Segment>
 }
@@ -22,7 +22,7 @@ impl Display for JpQuery {
     }
 }
 /// Enum representing different types of segments in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Segment {
     /// Represents a descendant segment.
     Descendant,
@@ -30,6 +30,12 @@ pub enum Segment {
     Selector(Selector),
     /// Represents multiple selectors.
     Selectors(Vec<Selector>),
+}
+
+impl Segment {
+    pub fn name(name:&str) -> Self{
+        Segment::Selector(Selector::Name(name.to_string()))
+    }
 }
 
 impl Display for Segment {
@@ -42,8 +48,8 @@ impl Display for Segment {
     }
 }
 /// Enum representing different types of selectors in a JSONPath query.
-#[derive(Debug, Clone)]
-enum Selector {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Selector {
     /// Represents a name selector.
     Name(String),
     /// Represents a wildcard selector.
@@ -51,7 +57,7 @@ enum Selector {
     /// Represents an index selector.
     Index(i64),
     /// Represents a slice selector.
-    Slice(i64, i64, i64),
+    Slice(Option<i64>, Option<i64>, Option<i64>),
     /// Represents a filter selector.
     Filter(Filter),
 }
@@ -62,37 +68,41 @@ impl Display for Selector {
             Selector::Name(name) => write!(f, "{}", name),
             Selector::Wildcard => write!(f, "*"),
             Selector::Index(index) => write!(f, "{}", index),
-            Selector::Slice(start, end, step) => write!(f, "{}:{}:{}", start, end, step),
+            Selector::Slice(start, end, step) => write!(f, "{}:{}:{}",
+                                                        start.unwrap_or(0),
+                                                        end.unwrap_or(0),
+                                                        step.unwrap_or(1)),
             Selector::Filter(filter) => write!(f, "[?{}]", filter),
         }
     }
 }
 /// Enum representing different types of filters in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Filter {
     /// Represents a logical OR filter.
-    Or(Box<Filter>, Box<Filter>),
+    Or(Vec<Filter>),
     /// Represents a logical AND filter.
-    And(Box<Filter>, Box<Filter>),
-    /// Represents a logical NOT filter.
-    Not(Box<Filter>),
+    And(Vec<Filter>),
     /// Represents an atomic filter.
     Atom(FilterAtom),
 }
 
 impl Display for Filter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+
+        let items_to_str = |items: &Vec<Filter>, sep:&str|
+            items.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(sep);
+
         match self {
-            Filter::Or(left, right) => write!(f, "{} || {}", left, right),
-            Filter::And(left, right) => write!(f, "{} && {}", left, right),
-            Filter::Not(expr) => write!(f, "!{}", expr),
+            Filter::Or(filters) => write!(f, "{}", items_to_str(filters, " || ")),
+            Filter::And(filters) => write!(f, "{}", items_to_str(filters, " && ")),
             Filter::Atom(atom) => write!(f, "{}", atom),
         }
     }
 }
 
 /// Enum representing different types of atomic filters in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FilterAtom {
     /// Represents a nested filter with an optional NOT flag.
     Filter {
@@ -144,7 +154,7 @@ impl Display for FilterAtom {
     }
 }
 /// Enum representing different types of comparisons in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Comparison {
     /// Represents an equality comparison.
     Eq(Comparable, Comparable),
@@ -188,7 +198,7 @@ impl Display for Comparison {
 }
 
 /// Enum representing different types of comparable values in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Comparable {
     /// Represents a literal value.
     Literal(Literal),
@@ -245,7 +255,7 @@ impl Display for SingularQuerySegment {
 }
 
 /// Enum representing different types of tests in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Test {
     /// Represents a relative query.
     RelQuery(Vec<Segment>),
@@ -266,7 +276,7 @@ impl Display for Test {
 }
 
 /// Enum representing different types of test functions in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TestFunction {
     /// Represents a custom function.
     Custom(String, Vec<FnArg>),
@@ -311,7 +321,7 @@ impl Display for TestFunction {
 }
 
 /// Enum representing different types of function arguments in a JSONPath query.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FnArg {
     /// Represents a literal argument.
     Literal(Literal),

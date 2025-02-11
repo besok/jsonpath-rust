@@ -1,3 +1,6 @@
+use crate::parser::model2::Test;
+use crate::parser::model2::FnArg;
+use crate::parser::model2::TestFunction;
 use crate::parser::model2::SingularQuery;
 use crate::parser::model2::SingularQuerySegment;
 use crate::parser::model2::Literal;
@@ -5,8 +8,8 @@ use std::fmt::Debug;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
-use crate::{lit, q_segments, q_segment, singular_query, slice};
-use crate::parser::parser2::{literal, singular_query, singular_query_segments, slice_selector, Rule};
+use crate::{lit, q_segments, q_segment, singular_query, slice, test_fn, arg, test};
+use crate::parser::parser2::{function_expr, literal, singular_query, singular_query_segments, slice_selector, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -127,6 +130,16 @@ fn slice_selector_test(){
         .assert("1::1",slice!(1,,1))
         .assert_fail("-0:")
         .assert_fail("9007199254740995")
+    ;
+}
 
+#[test]
+fn function_expr_test(){
+    TestPair::new(Rule::function_expr,function_expr)
+        .assert("length(1)", test_fn!(length arg!(lit!(i 1))))
+        .assert("length(true)", test_fn!(length arg!(lit!(b true))))
+        .assert("search(@, \"abc\")",
+                test_fn!(search arg!(t test!(@ ) ), arg!(lit!(s "\"abc\""))))
+        .assert("count(@.a)", test_fn!(count arg!(t test!(@ ))))
     ;
 }
