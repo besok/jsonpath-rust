@@ -15,7 +15,7 @@ use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
 use crate::{lit, q_segments, q_segment, singular_query, slice, test_fn, arg, test, segment, selector, atom, cmp, comparable, jq, filter, or, and};
-use crate::parser::parser2::{filter_atom, function_expr, jp_query, literal, singular_query, singular_query_segments, slice_selector, Rule};
+use crate::parser::parser2::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, singular_query, singular_query_segments, slice_selector, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -76,30 +76,7 @@ where T:PartialEq + Debug {
 }
 
 
-#[test]
-fn literals(){
 
-    TestPair::new(Rule::literal, literal)
-        .assert("null", lit!())
-        .assert("false", lit!(b false))
-        .assert("true", lit!(b true))
-        .assert("\"hello\"", lit!(s "\"hello\""))
-        .assert("\'hello\'", lit!(s "\'hello\'"))
-        .assert("\'hel\\'lo\'", lit!(s "\'hel\\'lo\'"))
-        .assert("\'hel\"lo\'", lit!(s "\'hel\"lo\'"))
-        .assert("\'hel\nlo\'", lit!(s "\'hel\nlo\'"))
-        .assert("\'\"\'", lit!(s "\'\"\'"))
-        .assert_fail("\'hel\\\"lo\'")
-        .assert("1", lit!(i 1))
-        .assert("0", lit!(i 0))
-        .assert("-0", lit!(i 0))
-        .assert("1.2", lit!(f 1.2))
-        .assert("9007199254740990", lit!(i 9007199254740990))
-        .assert_fail("9007199254740995")
-    ;
-
-
-}
 
 #[test]
 fn singular_query_segment_test(){
@@ -150,17 +127,7 @@ fn function_expr_test(){
     ;
 }
 
-#[test]
-fn atom_test(){
-    TestPair::new(Rule::atom_expr,filter_atom)
-        .assert("1 > 2", atom!(comparable!(lit!(i 1)), ">" , comparable!(lit!(i 2))))
-        .assert("!(@.a ==1 || @.b == 2)", atom!(! or!(
-            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ a)),"==", comparable!(lit!(i 1))))),
-            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ b)),"==", comparable!(lit!(i 2)))))
-            )
-        ))
-    ;
-}
+
 
 #[test]
 fn jq_test(){
@@ -170,5 +137,60 @@ fn jq_test(){
             segment!(selector!(a)),segment!(selector!(b)),
             segment!(selector!(? or!(and!(atom))))
         )  )
+    ;
+}
+
+#[test]
+fn comp_expr_test() {
+    TestPair::new(Rule::comp_expr, comp_expr)
+        .assert("@.a.b.c == 1",
+                cmp!(comparable!(> singular_query!(@ a b c)), "==", comparable!(lit!(i 1))))
+    ;
+}
+
+#[test]
+fn literal_test(){
+
+    TestPair::new(Rule::literal, literal)
+        .assert("null", lit!())
+        .assert("false", lit!(b false))
+        .assert("true", lit!(b true))
+        .assert("\"hello\"", lit!(s "\"hello\""))
+        .assert("\'hello\'", lit!(s "\'hello\'"))
+        .assert("\'hel\\'lo\'", lit!(s "\'hel\\'lo\'"))
+        .assert("\'hel\"lo\'", lit!(s "\'hel\"lo\'"))
+        .assert("\'hel\nlo\'", lit!(s "\'hel\nlo\'"))
+        .assert("\'\"\'", lit!(s "\'\"\'"))
+        .assert_fail("\'hel\\\"lo\'")
+        .assert("1", lit!(i 1))
+        .assert("0", lit!(i 0))
+        .assert("-0", lit!(i 0))
+        .assert("1.2", lit!(f 1.2))
+        .assert("9007199254740990", lit!(i 9007199254740990))
+        .assert_fail("9007199254740995")
+    ;
+
+
+}
+#[test]
+fn filter_atom_test(){
+    TestPair::new(Rule::atom_expr, filter_atom)
+        .assert("1 > 2", atom!(comparable!(lit!(i 1)), ">" , comparable!(lit!(i 2))))
+        .assert("!(@.a ==1 || @.b == 2)", atom!(! or!(
+            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ a)),"==", comparable!(lit!(i 1))))),
+            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ b)),"==", comparable!(lit!(i 2)))))
+            )
+        ))
+    ;
+}
+#[test]
+fn comparable_test(){
+    TestPair::new(Rule::comparable,comparable)
+        .assert("1",comparable!(lit!(i 1)))
+        .assert("\"a\"",comparable!(lit!(s "\"a\"")))
+        .assert("@.a.b.c",comparable!(> singular_query!(@ a b c)))
+        .assert("$.a.b.c",comparable!(> singular_query!(a b c)))
+        .assert("$[1]",comparable!(> singular_query!([1])))
+        .assert("length(1)",comparable!(f test_fn!(length arg!(lit!(i 1)))))
     ;
 }
