@@ -1,4 +1,4 @@
-use crate::parser::model2::{Filter, FilterAtom, FnArg, Literal, SingularQuery, Test};
+use crate::parser::model2::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, SingularQuery, Test};
 
 #[macro_export]
 macro_rules! lit {
@@ -46,7 +46,7 @@ macro_rules! q_segment {
 }
 #[macro_export]
 macro_rules! singular_query {
-    (@$($segment:tt)*) => {
+    (@ $($segment:tt)*) => {
         SingularQuery::Current(q_segments!($($segment)*))
     };
     ($($segment:tt)*) => {
@@ -115,14 +115,14 @@ macro_rules! test {
 
 #[macro_export]
 macro_rules! or {
-    ($($items:expr)*) => {
+    ($($items:expr),*) => {
         Filter::Or(vec![ $($items),* ])
     };
 }
 
 #[macro_export]
 macro_rules! and {
-    ($($items:expr)*) => {
+    ($($items:expr),*) => {
         Filter::And(vec![ $($items),* ])
     };
 }
@@ -136,19 +136,71 @@ macro_rules! atom {
         FilterAtom::filter($filter, false)
     };
     (t! $filter:expr) => {
-        FilterAtom::filter($filter, true)
+        FilterAtom::test($filter, true)
     };
     (t $filter:expr) => {
         FilterAtom::filter($filter, false)
     };
-    ($lhs:expr, $s:ident, $rhs:expr) => {
+    ($lhs:expr, $s:expr, $rhs:expr) => {
         FilterAtom::Comparison(Box::new(cmp!($lhs, $s, $rhs)))
     };
 }
 
 #[macro_export]
 macro_rules! cmp {
-  ($lhs:expr, $s:ident, $rhs:expr) => {
-      Comparison::try_new($lhs, stringify!($s), $rhs).unwrap()
+  ($lhs:expr, $op:expr , $rhs:expr) => {
+      Comparison::try_new($op, $lhs, $rhs).unwrap()
   }
+}
+
+#[macro_export]
+macro_rules! comparable {
+    ($lit:expr) => {
+        Comparable::Literal($lit)
+    };
+    (f $func:expr) => {
+        Comparable::Function($func)
+    };
+    (> $sq:expr) => {
+        Comparable::SingularQuery($sq)
+    };
+}
+
+#[macro_export]
+macro_rules! selector {
+    (*) => {
+        Selector::Wildcard
+    };
+    (?$filter:expr) => {
+        Selector::Filter($filter)
+    };
+    ($name:ident) => {
+        Selector::Name(stringify!($name).to_string())
+    };
+    ([$name:ident]) => {
+        Selector::Name(format!("\"{}\"", stringify!($name)))
+    };
+    ([$index:expr]) => {
+        Selector::Index($index)
+    };
+}
+
+#[macro_export]
+macro_rules! segment {
+    (..) => {
+        Segment::Descendant
+    };
+    ($selector:expr) => {
+        Segment::Selector($selector)
+    };
+    ($($selectors:expr),*) => {
+        Segment::Selectors(vec![$($selectors),*])
+    };
+}
+
+#[macro_export]
+macro_rules! jq {
+    ($($segment:expr),*) => {
+        JpQuery::new(vec![$($segment),*])
+    };
 }

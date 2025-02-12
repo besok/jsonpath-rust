@@ -1,3 +1,9 @@
+use crate::parser::model2::JpQuery;
+use crate::parser::model2::{Comparable, Filter};
+use crate::parser::model2::Comparison;
+use crate::parser::model2::FilterAtom;
+use crate::parser::model2::Segment;
+use crate::parser::model2::Selector;
 use crate::parser::model2::Test;
 use crate::parser::model2::FnArg;
 use crate::parser::model2::TestFunction;
@@ -8,8 +14,8 @@ use std::fmt::Debug;
 use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
-use crate::{lit, q_segments, q_segment, singular_query, slice, test_fn, arg, test};
-use crate::parser::parser2::{function_expr, literal, singular_query, singular_query_segments, slice_selector, Rule};
+use crate::{lit, q_segments, q_segment, singular_query, slice, test_fn, arg, test, segment, selector, atom, cmp, comparable, jq, filter, or, and};
+use crate::parser::parser2::{filter_atom, function_expr, jp_query, literal, singular_query, singular_query_segments, slice_selector, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -140,6 +146,29 @@ fn function_expr_test(){
         .assert("length(true)", test_fn!(length arg!(lit!(b true))))
         .assert("search(@, \"abc\")",
                 test_fn!(search arg!(t test!(@ ) ), arg!(lit!(s "\"abc\""))))
-        .assert("count(@.a)", test_fn!(count arg!(t test!(@ ))))
+        .assert("count(@.a)", test_fn!(count arg!(t test!(@ segment!(selector!(a))))))
+    ;
+}
+
+#[test]
+fn atom_test(){
+    TestPair::new(Rule::atom_expr,filter_atom)
+        .assert("1 > 2", atom!(comparable!(lit!(i 1)), ">" , comparable!(lit!(i 2))))
+        .assert("!(@.a ==1 || @.b == 2)", atom!(! or!(
+            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ a)),"==", comparable!(lit!(i 1))))),
+            and!( Filter::Atom(atom!(comparable!(> singular_query!(@ b)),"==", comparable!(lit!(i 2)))))
+            )
+        ))
+    ;
+}
+
+#[test]
+fn jq_test(){
+    let atom = Filter::Atom(atom!(comparable!(> singular_query!(@ a b)), ">", comparable!(lit!(i 1))));
+    TestPair::new(Rule::jp_query,jp_query)
+        .assert("$.a.b[?@.a.b > 1]",jq!(
+            segment!(selector!(a)),segment!(selector!(b)),
+            segment!(selector!(? or!(and!(atom))))
+        )  )
     ;
 }

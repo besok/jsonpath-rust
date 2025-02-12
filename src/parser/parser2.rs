@@ -5,6 +5,7 @@ use crate::parser::model2::{Comparable, Comparison, Filter, FilterAtom, FnArg, J
 use crate::path::JsonLike;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
+use crate::JsonPath;
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path_9535.pest"]
@@ -13,6 +14,20 @@ const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScri
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 
 pub(super) type Parsed<T> = Result<T, JsonPathParserError>;
+
+/// Parses a string into a [JsonPath].
+///
+/// # Errors
+///
+/// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
+pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery>
+{
+    JSPathParser::parse(Rule::main, jp_str)
+        .map_err(Box::new)?
+        .next()
+        .ok_or(JsonPathParserError::UnexpectedPestOutput)
+        .and_then(jp_query)
+}
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
     Ok(JpQuery::new(segments(rule)?))
@@ -32,7 +47,7 @@ pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
             let next = next_down(child)?;
             match next.as_rule() {
                 Rule::wildcard_selector => Ok(Segment::Selector(Selector::Wildcard)),
-                Rule::member_name_shorthand => Ok(Segment::name(next.as_str())),
+                Rule::member_name_shorthand => Ok(Segment::name(next.as_str().trim())),
                 Rule::bracketed_selection => {
                     let mut selectors = vec![];
                     for r in next.into_inner() {
@@ -58,7 +73,7 @@ pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
 pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
     let child = next_down(rule)?;
     match child.as_rule() {
-        Rule::name_selector => Ok(Selector::Name(child.as_str().to_string())),
+        Rule::name_selector => Ok(Selector::Name(child.as_str().trim().to_string())),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
         Rule::index_selector => Ok(Selector::Index(
             child.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
@@ -67,7 +82,7 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
             let (start, end, step) = slice_selector(child)?;
             Ok(Selector::Slice(start, end, step))
         }
-        Rule::filter_selector => Ok(Selector::Filter(logical_expr(child)?)),
+        Rule::filter_selector => Ok(Selector::Filter(logical_expr(next_down(child)?)?)),
         _ => Err(child.into()),
     }
 }
@@ -76,7 +91,7 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
     let mut elems = rule.into_inner();
     let name = elems
         .next()
-        .map(|e| e.as_str())
+        .map(|e| e.as_str().trim())
         .ok_or(JsonPathParserError::empty("function expression"))?
         ;
     let mut args = vec![];
@@ -125,7 +140,7 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     for r in rule.into_inner() {
         match r.as_rule() {
             Rule::name_segment => {
-                segments.push(SingularQuerySegment::Name(next_down(r)?.as_str().to_string()));
+                segments.push(SingularQuerySegment::Name(next_down(r)?.as_str().trim().to_string()));
             }
             Rule::index_segment => {
                 segments.push(SingularQuerySegment::Index(
@@ -195,6 +210,7 @@ pub fn comp_expr(rule:Pair<Rule>) -> Parsed<Comparison> {
 
 pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     fn parse_number(num: &str) -> Parsed<Literal> {
+        let num = num.trim();
         if num.contains('.') {
             Ok(Literal::Float(num.parse::<f64>().map_err(|e| (e, num))?))
         } else {
@@ -223,6 +239,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
 
 pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
     let rule = next_down(pair)?;
+
     match rule.as_rule() {
         Rule::paren_expr =>  {
             let mut not = false;
