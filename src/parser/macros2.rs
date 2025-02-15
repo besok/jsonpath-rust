@@ -87,6 +87,7 @@ macro_rules! test_fn {
     ($name:ident $arg:expr) => {
         TestFunction::try_new(stringify!($name), vec![$arg]).unwrap()
     };
+
     ($name:ident $arg1:expr, $arg2:expr ) => {
         TestFunction::try_new(stringify!($name), vec![$arg1, $arg2]).unwrap()
     };

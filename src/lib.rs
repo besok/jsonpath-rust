@@ -108,6 +108,7 @@ use JsonPathValue::{NewValue, NoValue, Slice};
 mod jsonpath;
 pub mod parser;
 pub mod path;
+pub mod query;
 
 #[macro_use]
 extern crate pest_derive;

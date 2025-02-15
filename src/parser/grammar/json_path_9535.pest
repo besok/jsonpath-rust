@@ -40,7 +40,7 @@ abs_singular_query = { root ~ singular_query_segments }
 singular_query_segments = { (S ~ (name_segment | index_segment))* }
 name_segment = { ("[" ~ name_selector ~ "]") | ("." ~ member_name_shorthand) }
 index_segment = { "[" ~ index_selector ~ "]" }
-comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" }
+comp_op = { "==" | "!=" | "<=" | ">=" | "<" | ">" | "in" | "nin" | "size" | "noneOf" | "anyOf" | "subsetOf"}
 
 LCALPHA = { 'a'..'z' }
 
