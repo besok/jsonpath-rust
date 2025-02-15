@@ -70,5 +70,5 @@ impl<'a, T: Queryable> Step<'a, T> {
 }
 
 pub trait Query {
-    fn process<'a, T: Queryable>(&self, progress: Step<'a, T>) -> Step<'a, T>;
+    fn process<'a, T: Queryable>(&self, step: Step<'a, T>) -> Step<'a, T>;
 }
