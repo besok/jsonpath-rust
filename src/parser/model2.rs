@@ -5,7 +5,7 @@ use crate::parser::parser2::Parsed;
 /// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JpQuery  {
-    segments: Vec<Segment>
+    pub segments: Vec<Segment>
 }
 
 impl JpQuery {

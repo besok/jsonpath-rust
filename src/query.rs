@@ -1,11 +1,12 @@
 pub mod queryable;
-mod test_function;
 mod segment;
 mod selector;
+mod test_function;
+mod jp_query;
 
-use crate::JsonPathParserError;
 use crate::path::JsonLike;
 use crate::query::queryable::Queryable;
+use crate::JsonPathParserError;
 
 type QueryPath = String;
 type Queried<T> = Result<T, JsonPathParserError>;
@@ -17,23 +18,29 @@ pub struct Data<'a, T: Queryable> {
 }
 
 impl<'a, T: Queryable> Data<'a, T> {
-
     pub fn new(pointer: &'a T, path: QueryPath) -> Self {
         Data { pointer, path }
     }
 
-    pub fn new_key(pointer: &'a T, path:QueryPath, key: &str) -> Self {
-        Data { pointer, path: format!("{}.['{}']", path, key) }
+    pub fn key(pointer: &'a T, path: QueryPath, key: &str) -> Self {
+        Data {
+            pointer,
+            path: format!("{}.['{}']", path, key),
+        }
     }
-    pub fn new_idx(pointer: &'a T, path:QueryPath, index:usize) -> Self {
-        Data { pointer, path: format!("{}[{}]", path, index) }
+    pub fn idx(pointer: &'a T, path: QueryPath, index: usize) -> Self {
+        Data {
+            pointer,
+            path: format!("{}[{}]", path, index),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 enum Step<'a, T: Queryable> {
-    Data(Data<'a, T>),
-    NewData(T),
+    Ref(Data<'a, T>),
+    Refs(Vec<Data<'a, T>>),
+    Value(T),
     Nothing,
 }
 
@@ -44,29 +51,57 @@ impl<'a, T: Queryable> Default for Step<'a, T> {
 }
 
 impl<'a, T: Queryable> Step<'a, T> {
-
-    pub fn flat_map<F>(self, f: F) -> Step<'a, T>
-    where
-        F: FnOnce(Data<'a, T>) -> Step<'a, T>,
-    {
-        match self {
-            Step::Data(data) => f(data),
+    pub fn reduce(self, other: Step<'a, T>) -> Step<'a, T> {
+        match (self, other) {
+            (Step::Ref(data), Step::Ref(data2)) => Step::Refs(vec![data, data2]),
+            (Step::Ref(data), Step::Refs(data_vec)) => {
+                Step::Refs(data_vec.into_iter().chain(vec![data]).collect())
+            }
+            (Step::Refs(data_vec), Step::Ref(data)) => {
+                Step::Refs(data_vec.into_iter().chain(vec![data]).collect())
+            }
+            (Step::Refs(data_vec), Step::Refs(data_vec2)) => {
+                Step::Refs(data_vec.into_iter().chain(data_vec2).collect())
+            }
             _ => Step::Nothing,
         }
     }
 
-    pub fn ok(self) -> Option<Data<'a, T>> {
+    pub fn flat_map<F>(self, f: F) -> Step<'a, T>
+    where
+        F: Fn(Data<'a, T>) -> Step<'a, T>,
+    {
         match self {
-            Step::Data(data) => Some(data),
+            Step::Ref(data) => f(data),
+            Step::Refs(data_vec) => Step::Refs(
+                data_vec
+                    .into_iter()
+                    .flat_map(|data| match f(data) {
+                        Step::Ref(data) => vec![data],
+                        Step::Refs(data_vec) => data_vec,
+                        _ => vec![],
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+            _ => Step::Nothing,
+        }
+    }
+
+    pub fn ok(self) -> Option<Vec<Data<'a, T>>> {
+        match self {
+            Step::Ref(data) => Some(vec![data]),
+            Step::Refs(data) => Some(data),
             _ => None,
         }
     }
 
-    pub fn new_ref(data: Data<'a,T>) -> Step<'a, T> {
-        Step::Data(data)
+    pub fn new_ref(data: Data<'a, T>) -> Step<'a, T> {
+        Step::Ref(data)
     }
 
-
+    pub fn new_refs(data: Vec<Data<'a, T>>) -> Step<'a, T> {
+        Step::Refs(data)
+    }
 }
 
 pub trait Query {
