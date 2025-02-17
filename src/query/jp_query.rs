@@ -1,9 +1,10 @@
 use crate::parser::model2::JpQuery;
 use crate::query::queryable::Queryable;
-use crate::query::{Query, Step};
+use crate::query::Query;
+use crate::query::state::State;
 
 impl Query for JpQuery {
-    fn process<'a, T: Queryable>(&self, step: Step<'a, T>) -> Step<'a, T> {
+    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
         self.segments
             .iter()
             .fold(step, |next, segment| segment.process(next))
@@ -14,7 +15,8 @@ impl Query for JpQuery {
 mod tests {
     use serde_json::json;
     use crate::parser::model2::{JpQuery, Segment, Selector};
-    use crate::query::{Data, Query, Step};
+    use crate::query::Query;
+    use crate::query::state::{Data, Pointer, State};
 
     #[test]
     fn test_process() {
@@ -41,10 +43,12 @@ mod tests {
             Segment::Selector(Selector::Name("first".to_string())),
         ]);
 
-        let result = query.process(Step::new_ref(Data::new(&value, "$".to_string())));
+        let state = State::data(&value, Data::new_ref(Pointer::new(&value, "$".to_string())));
+
+        let result = query.process(state);
         assert_eq!(
             result.ok(),
-            Some(vec![Data::new(&json!("Blaise"), "$.['result'][0].['name'].['first']".to_string())])
+            Some(vec![Pointer::new(&json!("Blaise"), "$.['result'][0].['name'].['first']".to_string())])
         );
     }
 }

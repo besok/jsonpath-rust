@@ -1,4 +1,4 @@
-use crate::query::Step;
+use crate::query::state::Data;
 use serde_json::{json, Value};
 use std::fmt::Debug;
 
@@ -8,13 +8,11 @@ where
         + Clone
         + Debug
         + for<'a> From<&'a str>
-        + From<Vec<String>>
         + From<bool>
         + From<i64>
         + From<f64>
         + From<Vec<Self>>
         + From<String>
-        + PartialEq,
 {
 
 
@@ -28,10 +26,14 @@ where
     fn as_str(&self) -> Option<&str>;
 
     fn as_i64(&self) -> Option<i64>;
+
+    /// Returns a null value.
+    fn null() -> Self;
+
+
 }
 
 impl Queryable for Value {
-
 
     fn get(&self, key: &str) -> Option<&Self> {
         self.get(key)
@@ -52,5 +54,9 @@ impl Queryable for Value {
 
     fn as_i64(&self) -> Option<i64> {
         self.as_i64()
+    }
+
+    fn null() -> Self {
+        Value::Null
     }
 }

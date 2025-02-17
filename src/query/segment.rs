@@ -1,9 +1,10 @@
 use crate::parser::model2::{Segment, Selector};
 use crate::query::queryable::Queryable;
-use crate::query::{Data, Query, Step};
+use crate::query::Query;
+use crate::query::state::{Data, Pointer, State};
 
 impl Query for Segment {
-    fn process<'a, T: Queryable>(&self, step: Step<'a, T>) -> Step<'a, T> {
+    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
         match self {
             Segment::Descendant => step.flat_map(process_descendant),
             Segment::Selector(selector) => selector.process(step),
@@ -13,33 +14,33 @@ impl Query for Segment {
 }
 
 
-fn process_selectors<'a, T: Queryable>(step: Step<'a, T>, selectors: &Vec<Selector>) -> Step<'a, T> {
+fn process_selectors<'a, T: Queryable>(step: State<'a, T>, selectors: &Vec<Selector>) -> State<'a, T> {
     selectors
         .into_iter()
         .map(|s| s.process(step.clone()))
-        .reduce(Step::reduce)
-        .unwrap_or_default()
+        .reduce(State::reduce)
+        .unwrap_or(step.root.into())
 }
 
-fn process_descendant<T: Queryable>(data: Data<T>) -> Step<T> {
-    if let Some(array) = data.pointer.as_array() {
-        Step::new_refs(
+fn process_descendant<T: Queryable>(data: Pointer<T>) -> Data<T> {
+    if let Some(array) = data.inner.as_array() {
+        Data::new_refs(
             array
                 .iter()
                 .enumerate()
-                .map(|(i, elem)| Data::idx(elem, data.path.clone(), i))
+                .map(|(i, elem)| Pointer::idx(elem, data.path.clone(), i))
                 .collect(),
-        ).reduce(Step::Ref(data))
+        ).reduce(Data::Ref(data))
 
-    } else if let Some(object) = data.pointer.as_object() {
-        Step::new_refs(
+    } else if let Some(object) = data.inner.as_object() {
+        Data::new_refs(
             object
                 .into_iter()
-                .map(|(key, value)| Data::key(value, data.path.clone(), key))
+                .map(|(key, value)| Pointer::key(value, data.path.clone(), key))
                 .collect(),
-        ).reduce(Step::Ref(data))
+        ).reduce(Data::Ref(data))
     } else {
-        Step::Nothing
+        Data::Nothing
     }
 }
 
@@ -48,7 +49,8 @@ fn process_descendant<T: Queryable>(data: Data<T>) -> Step<T> {
 mod tests {
     use serde_json::json;
     use crate::parser::model2::{Segment, Selector};
-    use crate::query::{Data, Query, Step};
+    use crate::query::Query;
+    use crate::query::state::{Pointer, State};
 
     #[test]
     fn test_process_selectors() {
@@ -57,13 +59,13 @@ mod tests {
             Selector::Name("firstName".to_string()),
             Selector::Name("lastName".to_string()),
         ]);
-        let step = segment.process(Step::new_ref(Data::new(&value, "$".to_string())));
+        let step = segment.process(State::root(&value));
 
         assert_eq!(
             step.ok(),
             Some(vec![
-                Data::new(&json!("John"), "$.['firstName']".to_string()),
-                Data::new(&json!("doe"), "$.['lastName']".to_string())
+                Pointer::new(&json!("John"), "$.['firstName']".to_string()),
+                Pointer::new(&json!("doe"), "$.['lastName']".to_string())
             ])
         );
     }
@@ -72,14 +74,14 @@ mod tests {
     fn test_process_descendant() {
         let value = json!([{"name": "John"}, {"name": "doe"}]);
         let segment = Segment::Descendant;
-        let step = segment.process(Step::new_ref(Data::new(&value, "$".to_string())));
+        let step = segment.process(State::root(&value));
 
         assert_eq!(
             step.ok(),
             Some(vec![
-                Data::new(&json!({"name": "John"}), "$[0]".to_string()),
-                Data::new(&json!({"name": "doe"}), "$[1]".to_string()),
-                Data::new(&json!([{"name": "John"}, {"name": "doe"}]), "$".to_string()),
+                Pointer::new(&json!({"name": "John"}), "$[0]".to_string()),
+                Pointer::new(&json!({"name": "doe"}), "$[1]".to_string()),
+                Pointer::new(&json!([{"name": "John"}, {"name": "doe"}]), "$".to_string()),
 
             ])
         );

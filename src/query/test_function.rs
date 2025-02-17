@@ -1,7 +1,7 @@
-use serde_json::json;
 use crate::parser::model2::TestFunction;
-use crate::query::{Step, Query};
+use crate::query::Query;
 use crate::query::queryable::Queryable;
+use crate::query::state::State;
 
 impl TestFunction {
     /// Returns the length/size of the object.
@@ -29,7 +29,7 @@ impl TestFunction {
     //     }
     // }
 
-    pub fn apply<'a,T:Queryable>(&self, progress: Step<'a, T>) -> Step<'a,T>{
+    pub fn apply<'a,T:Queryable>(&self, progress: State<'a, T>) -> State<'a,T>{
 
         match progress {
             // Step::Data(data) => {
@@ -42,13 +42,13 @@ impl TestFunction {
             //          TestFunction::Match(_, _) => {}
             //      }
             // }
-            _ => Step::Nothing
+            State{ root, .. } => State::new(root)
         }
     }
 }
 
 impl Query for TestFunction {
-    fn process<'a, T: Queryable>(&self, progress: Step<'a, T>) -> Step<'a, T> {
-        self.apply(progress)
+    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+        self.apply(step)
     }
 }
