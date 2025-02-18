@@ -161,7 +161,7 @@ mod tests {
         let segment = Segment::Selector(Selector::Name("key2".to_string()));
         let step = segment.process(State::root(&value));
 
-        assert_eq!(step, State::new(&value));
+        assert_eq!(step, State::nothing(&value));
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod tests {
         let segment = Segment::Selector(Selector::Index(3));
         let step = segment.process(State::root(&value));
 
-        assert_eq!(step, State::new(&value));
+        assert_eq!(step, State::nothing(&value));
     }
 
     #[test]
@@ -278,6 +278,6 @@ mod tests {
         let segment = Segment::Selector(Selector::Wildcard);
         let step = segment.process(State::root(&value));
 
-        assert_eq!(step, State::new(&value));
+        assert_eq!(step, State::nothing(&value));
     }
 }

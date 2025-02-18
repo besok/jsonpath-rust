@@ -26,7 +26,7 @@ impl<'a, T: Queryable> State<'a, T> {
         }
     }
 
-    pub fn new(root: &'a T) -> Self {
+    pub fn nothing(root: &'a T) -> Self {
         State {
             root,
             data: Data::Nothing,

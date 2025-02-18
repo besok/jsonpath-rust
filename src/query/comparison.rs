@@ -1,168 +1,131 @@
-use crate::parser::model2::{Comparable, Literal, SingularQuery, SingularQuerySegment};
+use crate::parser::model2::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
 use crate::query::queryable::Queryable;
 use crate::query::selector::{process_index, process_key};
-use crate::query::state::{Data, State};
+use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 
-impl Query for Comparable {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
-        match self {
-            Comparable::Literal(lit) => lit.process(step),
-            Comparable::Function(tf) => tf.process(step),
-            Comparable::SingularQuery(query) => query.process(step),
-        }
-    }
-}
-
-impl Query for Literal {
+impl Query for Comparison {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        let val = match self {
-            Literal::Int(v) => (*v).into(),
-            Literal::Float(v) => (*v).into(),
-            Literal::String(v) => v.as_str().into(),
-            Literal::Bool(v) => (*v).into(),
-            Literal::Null => T::null(),
-        };
-
-        State::data(state.root, Data::Value(val))
-    }
-}
-
-impl Query for SingularQuery {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
         match self {
-            SingularQuery::Current(segments) => segments.process(step),
-            SingularQuery::Root(segments) => segments.process(step.shift_to_root()),
+            Comparison::Eq(lhs, rhs) => {
+                let lhs = lhs.process(state.clone());
+                let rhs = rhs.process(state);
+                eq(lhs, rhs)
+            }
+            Comparison::Ne(lhs, rhs) => State::nothing(state.root),
+            Comparison::Gt(lhs, rhs) => State::nothing(state.root),
+            Comparison::Gte(lhs, rhs) => State::nothing(state.root),
+            Comparison::Lt(lhs, rhs) => State::nothing(state.root),
+            Comparison::Lte(lhs, rhs) => State::nothing(state.root),
         }
     }
 }
 
-impl Query for SingularQuerySegment {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
-        match self {
-            SingularQuerySegment::Index(idx) => step.flat_map(|d| process_index(d, idx)),
-            SingularQuerySegment::Name(key) => step.flat_map(|d| process_key(d, key)),
+fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> State<'a, T> {
+    let root = lhs_state.root;
+    match (lhs_state.data, rhs_state.data) {
+        (Data::Value(lhs), Data::Value(rhs)) => {
+            if lhs == rhs {
+                State::data(root, Data::Value(lhs))
+            } else {
+                State::nothing(root)
+            }
         }
+        (Data::Value(v), Data::Ref(p)) | (Data::Ref(p), Data::Value(v)) => {
+            if v == *p.inner {
+                State::data(root, Data::new_ref(p))
+            } else {
+                State::nothing(root)
+            }
+        }
+
+        (Data::Ref(lhs), Data::Ref(rhs)) => {
+            if lhs.inner == rhs.inner {
+                State::data(root, Data::new_ref(lhs))
+            } else {
+                State::nothing(root)
+            }
+        }
+
+        (Data::Refs(lhs), Data::Refs(rhs)) => {
+            if lhs == rhs {
+                State::data(root, Data::Refs(lhs))
+            } else {
+                State::nothing(root)
+            }
+        }
+
+        (Data::Ref(r), Data::Refs(rhs)) => r
+            .inner
+            .as_array()
+            .filter(|array| eq_arrays(array, &rhs.iter().map(|p| p.inner).collect::<Vec<_>>()))
+            .map_or(State::nothing(root), |_| State::data(root, Data::Ref(r))),
+
+        _ => State::nothing(root),
     }
 }
 
-impl Query for Vec<SingularQuerySegment> {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        self.iter()
-            .fold(state, |next, segment| segment.process(next))
-    }
+fn eq_arrays<T: PartialEq>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
+    lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == *b)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::model2::{Comparable, Literal, SingularQuery, SingularQuerySegment};
+    use crate::parser::model2::{
+        Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
+    };
+    use crate::q_segments;
     use crate::query::state::{Data, Pointer, State};
     use crate::query::Query;
+    use crate::singular_query;
+    use crate::{cmp, comparable, lit, q_segment};
     use serde_json::json;
 
     #[test]
-    fn singular_query() {
-        let value = json!({
-          "result": [
-            {
-              "message": "Hello, Emmy! Your order number is: #100",
-              "phoneNumber": "255-301-9429",
-              "phoneVariation": "+90 398 588 10 73",
-              "status": "active",
-              "name": {
-                "first": "Blaise",
-                "middle": "Kyle",
-                "last": "Fadel"
-              }
-            }
-          ]
-        });
+    fn eq_comp_val() {
+        let data = json!({"key": "value"});
+        let state = State::root(&data);
 
-        let query = SingularQuery::Current(vec![
-            SingularQuerySegment::Name("result".to_string()),
-            SingularQuerySegment::Index(0),
-            SingularQuerySegment::Name("name".to_string()),
-            SingularQuerySegment::Name("first".to_string()),
-        ]);
+        let comparison = Comparison::Eq(
+            comparable!(lit!(s "key")),
+            comparable!(lit!(s "key")),
+        );
+        let result = comparison.process(state);
+        assert_eq!(result.val(), Some(json!("key")));
+    }
 
-        let state = State::root(&value);
+    #[test]
+    fn eq_comp_ref() {
+        let data = json!({"key": "value"});
+        let state = State::root(&data);
 
-        let result = query.process(state);
+        let comparison = Comparison::Eq(
+            comparable!(lit!(s "value")),
+            comparable!(> singular_query!(@ key))
+        );
+
+        let result = comparison.process(state);
         assert_eq!(
             result.ok(),
-            Some(vec![Pointer::new(
-                &json!("Blaise"),
-                "$.['result'][0].['name'].['first']".to_string()
-            )])
+            Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
         );
     }
 
     #[test]
-    fn singular_query_root() {
-        let value = json!({
-          "result": [
-            {
-              "message": "Hello, Emmy! Your order number is: #100",
-              "phoneNumber": "255-301-9429",
-              "phoneVariation": "+90 398 588 10 73",
-              "status": "active",
-              "name": {
-                "first": "Blaise",
-                "middle": "Kyle",
-                "last": "Fadel"
-              }
-            }
-          ]
-        });
+    fn eq_comp_queries() {
+        let data = json!({"key": "value", "key2": "value"});
+        let state = State::root(&data);
 
-        let query = SingularQuery::Root(vec![
-            SingularQuerySegment::Name("result".to_string()),
-            SingularQuerySegment::Index(0),
-            SingularQuerySegment::Name("name".to_string()),
-            SingularQuerySegment::Name("first".to_string()),
-        ]);
-
-        let state = State::data(
-            &value,
-            Data::new_ref(Pointer::new(&value, "$.name".to_string())),
+        let comparison = Comparison::Eq(
+            comparable!(> singular_query!(@ key)),
+            comparable!(> singular_query!(key2)),
         );
-
-        let result = query.process(state);
+        let result = comparison.process(state);
         assert_eq!(
             result.ok(),
-            Some(vec![Pointer::new(
-                &json!("Blaise"),
-                "$.['result'][0].['name'].['first']".to_string()
-            )])
+            Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
         );
     }
 
-    #[test]
-    fn literal() {
-        let value = json!({
-          "result": [
-            {
-              "message": "Hello, Emmy! Your order number is: #100",
-              "phoneNumber": "255-301-9429",
-              "phoneVariation": "+90 398 588 10 73",
-              "status": "active",
-              "name": {
-                "first": "Blaise",
-                "middle": "Kyle",
-                "last": "Fadel"
-              }
-            }
-          ]
-        });
 
-        let query = Comparable::Literal(Literal::String("Hello".to_string()));
-
-        let state = State::root(&value);
-
-        let result = query.process(state);
-        assert_eq!(
-            result.val(),
-            Some(json!("Hello"))
-        );
-    }
 }

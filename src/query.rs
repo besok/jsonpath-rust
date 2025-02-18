@@ -5,6 +5,7 @@ mod segment;
 mod selector;
 mod test_function;
 mod state;
+mod comparable;
 
 use state::State;
 use crate::path::JsonLike;

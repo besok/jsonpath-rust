@@ -42,7 +42,7 @@ impl TestFunction {
             //          TestFunction::Match(_, _) => {}
             //      }
             // }
-            State{ root, .. } => State::new(root)
+            State{ root, .. } => State::nothing(root)
         }
     }
 }

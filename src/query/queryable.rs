@@ -13,6 +13,7 @@ where
         + From<f64>
         + From<Vec<Self>>
         + From<String>
+        + PartialEq
 {
 
 
