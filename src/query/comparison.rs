@@ -6,13 +6,18 @@ use crate::query::Query;
 
 impl Query for Comparison {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+        let root = state.root;
         match self {
             Comparison::Eq(lhs, rhs) => {
                 let lhs = lhs.process(state.clone());
                 let rhs = rhs.process(state);
-                eq(lhs, rhs)
+                bool_to_state(eq(lhs, rhs), root)
             }
-            Comparison::Ne(lhs, rhs) => State::nothing(state.root),
+            Comparison::Ne(lhs, rhs) => {
+                let lhs = lhs.process(state.clone());
+                let rhs = rhs.process(state);
+                bool_to_state(!eq(lhs, rhs), root)
+            }
             Comparison::Gt(lhs, rhs) => State::nothing(state.root),
             Comparison::Gte(lhs, rhs) => State::nothing(state.root),
             Comparison::Lt(lhs, rhs) => State::nothing(state.root),
@@ -21,48 +26,26 @@ impl Query for Comparison {
     }
 }
 
-fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> State<'a, T> {
-    let root = lhs_state.root;
+fn bool_to_state<T: Queryable>(b: bool, root: &T) -> State<T> {
+    State::data(root, Data::Value(b.into()))
+}
+
+fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> bool {
     match (lhs_state.data, rhs_state.data) {
-        (Data::Value(lhs), Data::Value(rhs)) => {
-            if lhs == rhs {
-                State::data(root, Data::Value(lhs))
-            } else {
-                State::nothing(root)
-            }
-        }
-        (Data::Value(v), Data::Ref(p)) | (Data::Ref(p), Data::Value(v)) => {
-            if v == *p.inner {
-                State::data(root, Data::new_ref(p))
-            } else {
-                State::nothing(root)
-            }
-        }
+        (Data::Value(lhs), Data::Value(rhs)) => lhs == rhs,
+        (Data::Value(v), Data::Ref(p)) | (Data::Ref(p), Data::Value(v)) => v == *p.inner,
+        (Data::Ref(lhs), Data::Ref(rhs)) => lhs.inner == rhs.inner,
+        (Data::Refs(lhs), Data::Refs(rhs)) => lhs == rhs,
+        (Data::Ref(r), Data::Refs(rhs)) => eq_ref_to_array(r, &rhs),
 
-        (Data::Ref(lhs), Data::Ref(rhs)) => {
-            if lhs.inner == rhs.inner {
-                State::data(root, Data::new_ref(lhs))
-            } else {
-                State::nothing(root)
-            }
-        }
-
-        (Data::Refs(lhs), Data::Refs(rhs)) => {
-            if lhs == rhs {
-                State::data(root, Data::Refs(lhs))
-            } else {
-                State::nothing(root)
-            }
-        }
-
-        (Data::Ref(r), Data::Refs(rhs)) => r
-            .inner
-            .as_array()
-            .filter(|array| eq_arrays(array, &rhs.iter().map(|p| p.inner).collect::<Vec<_>>()))
-            .map_or(State::nothing(root), |_| State::data(root, Data::Ref(r))),
-
-        _ => State::nothing(root),
+        _ => false,
     }
+}
+
+fn eq_ref_to_array<T: Queryable>(r: Pointer<T>, rhs: &Vec<Pointer<T>>) -> bool {
+    r.inner.as_array().map_or(false, |array| {
+        eq_arrays(array, &rhs.iter().map(|p| p.inner).collect::<Vec<_>>())
+    })
 }
 
 fn eq_arrays<T: PartialEq>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
@@ -86,12 +69,9 @@ mod tests {
         let data = json!({"key": "value"});
         let state = State::root(&data);
 
-        let comparison = Comparison::Eq(
-            comparable!(lit!(s "key")),
-            comparable!(lit!(s "key")),
-        );
+        let comparison = Comparison::Eq(comparable!(lit!(s "key")), comparable!(lit!(s "key")));
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!("key")));
+        assert_eq!(result.val(), Some(json!(true)));
     }
 
     #[test]
@@ -101,14 +81,11 @@ mod tests {
 
         let comparison = Comparison::Eq(
             comparable!(lit!(s "value")),
-            comparable!(> singular_query!(@ key))
+            comparable!(> singular_query!(@ key)),
         );
 
         let result = comparison.process(state);
-        assert_eq!(
-            result.ok(),
-            Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
-        );
+        assert_eq!(result.val(), Some(json!(true)));
     }
 
     #[test]
@@ -121,11 +98,16 @@ mod tests {
             comparable!(> singular_query!(key2)),
         );
         let result = comparison.process(state);
-        assert_eq!(
-            result.ok(),
-            Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
-        );
+        assert_eq!(result.val(), Some(json!(true)));
     }
 
+    #[test]
+    fn neq_comp_val() {
+        let data = json!({"key": "value"});
+        let state = State::root(&data);
 
+        let comparison = Comparison::Ne(comparable!(lit!(s "key")), comparable!(lit!(s "key")));
+        let result = comparison.process(state);
+        assert_eq!(result.val(), Some(json!(false)));
+    }
 }

@@ -27,6 +27,7 @@ where
     fn as_str(&self) -> Option<&str>;
 
     fn as_i64(&self) -> Option<i64>;
+    fn as_bool(&self) -> Option<bool>;
 
     /// Returns a null value.
     fn null() -> Self;
@@ -55,6 +56,10 @@ impl Queryable for Value {
 
     fn as_i64(&self) -> Option<i64> {
         self.as_i64()
+    }
+
+    fn as_bool(&self) -> Option<bool> {
+        self.as_bool()
     }
 
     fn null() -> Self {
