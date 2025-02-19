@@ -1,33 +1,44 @@
 use crate::parser::model2::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
 use crate::query::queryable::Queryable;
-use crate::query::selector::{process_index, process_key};
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 
 impl Query for Comparison {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         let root = state.root;
+        let (lhs, rhs) = self.vals();
+        let lhs = lhs.process(state.clone());
+        let rhs = rhs.process(state);
+
         match self {
-            Comparison::Eq(lhs, rhs) => {
-                let lhs = lhs.process(state.clone());
-                let rhs = rhs.process(state);
-                bool_to_state(eq(lhs, rhs), root)
-            }
-            Comparison::Ne(lhs, rhs) => {
-                let lhs = lhs.process(state.clone());
-                let rhs = rhs.process(state);
-                bool_to_state(!eq(lhs, rhs), root)
-            }
-            Comparison::Gt(lhs, rhs) => State::nothing(state.root),
-            Comparison::Gte(lhs, rhs) => State::nothing(state.root),
-            Comparison::Lt(lhs, rhs) => State::nothing(state.root),
-            Comparison::Lte(lhs, rhs) => State::nothing(state.root),
+            Comparison::Eq(..) => State::bool(eq(lhs, rhs), root),
+            Comparison::Ne(..) => State::bool(!eq(lhs, rhs), root),
+            Comparison::Gt(..) => State::bool(lt(rhs, lhs), root),
+            Comparison::Gte(..) => State::bool(lt(rhs.clone(), lhs.clone()) || eq(lhs, rhs), root),
+            Comparison::Lt(..) => State::bool(lt(lhs, rhs), root),
+            Comparison::Lte(..) => State::bool(lt(lhs.clone(), rhs.clone()) || eq(lhs, rhs), root),
         }
     }
 }
 
-fn bool_to_state<T: Queryable>(b: bool, root: &T) -> State<T> {
-    State::data(root, Data::Value(b.into()))
+fn lt<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>) -> bool {
+    let cmp = |lhs: &T, rhs: &T| {
+        if let (Some(lhs), Some(rhs)) = (lhs.as_i64(), rhs.as_i64()) {
+            lhs < rhs
+        } else if let (Some(lhs), Some(rhs)) = (lhs.as_str(), rhs.as_str()) {
+            lhs < rhs
+        } else {
+            false
+        }
+    };
+
+    match (lhs.data, rhs.data) {
+        (Data::Value(lhs), Data::Value(rhs)) => cmp(&lhs, &rhs),
+        (Data::Value(v), Data::Ref(p)) => cmp(&v, p.inner),
+        (Data::Ref(p), Data::Value(v)) => cmp(&v, p.inner),
+        (Data::Ref(lhs), Data::Ref(rhs)) => cmp(lhs.inner, rhs.inner),
+        _ => false,
+    }
 }
 
 fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> bool {
@@ -37,7 +48,6 @@ fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> boo
         (Data::Ref(lhs), Data::Ref(rhs)) => lhs.inner == rhs.inner,
         (Data::Refs(lhs), Data::Refs(rhs)) => lhs == rhs,
         (Data::Ref(r), Data::Refs(rhs)) => eq_ref_to_array(r, &rhs),
-
         _ => false,
     }
 }
@@ -107,6 +117,32 @@ mod tests {
         let state = State::root(&data);
 
         let comparison = Comparison::Ne(comparable!(lit!(s "key")), comparable!(lit!(s "key")));
+        let result = comparison.process(state);
+        assert_eq!(result.val(), Some(json!(false)));
+    }
+
+    #[test]
+    fn less_than() {
+        let data = json!({"key": 3});
+        let state = State::root(&data);
+
+        let comparison = Comparison::Lt(
+            comparable!(lit!(i 2)),
+            comparable!(> singular_query!(@ key)),
+        );
+        let result = comparison.process(state);
+        assert_eq!(result.val(), Some(json!(true)));
+    }
+
+    #[test]
+    fn less_than_false() {
+        let data = json!({"key": 1});
+        let state = State::root(&data);
+
+        let comparison = Comparison::Lt(
+            comparable!(lit!(i 2)),
+            comparable!(> singular_query!(@ key)),
+        );
         let result = comparison.process(state);
         assert_eq!(result.val(), Some(json!(false)));
     }

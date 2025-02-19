@@ -182,6 +182,17 @@ impl Comparison {
             _ => Err(JsonPathParserError::InvalidJsonPath(format!("Invalid comparison operator: {}", op))),
         }
     }
+
+    pub fn vals(&self) -> (&Comparable, &Comparable) {
+        match self {
+            Comparison::Eq(left, right) => (left, right),
+            Comparison::Ne(left, right) => (left, right),
+            Comparison::Gt(left, right) => (left, right),
+            Comparison::Gte(left, right) => (left, right),
+            Comparison::Lt(left, right) => (left, right),
+            Comparison::Lte(left, right) => (left, right),
+        }
+    }
 }
 
 impl Display for Comparison {

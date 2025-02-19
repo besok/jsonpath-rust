@@ -7,13 +7,17 @@ pub struct State<'a, T: Queryable> {
     pub data: Data<'a, T>,
 }
 
-impl<'a, T:Queryable> From<&'a T> for State<'a, T> {
+impl<'a, T: Queryable> From<&'a T> for State<'a, T> {
     fn from(root: &'a T) -> Self {
         State::root(root)
     }
 }
 
 impl<'a, T: Queryable> State<'a, T> {
+
+    pub fn bool(b: bool, root: &T) -> State<T> {
+        State::data(root, Data::Value(b.into()))
+    }
 
     pub fn shift_to_root(self) -> State<'a, T> {
         State::root(self.root)
@@ -47,6 +51,8 @@ impl<'a, T: Queryable> State<'a, T> {
             _ => None,
         }
     }
+
+
 
     pub fn reduce(self, other: State<'a, T>) -> State<'a, T> {
         State {
@@ -124,7 +130,6 @@ impl<'a, T: Queryable> Data<'a, T> {
         }
     }
 
-
     pub fn new_ref(data: Pointer<'a, T>) -> Data<'a, T> {
         Data::Ref(data)
     }
@@ -142,10 +147,7 @@ pub struct Pointer<'a, T: Queryable> {
 
 impl<'a, T: Queryable> Pointer<'a, T> {
     pub fn new(inner: &'a T, path: QueryPath) -> Self {
-        Pointer {
-            inner,
-            path,
-        }
+        Pointer { inner, path }
     }
 
     pub fn key(inner: &'a T, path: QueryPath, key: &str) -> Self {

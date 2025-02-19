@@ -6,6 +6,9 @@ mod selector;
 mod test_function;
 mod state;
 mod comparable;
+mod test;
+mod filter;
+mod atom;
 
 use state::State;
 use crate::path::JsonLike;
