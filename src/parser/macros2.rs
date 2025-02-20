@@ -117,14 +117,29 @@ macro_rules! test {
 #[macro_export]
 macro_rules! or {
     ($($items:expr),*) => {
-        Filter::Or(vec![ $($items),* ])
+       crate::parser::model2::Filter::Or(vec![ $($items),* ])
     };
 }
 
 #[macro_export]
 macro_rules! and {
     ($($items:expr),*) => {
-        Filter::And(vec![ $($items),* ])
+        crate::parser::model2::Filter::And(vec![ $($items),* ])
+    };
+}
+
+#[macro_export]
+macro_rules! filter_ {
+    ($item:expr) => {
+        crate::parser::model2::Filter::Atom($item)
+    };
+
+    (or $($items:expr),*) => {
+       crate::parser::model2::Filter::Or(vec![ $($items),* ])
+    };
+
+    (and $($items:expr),*) => {
+        crate::parser::model2::Filter::And(vec![ $($items),* ])
     };
 }
 

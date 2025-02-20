@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::query::state::Data;
 use serde_json::{json, Value};
 use std::fmt::Debug;
@@ -13,10 +14,8 @@ where
         + From<f64>
         + From<Vec<Self>>
         + From<String>
-        + PartialEq
+        + PartialEq,
 {
-
-
     /// Retrieves a reference to the value associated with the given key.
     fn get(&self, key: &str) -> Option<&Self>;
 
@@ -32,11 +31,12 @@ where
     /// Returns a null value.
     fn null() -> Self;
 
-
+    fn extension_custom(_name: &str, _args: Vec<Cow<Self>>) -> Self {
+        Self::null()
+    }
 }
 
 impl Queryable for Value {
-
     fn get(&self, key: &str) -> Option<&Self> {
         self.get(key)
     }

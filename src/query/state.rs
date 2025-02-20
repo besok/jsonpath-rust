@@ -19,6 +19,10 @@ impl<'a, T: Queryable> State<'a, T> {
         State::data(root, Data::Value(b.into()))
     }
 
+    pub fn i64(i: i64, root: &T) -> State<T> {
+        State::data(root, Data::Value(i.into()))
+    }
+
     pub fn shift_to_root(self) -> State<'a, T> {
         State::root(self.root)
     }
