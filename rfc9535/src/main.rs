@@ -13,7 +13,7 @@ fn main() -> Result<(), Error> {
     console::process_results(
         cases
             .iter()
-            .map(suite::handle_test_case)
+            .map(suite::handle_test_case2)
             .collect::<Vec<TestResult>>(),
         skipped,
     )

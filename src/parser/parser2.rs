@@ -1,6 +1,6 @@
 #![allow(clippy::empty_docs)]
 
-use crate::parser::errors2::JsonPathParserError;
+use crate::parser::errors2::JsonPathError;
 use crate::parser::model2::{Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector, SingularQuery, SingularQuerySegment, Test, TestFunction};
 use crate::path::JsonLike;
 use pest::iterators::{Pair, Pairs};
@@ -13,7 +13,7 @@ pub(super) struct JSPathParser;
 const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 
-pub(super) type Parsed<T> = Result<T, JsonPathParserError>;
+pub(super) type Parsed<T> = Result<T, JsonPathError>;
 
 /// Parses a string into a [JsonPath].
 ///
@@ -25,12 +25,12 @@ pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery>
     JSPathParser::parse(Rule::main, jp_str)
         .map_err(Box::new)?
         .next()
-        .ok_or(JsonPathParserError::UnexpectedPestOutput)
+        .ok_or(JsonPathError::UnexpectedPestOutput)
         .and_then(jp_query)
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
-    Ok(JpQuery::new(segments(rule)?))
+    Ok(JpQuery::new(segments(next_down(rule)?)?))
 }
 pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
     segments(rule)
@@ -57,7 +57,7 @@ pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
                         Ok(Segment::Selector(
                             selectors.into_iter()
                             .next()
-                            .ok_or(JsonPathParserError::empty("selector"))?))
+                            .ok_or(JsonPathError::empty("selector"))?))
                     } else {
                         Ok(Segment::Selectors(selectors))
                     }
@@ -92,7 +92,7 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
     let name = elems
         .next()
         .map(|e| e.as_str().trim())
-        .ok_or(JsonPathParserError::empty("function expression"))?
+        .ok_or(JsonPathError::empty("function expression"))?
         ;
     let mut args = vec![];
     for arg in elems {
@@ -152,9 +152,9 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     }
     Ok(segments)
 }
-fn validate_range(val: i64) -> Result<i64, JsonPathParserError> {
+fn validate_range(val: i64) -> Result<i64, JsonPathError> {
     if val > MAX_VAL || val < MIN_VAL {
-        Err(JsonPathParserError::InvalidJsonPath(format!(
+        Err(JsonPathError::InvalidJsonPath(format!(
             "Value {} is out of range",
             val
         )))
@@ -201,9 +201,9 @@ pub fn singular_query(rule: Pair<Rule>) -> Parsed<SingularQuery> {
 pub fn comp_expr(rule:Pair<Rule>) -> Parsed<Comparison> {
     let mut children = rule.into_inner();
 
-    let lhs = comparable(children.next().ok_or(JsonPathParserError::empty("comparison"))?)?;
-    let op = children.next().ok_or(JsonPathParserError::empty("comparison"))?.as_str();
-    let rhs = comparable(children.next().ok_or(JsonPathParserError::empty("comparison"))?)?;;
+    let lhs = comparable(children.next().ok_or(JsonPathError::empty("comparison"))?)?;
+    let op = children.next().ok_or(JsonPathError::empty("comparison"))?.as_str();
+    let rhs = comparable(children.next().ok_or(JsonPathError::empty("comparison"))?)?;;
 
     Comparison::try_new(op,lhs, rhs)
 }
@@ -216,7 +216,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
         } else {
             let num = num.parse::<i64>().map_err(|e| (e, num))?;
             if num > MAX_VAL || num < MIN_VAL {
-                Err(JsonPathParserError::InvalidNumber(format!(
+                Err(JsonPathError::InvalidNumber(format!(
                     "number out of bounds: {}",
                     num
                 )))
@@ -292,6 +292,6 @@ fn next_down(rule: Pair<Rule>) -> Parsed<Pair<Rule>> {
     let rule_as_str = rule.as_str().to_string();
     rule.into_inner()
         .next()
-        .ok_or(JsonPathParserError::EmptyInner(rule_as_str))
+        .ok_or(JsonPathError::InvalidJsonPath(rule_as_str))
 }
 

@@ -1,8 +1,8 @@
 use crate::parser::model2::Selector;
 use crate::query::queryable::Queryable;
+use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 use std::cmp::{max, min};
-use crate::query::state::{Data, Pointer, State};
 
 impl Query for Selector {
     fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
@@ -13,14 +13,17 @@ impl Query for Selector {
             Selector::Slice(start, end, sl_step) => {
                 step.flat_map(|d| process_slice(d, start, end, sl_step))
             }
-            Selector::Filter(_) => {
-                unimplemented!()
-            }
+            Selector::Filter(f) => f.process(step),
         }
     }
 }
 
-fn process_wildcard<T: Queryable>(Pointer { inner: pointer, path }: Pointer<T>) -> Data<T> {
+fn process_wildcard<T: Queryable>(
+    Pointer {
+        inner: pointer,
+        path,
+    }: Pointer<T>,
+) -> Data<T> {
     if let Some(array) = pointer.as_array() {
         Data::new_refs(
             array
@@ -110,14 +113,20 @@ fn process_slice<'a, T: Queryable>(
         .unwrap_or_default()
 }
 
-pub fn process_key<'a, T: Queryable>(Pointer { inner, path }: Pointer<'a, T>, key: &str) -> Data<'a, T> {
+pub fn process_key<'a, T: Queryable>(
+    Pointer { inner, path }: Pointer<'a, T>,
+    key: &str,
+) -> Data<'a, T> {
     inner
         .get(key)
         .map(|v| Data::new_ref(Pointer::key(v, path, key)))
         .unwrap_or_default()
 }
 
-pub fn process_index<'a, T: Queryable>(Pointer { inner, path }: Pointer<'a, T>, idx: &i64) -> Data<'a, T> {
+pub fn process_index<'a, T: Queryable>(
+    Pointer { inner, path }: Pointer<'a, T>,
+    idx: &i64,
+) -> Data<'a, T> {
     inner
         .as_array()
         .map(|array| {

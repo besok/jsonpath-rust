@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::parser::parser2::Rule;
 
 #[derive(Error, Debug)]
-pub enum JsonPathParserError {
+pub enum JsonPathError {
     #[error("Failed to parse rule: {0}")]
     PestError(#[from] Box<pest::error::Error<Rule>>),
     #[error("Unexpected rule `{0:?}` when trying to parse logic atom: `{1}` within `{2}`")]
@@ -30,35 +30,35 @@ pub enum JsonPathParserError {
     InvalidJsonPath(String),
 }
 
-impl JsonPathParserError {
+impl JsonPathError {
     pub fn empty(v:&str) -> Self {
-        JsonPathParserError::EmptyInner(v.to_string())
+        JsonPathError::EmptyInner(v.to_string())
     }
 }
 
-impl From<&str> for JsonPathParserError {
+impl From<&str> for JsonPathError {
     fn from(val: &str) -> Self {
-        JsonPathParserError::EmptyInner(val.to_string())
+        JsonPathError::EmptyInner(val.to_string())
     }
 }
 
-impl From<(ParseIntError, &str)> for JsonPathParserError {
+impl From<(ParseIntError, &str)> for JsonPathError {
     fn from((err, val): (ParseIntError, &str)) -> Self {
-        JsonPathParserError::InvalidNumber(format!("{:?} for `{}`", err, val))
+        JsonPathError::InvalidNumber(format!("{:?} for `{}`", err, val))
     }
 }
-impl From<(ParseFloatError, &str)> for JsonPathParserError {
+impl From<(ParseFloatError, &str)> for JsonPathError {
     fn from((err, val): (ParseFloatError, &str)) -> Self {
-        JsonPathParserError::InvalidNumber(format!("{:?} for `{}`", err, val))
+        JsonPathError::InvalidNumber(format!("{:?} for `{}`", err, val))
     }
-}impl From<ParseBoolError> for JsonPathParserError {
+}impl From<ParseBoolError> for JsonPathError {
     fn from(err : ParseBoolError) -> Self {
-        JsonPathParserError::InvalidJsonPath(format!("{:?} ", err))
+        JsonPathError::InvalidJsonPath(format!("{:?} ", err))
     }
 }
-impl From<Pair<'_, Rule>> for JsonPathParserError {
+impl From<Pair<'_, Rule>> for JsonPathError {
     fn from(rule: Pair<Rule>) -> Self {
-        JsonPathParserError::UnexpectedRuleLogicError(
+        JsonPathError::UnexpectedRuleLogicError(
             rule.as_rule(),
             rule.as_span().as_str().to_string(),
             rule.as_str().to_string())

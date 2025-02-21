@@ -2,6 +2,9 @@ use colored::Colorize;
 use jsonpath_rust::{JsonPath, JsonPathParserError};
 use serde_json::Value;
 use std::str::FromStr;
+use jsonpath_rust::parser::model2::JpQuery;
+use jsonpath_rust::parser::parser2::parse_json_path;
+use jsonpath_rust::query::{js_path, js_path_vals};
 use crate::console::TestResult;
 
 type SkippedCases = usize;
@@ -47,6 +50,49 @@ pub fn handle_test_case(case: &TestCase) -> TestResult {
         if let Some(doc) = case.document.as_ref() {
             let js_path = js_path.map_err(|err| (err, case))?;
             let result = js_path.find(doc);
+
+            match (case.result.as_ref(), case.results.as_ref()) {
+                (Some(expected), _) => {
+                    if result == *expected {
+                        Ok(())
+                    } else {
+                        Err(TestFailure::match_one(case, &result))
+                    }
+                }
+                (None, Some(expected)) => {
+                    if expected.iter().any(|exp| result == *exp) {
+                        Ok(())
+                    } else {
+                        Err(TestFailure::match_any(case, &result))
+                    }
+                }
+                _ => Ok(()),
+            }
+        } else {
+            Ok(())
+        }
+    }
+}
+pub fn handle_test_case2(case: &TestCase) -> TestResult {
+    let jspath = parse_json_path(case.selector.as_str());
+
+    if case.invalid_selector {
+        if jspath.is_ok() {
+            Err(TestFailure::invalid(case))
+        } else {
+            Ok(())
+        }
+    } else {
+        if let Some(doc) = case.document.as_ref() {
+            let p = case.selector.as_str();
+            let result = js_path_vals(p,doc);
+
+            if result.is_err(){
+                println!("path: {}", p);
+                println!("value: {}", doc);
+                return Err(TestFailure::invalid(case));
+            }
+            let result = result.unwrap();
 
             match (case.result.as_ref(), case.results.as_ref()) {
                 (Some(expected), _) => {

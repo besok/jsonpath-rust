@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use crate::parser::errors2::JsonPathParserError;
+use crate::parser::errors2::JsonPathError;
 use crate::parser::parser2::Parsed;
 
 /// Represents a JSONPath query with a list of segments.
@@ -179,7 +179,7 @@ impl Comparison {
             ">=" => Ok(Comparison::Gte(left, right)),
             "<" => Ok(Comparison::Lt(left, right)),
             "<=" => Ok(Comparison::Lte(left, right)),
-            _ => Err(JsonPathParserError::InvalidJsonPath(format!("Invalid comparison operator: {}", op))),
+            _ => Err(JsonPathError::InvalidJsonPath(format!("Invalid comparison operator: {}", op))),
         }
     }
 
@@ -312,7 +312,7 @@ impl TestFunction {
             ("search",[a,b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
             ("match", [a,b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
             ("length" | "value" | "count" | "match" | "search", args ) =>
-                Err(JsonPathParserError::InvalidJsonPath(format!("Invalid number of arguments for the function `{}`: got {}", name, args.len()))),
+                Err(JsonPathError::InvalidJsonPath(format!("Invalid number of arguments for the function `{}`: got {}", name, args.len()))),
             (custom,_) => Ok(TestFunction::Custom(custom.to_string(), args)),
         }
     }

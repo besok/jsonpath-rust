@@ -15,7 +15,7 @@ use pest::error::Error;
 use pest::iterators::Pair;
 use pest::Parser;
 use crate::{lit, q_segments, q_segment, singular_query, slice, test_fn, arg, test, segment, selector, atom, cmp, comparable, jq, filter, or, and};
-use crate::parser::parser2::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, singular_query, singular_query_segments, slice_selector, Rule};
+use crate::parser::parser2::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, parse_json_path, singular_query, singular_query_segments, slice_selector, Rule};
 use std::panic;
 
 struct TestPair<T> {
@@ -193,4 +193,12 @@ fn comparable_test(){
         .assert("$[1]",comparable!(> singular_query!([1])))
         .assert("length(1)",comparable!(f test_fn!(length arg!(lit!(i 1)))))
     ;
+}
+
+
+#[test]
+fn parse_path(){
+    let result = parse_json_path("$");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), JpQuery::new(vec![]));
 }
