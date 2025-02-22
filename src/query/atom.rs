@@ -5,7 +5,6 @@ use crate::query::Query;
 
 impl Query for FilterAtom {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        println!("FilterAtom: {}", state);
         match self {
             FilterAtom::Filter { expr, not } => {
                 let bool_res = expr.process(state);
@@ -18,8 +17,6 @@ impl Query for FilterAtom {
             FilterAtom::Test { expr, not } => {
                 let new_state = |b| State::bool(b, state.root);
                 let res = expr.process(state.clone());
-                println!("self {:?}", self);
-                println!("test: {}, {}", res, state);
                 if res.is_nothing() {
                     new_state(*not)
                 } else {

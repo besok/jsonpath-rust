@@ -7,7 +7,9 @@ impl Query for Filter {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         let root = state.root;
         state.flat_map(|p| {
-            if let Some(items) = p.inner.as_array() {
+            if p.is_internal() {
+                Data::Value(self.filter_item(p, root).into())
+            } else if let Some(items) = p.inner.as_array() {
                 Data::Refs(
                     items
                         .into_iter()
@@ -25,11 +27,7 @@ impl Query for Filter {
                         .collect(),
                 )
             } else {
-                if p.is_internal() {
-                    Data::Value(self.filter_item(p, root).into())
-                } else {
-                    return Data::Nothing;
-                }
+                return Data::Nothing;
             }
         })
     }
@@ -38,8 +36,8 @@ impl Query for Filter {
 impl Filter {
     fn process_elem<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         let process_cond = |filter: &Filter| {
-            filter
-                .process(state.clone())
+            let state1 = filter.process(state.clone());
+            state1
                 .ok_val()
                 .and_then(|v| v.as_bool())
                 .unwrap_or_default()
@@ -121,6 +119,7 @@ mod tests {
             Ok(vec![
                 (&json!({"b":1}), "$.['a'].['a']".to_string()).into(),
                 (&json!({"b":2}), "$.['a'].['c']".to_string()).into(),
+                (&json!({"b1":3}), "$.['a'].['d']".to_string()).into(),
             ])
         );
     }

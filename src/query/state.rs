@@ -183,7 +183,7 @@ pub struct Pointer<'a, T: Queryable> {
 
 impl<'a, T: Queryable> Display for Pointer<'a, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?},{}", self.inner, self.path)
+        write!(f, "{:?}='{}'", self.inner, self.path)
     }
 }
 
