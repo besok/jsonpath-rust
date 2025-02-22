@@ -89,7 +89,7 @@ mod tests {
 
         let result = query.process(state);
         assert_eq!(
-            result.ok(),
+            result.ok_ref(),
             Some(vec![Pointer::new(
                 &json!("Blaise"),
                 "$.['result'][0].['name'].['first']".to_string()
@@ -129,7 +129,7 @@ mod tests {
 
         let result = query.process(state);
         assert_eq!(
-            result.ok(),
+            result.ok_ref(),
             Some(vec![Pointer::new(
                 &json!("Blaise"),
                 "$.['result'][0].['name'].['first']".to_string()
@@ -161,7 +161,7 @@ mod tests {
 
         let result = query.process(state);
         assert_eq!(
-            result.val(),
+            result.ok_val(),
             Some(json!("Hello"))
         );
     }

@@ -6,6 +6,7 @@ use crate::query::Query;
 impl Query for JpQuery {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         self.segments.process(state)
+
     }
 }
 
@@ -52,7 +53,7 @@ mod tests {
 
         let result = query.process(state);
         assert_eq!(
-            result.ok(),
+            result.ok_ref(),
             Some(vec![Pointer::new(
                 &json!("Blaise"),
                 "$.['result'][0].['name'].['first']".to_string()

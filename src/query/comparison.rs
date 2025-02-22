@@ -9,7 +9,6 @@ impl Query for Comparison {
         let (lhs, rhs) = self.vals();
         let lhs = lhs.process(state.clone());
         let rhs = rhs.process(state);
-
         match self {
             Comparison::Eq(..) => State::bool(eq(lhs, rhs), root),
             Comparison::Ne(..) => State::bool(!eq(lhs, rhs), root),
@@ -81,7 +80,7 @@ mod tests {
 
         let comparison = Comparison::Eq(comparable!(lit!(s "key")), comparable!(lit!(s "key")));
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(true)));
+        assert_eq!(result.ok_val(), Some(json!(true)));
     }
 
     #[test]
@@ -95,7 +94,7 @@ mod tests {
         );
 
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(true)));
+        assert_eq!(result.ok_val(), Some(json!(true)));
     }
 
     #[test]
@@ -108,7 +107,7 @@ mod tests {
             comparable!(> singular_query!(key2)),
         );
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(true)));
+        assert_eq!(result.ok_val(), Some(json!(true)));
     }
 
     #[test]
@@ -118,7 +117,7 @@ mod tests {
 
         let comparison = Comparison::Ne(comparable!(lit!(s "key")), comparable!(lit!(s "key")));
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(false)));
+        assert_eq!(result.ok_val(), Some(json!(false)));
     }
 
     #[test]
@@ -131,7 +130,7 @@ mod tests {
             comparable!(> singular_query!(@ key)),
         );
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(true)));
+        assert_eq!(result.ok_val(), Some(json!(true)));
     }
 
     #[test]
@@ -144,6 +143,6 @@ mod tests {
             comparable!(> singular_query!(@ key)),
         );
         let result = comparison.process(state);
-        assert_eq!(result.val(), Some(json!(false)));
+        assert_eq!(result.ok_val(), Some(json!(false)));
     }
 }

@@ -159,7 +159,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
         );
     }
@@ -180,7 +180,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![Pointer::new(&json!(2), "$[1]".to_string())])
         );
     }
@@ -201,7 +201,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![
                 Pointer::new(&json!(2), "$[1]".to_string()),
                 Pointer::new(&json!(3), "$[2]".to_string()),
@@ -217,7 +217,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![
                 Pointer::new(&json!(3), "$[2]".to_string()),
                 Pointer::new(&json!(2), "$[1]".to_string()),
@@ -232,7 +232,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![
                 Pointer::new(&json!(1), "$[0]".to_string()),
                 Pointer::new(&json!(3), "$[2]".to_string()),
@@ -247,7 +247,7 @@ mod tests {
         let segment = Segment::Selector(Selector::Slice(Some(0), Some(5), Some(0)));
         let step = segment.process(State::root(&value));
 
-        assert_eq!(step.ok(), Some(vec![]));
+        assert_eq!(step.ok_ref(), Some(vec![]));
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![
                 Pointer::new(&json!("value"), "$.['key']".to_string()),
                 Pointer::new(&json!("value2"), "$.['key2']".to_string())
@@ -272,7 +272,7 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(
-            step.ok(),
+            step.ok_ref(),
             Some(vec![
                 Pointer::new(&json!(1), "$[0]".to_string()),
                 Pointer::new(&json!(2), "$[1]".to_string()),

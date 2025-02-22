@@ -5,32 +5,38 @@ use crate::query::Query;
 
 impl Query for FilterAtom {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+        println!("FilterAtom: {}", state);
         match self {
-            FilterAtom::Filter { expr, not } => process_with_not(expr, state, *not),
-            FilterAtom::Test { expr, not } => process_with_not(expr, state, *not),
+            FilterAtom::Filter { expr, not } => {
+                let bool_res = expr.process(state);
+                if *not {
+                    invert_bool(bool_res)
+                } else {
+                    bool_res
+                }
+            }
+            FilterAtom::Test { expr, not } => {
+                let new_state = |b| State::bool(b, state.root);
+                let res = expr.process(state.clone());
+                println!("self {:?}", self);
+                println!("test: {}, {}", res, state);
+                if res.is_nothing() {
+                    new_state(*not)
+                } else {
+                    new_state(!*not)
+                }
+            }
             FilterAtom::Comparison(cmp) => cmp.process(state),
         }
     }
 }
 
-fn process_with_not<'a, T, Q>(expr: &Box<Q>, state: State<'a, T>, not: bool) -> State<'a, T>
-where
-    Q: Query,
-    T: Queryable,
-{
-    let new_state = |b| State::bool(b, state.root);
-    let bool_res = expr.process(state);
-
-    if not {
-        bool_res
-            .val()
-            .and_then(|v| v.as_bool())
-            .map(|b| !b)
-            .map(new_state)
-            .unwrap_or_else(|| new_state(false))
-    } else {
-        bool_res
-    }
+fn invert_bool<T:Queryable>(state: State<T>) -> State<T> {
+    let root = state.root;
+    State::bool(
+        !state.ok_val().and_then(|v| v.as_bool()).unwrap_or_default(),
+        root,
+    )
 }
 
 #[cfg(test)]
@@ -55,7 +61,7 @@ mod tests {
         let atom = atom!(comparable!(lit!(i 1)), ">=", comparable!(lit!(i 1)));
         let state = State::root(&json);
         let res = atom.process(state);
-        assert_eq!(res.val().and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(res.ok_val().and_then(|v| v.as_bool()), Some(true));
     }
 
     #[test]
@@ -63,24 +69,30 @@ mod tests {
         let json = json!({"a": 1 , "b": 2});
         let state = State::root(&json);
 
-        let f1 = filter_!(
-                atom!(
-                    comparable!(> SingularQuery::Current(vec![])),
-                    ">",
-                    comparable!(lit!(i 2))
-                )
-            );
+        let f1 = filter_!(atom!(
+            comparable!(> SingularQuery::Current(vec![])),
+            ">",
+            comparable!(lit!(i 2))
+        ));
         let f2 = filter_!(atom!(
-                    comparable!(> singular_query!(b)),
-                    "!=",
-                    comparable!(> singular_query!(a))
-                )
-            );
+            comparable!(> singular_query!(b)),
+            "!=",
+            comparable!(> singular_query!(a))
+        ));
 
         let atom_or = atom!(!filter_!(or f1.clone(), f2.clone()));
         let atom_and = atom!(!filter_!(and f1, f2));
 
-        assert_eq!(atom_or.process(state.clone()).val().and_then(|v| v.as_bool()), Some(false));
-        assert_eq!(atom_and.process(state).val().and_then(|v| v.as_bool()), Some(true));
+        assert_eq!(
+            atom_or
+                .process(state.clone())
+                .ok_val()
+                .and_then(|v| v.as_bool()),
+            Some(false)
+        );
+        assert_eq!(
+            atom_and.process(state).ok_val().and_then(|v| v.as_bool()),
+            Some(true)
+        );
     }
 }

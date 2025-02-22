@@ -26,9 +26,16 @@ pub trait Query {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T>;
 }
 
+#[derive(Debug, Clone, PartialEq)]
 enum QueryResult<'a, T: Queryable> {
     Val(T),
     Ref(&'a T, QueryPath),
+}
+
+impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryResult<'a, T> {
+    fn from((inner, path): (&'a T, QueryPath)) -> Self {
+        QueryResult::Ref(inner, path)
+    }
 }
 
 impl<'a, T: Queryable> QueryResult<'a, T> {
@@ -36,6 +43,12 @@ impl<'a, T: Queryable> QueryResult<'a, T> {
         match self {
             QueryResult::Val(v) => v.clone(),
             QueryResult::Ref(v, _) => v.clone(),
+        }
+    }
+    pub fn path(self) -> Option<QueryPath> {
+        match self {
+            QueryResult::Val(_) => None,
+            QueryResult::Ref(_, path) => Some(path),
         }
     }
 }
@@ -65,6 +78,5 @@ pub fn js_path_vals<T: Queryable>(path: &str, value: &T) -> Queried<T> {
         .into_iter()
         .map(|r| r.val())
         .collect::<Vec<_>>()
-        .into()
-    )
+        .into())
 }

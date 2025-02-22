@@ -1,10 +1,17 @@
 use crate::query::queryable::Queryable;
 use crate::query::QueryPath;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct State<'a, T: Queryable> {
-    pub root: &'a T,
     pub data: Data<'a, T>,
+    pub root: &'a T,
+}
+
+impl<'a, T: Queryable> Display for State<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.data)
+    }
 }
 
 impl<'a, T: Queryable> From<&'a T> for State<'a, T> {
@@ -14,7 +21,6 @@ impl<'a, T: Queryable> From<&'a T> for State<'a, T> {
 }
 
 impl<'a, T: Queryable> State<'a, T> {
-
     pub fn bool(b: bool, root: &T) -> State<T> {
         State::data(root, Data::Value(b.into()))
     }
@@ -45,18 +51,20 @@ impl<'a, T: Queryable> State<'a, T> {
         State { root, data }
     }
 
-    pub fn ok(self) -> Option<Vec<Pointer<'a, T>>> {
-        self.data.ok()
+    pub fn ok_ref(self) -> Option<Vec<Pointer<'a, T>>> {
+        self.data.ok_ref()
     }
 
-    pub fn val(self) -> Option<T> {
+    pub fn ok_val(self) -> Option<T> {
         match self.data {
             Data::Value(v) => Some(v),
             _ => None,
         }
     }
 
-
+    pub fn is_nothing(&self) -> bool {
+        matches!(&self.data, Data::Nothing)
+    }
 
     pub fn reduce(self, other: State<'a, T>) -> State<'a, T> {
         State {
@@ -81,6 +89,24 @@ pub enum Data<'a, T: Queryable> {
     Refs(Vec<Pointer<'a, T>>),
     Value(T),
     Nothing,
+}
+
+impl<'a, T: Queryable> Display for Data<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Data::Ref(p) => write!(f, "&{}", p),
+            Data::Refs(p) => write!(
+                f,
+                "{}",
+                p.iter()
+                    .map(|ptr| ptr.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            Data::Value(v) => write!(f, "{:?}", v),
+            Data::Nothing => write!(f, "Nothing"),
+        }
+    }
 }
 
 impl<'a, T: Queryable> Default for Data<'a, T> {
@@ -126,10 +152,16 @@ impl<'a, T: Queryable> Data<'a, T> {
         }
     }
 
-    pub fn ok(self) -> Option<Vec<Pointer<'a, T>>> {
+    pub fn ok_ref(self) -> Option<Vec<Pointer<'a, T>>> {
         match self {
             Data::Ref(data) => Some(vec![data]),
             Data::Refs(data) => Some(data),
+            _ => None,
+        }
+    }
+    pub fn ok_val(self) -> Option<T> {
+        match self {
+            Data::Value(v) => Some(v),
             _ => None,
         }
     }
@@ -149,6 +181,12 @@ pub struct Pointer<'a, T: Queryable> {
     pub path: QueryPath,
 }
 
+impl<'a, T: Queryable> Display for Pointer<'a, T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?},{}", self.inner, self.path)
+    }
+}
+
 impl<'a, T: Queryable> Pointer<'a, T> {
     pub fn new(inner: &'a T, path: QueryPath) -> Self {
         Pointer { inner, path }
@@ -165,5 +203,16 @@ impl<'a, T: Queryable> Pointer<'a, T> {
             inner,
             path: format!("{}[{}]", path, index),
         }
+    }
+
+    pub fn empty(inner: &'a T) -> Self {
+        Pointer {
+            inner,
+            path: String::new(),
+        }
+    }
+
+    pub fn is_internal(&self) -> bool {
+        self.path.is_empty()
     }
 }

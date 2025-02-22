@@ -1,11 +1,14 @@
 #![allow(clippy::empty_docs)]
 
 use crate::parser::errors2::JsonPathError;
-use crate::parser::model2::{Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector, SingularQuery, SingularQuerySegment, Test, TestFunction};
+use crate::parser::model2::{
+    Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector,
+    SingularQuery, SingularQuerySegment, Test, TestFunction,
+};
 use crate::path::JsonLike;
+use crate::JsonPath;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
-use crate::JsonPath;
 
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path_9535.pest"]
@@ -20,13 +23,13 @@ pub(super) type Parsed<T> = Result<T, JsonPathError>;
 /// # Errors
 ///
 /// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
-pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery>
-{
-    JSPathParser::parse(Rule::main, jp_str)
+pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
+    let result = JSPathParser::parse(Rule::main, jp_str)
         .map_err(Box::new)?
         .next()
         .ok_or(JsonPathError::UnexpectedPestOutput)
-        .and_then(jp_query)
+        .and_then(jp_query);
+    result
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
@@ -55,9 +58,11 @@ pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
                     }
                     if selectors.len() == 1 {
                         Ok(Segment::Selector(
-                            selectors.into_iter()
-                            .next()
-                            .ok_or(JsonPathError::empty("selector"))?))
+                            selectors
+                                .into_iter()
+                                .next()
+                                .ok_or(JsonPathError::empty("selector"))?,
+                        ))
                     } else {
                         Ok(Segment::Selectors(selectors))
                     }
@@ -92,8 +97,7 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
     let name = elems
         .next()
         .map(|e| e.as_str().trim())
-        .ok_or(JsonPathError::empty("function expression"))?
-        ;
+        .ok_or(JsonPathError::empty("function expression"))?;
     let mut args = vec![];
     for arg in elems {
         let next = next_down(arg)?;
@@ -121,18 +125,32 @@ pub fn test(rule: Pair<Rule>) -> Parsed<Test> {
 
 pub fn logical_expr(rule: Pair<Rule>) -> Parsed<Filter> {
     let mut ors = vec![];
-    for r in rule.into_inner(){
+    for r in rule.into_inner() {
         ors.push(logical_expr_and(r)?);
     }
-    Ok(Filter::Or(ors))
+    if ors.len() == 1 {
+        Ok(ors
+            .into_iter()
+            .next()
+            .ok_or(JsonPathError::empty("logical expression"))?)
+    } else {
+        Ok(Filter::Or(ors))
+    }
 }
 
 pub fn logical_expr_and(rule: Pair<Rule>) -> Parsed<Filter> {
     let mut ands = vec![];
-    for r in rule.into_inner(){
+    for r in rule.into_inner() {
         ands.push(Filter::Atom(filter_atom(r)?));
     }
-    Ok(Filter::And(ands))
+    if ands.len() == 1 {
+        Ok(ands
+            .into_iter()
+            .next()
+            .ok_or(JsonPathError::empty("logical expression"))?)
+    } else {
+        Ok(Filter::And(ands))
+    }
 }
 
 pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegment>> {
@@ -140,11 +158,16 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     for r in rule.into_inner() {
         match r.as_rule() {
             Rule::name_segment => {
-                segments.push(SingularQuerySegment::Name(next_down(r)?.as_str().trim().to_string()));
+                segments.push(SingularQuerySegment::Name(
+                    next_down(r)?.as_str().trim().to_string(),
+                ));
             }
             Rule::index_segment => {
                 segments.push(SingularQuerySegment::Index(
-                    next_down(r)?.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
+                    next_down(r)?
+                        .as_str()
+                        .parse::<i64>()
+                        .map_err(|e| (e, "int"))?,
                 ));
             }
             _ => return Err(r.into()),
@@ -198,14 +221,17 @@ pub fn singular_query(rule: Pair<Rule>) -> Parsed<SingularQuery> {
     }
 }
 
-pub fn comp_expr(rule:Pair<Rule>) -> Parsed<Comparison> {
+pub fn comp_expr(rule: Pair<Rule>) -> Parsed<Comparison> {
     let mut children = rule.into_inner();
 
     let lhs = comparable(children.next().ok_or(JsonPathError::empty("comparison"))?)?;
-    let op = children.next().ok_or(JsonPathError::empty("comparison"))?.as_str();
-    let rhs = comparable(children.next().ok_or(JsonPathError::empty("comparison"))?)?;;
+    let op = children
+        .next()
+        .ok_or(JsonPathError::empty("comparison"))?
+        .as_str();
+    let rhs = comparable(children.next().ok_or(JsonPathError::empty("comparison"))?)?;
 
-    Comparison::try_new(op,lhs, rhs)
+    Comparison::try_new(op, lhs, rhs)
 }
 
 pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
@@ -241,50 +267,48 @@ pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
     let rule = next_down(pair)?;
 
     match rule.as_rule() {
-        Rule::paren_expr =>  {
+        Rule::paren_expr => {
             let mut not = false;
             let mut logic_expr = None;
-            for r in rule.into_inner(){
-                match r.as_rule(){
+            for r in rule.into_inner() {
+                match r.as_rule() {
                     Rule::not_op => not = true,
-                    Rule::logical_expr =>  logic_expr = Some(logical_expr(r)?),
+                    Rule::logical_expr => logic_expr = Some(logical_expr(r)?),
                     _ => (),
                 }
             }
 
             logic_expr
-                .map(|expr|FilterAtom::filter(expr, not))
+                .map(|expr| FilterAtom::filter(expr, not))
                 .ok_or("Logical expression is absent".into())
         }
-        Rule::comp_expr =>  {
-            Ok(FilterAtom::cmp(Box::new(comp_expr(rule)?)))
-        }
+        Rule::comp_expr => Ok(FilterAtom::cmp(Box::new(comp_expr(rule)?))),
         Rule::test_expr => {
             let mut not = false;
             let mut test_expr = None;
-            for r in rule.into_inner(){
-                match r.as_rule(){
+            for r in rule.into_inner() {
+                match r.as_rule() {
                     Rule::not_op => not = true,
-                    Rule::test =>  test_expr = Some(test(r)?),
+                    Rule::test => test_expr = Some(test(r)?),
                     _ => (),
                 }
             }
 
             test_expr
-                .map(|expr|FilterAtom::test(expr, not))
+                .map(|expr| FilterAtom::test(expr, not))
                 .ok_or("Logical expression is absent".into())
         }
         _ => Err(rule.into()),
     }
 }
 
-pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable>{
+pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable> {
     let rule = next_down(rule)?;
-    match rule.as_rule(){
+    match rule.as_rule() {
         Rule::literal => Ok(Comparable::Literal(literal(rule)?)),
         Rule::singular_query => Ok(Comparable::SingularQuery(singular_query(rule)?)),
         Rule::function_expr => Ok(Comparable::Function(function_expr(rule)?)),
-        _ => Err(rule.into())
+        _ => Err(rule.into()),
     }
 }
 
@@ -294,4 +318,3 @@ fn next_down(rule: Pair<Rule>) -> Parsed<Pair<Rule>> {
         .next()
         .ok_or(JsonPathError::InvalidJsonPath(rule_as_str))
 }
-

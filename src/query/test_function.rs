@@ -169,7 +169,7 @@ mod tests {
         let query = test_fn!(length arg!(t test!(@ segment!(selector!(array)))));
         let res = query.process(state);
 
-        assert_eq!(res.val(), Some(json!(3)));
+        assert_eq!(res.ok_val(), Some(json!(3)));
     }
 
     #[test]
@@ -183,7 +183,7 @@ mod tests {
         );
         let res = query.process(state);
 
-        assert_eq!(res.val(), Some(json!(true)));
+        assert_eq!(res.ok_val(), Some(json!(true)));
     }
 
     #[test]
@@ -194,6 +194,6 @@ mod tests {
         let query = test_fn!(count arg!(t test!(@ segment!(selector!(array)))));
         let res = query.process(state);
 
-        assert_eq!(res.val(), Some(json!(1)));
+        assert_eq!(res.ok_val(), Some(json!(1)));
     }
 }

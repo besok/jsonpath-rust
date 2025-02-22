@@ -4,7 +4,7 @@ use pest::iterators::Pair;
 use thiserror::Error;
 use crate::parser::parser2::Rule;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum JsonPathError {
     #[error("Failed to parse rule: {0}")]
     PestError(#[from] Box<pest::error::Error<Rule>>),
