@@ -10,14 +10,14 @@ mod state;
 mod test;
 mod test_function;
 
-use crate::parser::errors2::JsonPathError;
-use crate::parser::parser2::parse_json_path;
+use crate::parser2::errors2::JsonPathError;
 use crate::path::JsonLike;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer};
 use serde_json::Value;
 use state::State;
 use std::borrow::Cow;
+use crate::parser2::parse_json_path;
 
 type QueryPath = String;
 type Queried<T> = Result<T, JsonPathError>;

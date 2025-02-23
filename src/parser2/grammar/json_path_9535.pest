@@ -5,11 +5,11 @@ segment = { child_segment | descendant_segment }
 child_segment = { bracketed_selection | ("." ~ (wildcard_selector | member_name_shorthand)) }
 bracketed_selection = { "[" ~ S ~ selector ~ (S ~ "," ~ S ~ selector)* ~ S ~ "]" }
 descendant_segment = { ".."}
-selector = {name_selector | wildcard_selector | index_selector | slice_selector | filter_selector}
+selector = {name_selector | wildcard_selector | slice_selector| index_selector | filter_selector}
 
 root = _{"$"}
 name_selector = {string}
-wildcard_selector   = _{"*"}
+wildcard_selector   = {"*"}
 index_selector   = {int}
 int = { "0" | ("-"? ~ DIGIT1 ~ DIGIT*) }
 step = {":" ~ S ~ int?}

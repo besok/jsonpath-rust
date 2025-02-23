@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
-use crate::parser::errors2::JsonPathError;
-use crate::parser::parser2::Parsed;
+use crate::parser2::errors2::JsonPathError;
+use crate::parser2::Parsed;
 
 /// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone, PartialEq)]

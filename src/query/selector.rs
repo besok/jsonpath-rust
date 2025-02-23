@@ -1,4 +1,4 @@
-use crate::parser::model2::Selector;
+use crate::parser2::model2::Selector;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -147,9 +147,10 @@ pub fn process_index<'a, T: Queryable>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::model2::Segment;
+    use crate::parser2::model2::Segment;
     use serde_json::json;
     use std::vec;
+    use crate::query::{js_path, js_path_vals, Queried};
 
     #[test]
     fn test_process_key() {
@@ -288,5 +289,18 @@ mod tests {
         let step = segment.process(State::root(&value));
 
         assert_eq!(step, State::nothing(&value));
+    }
+
+    #[test]
+    fn multi_selector() -> Queried<()>{
+        let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        let vec = js_path("$['a',1]", &json)?;
+
+        assert_eq!(vec, vec![
+            (&json!(1), "$[1]".to_string()).into(),
+        ]);
+
+        Ok(())
     }
 }

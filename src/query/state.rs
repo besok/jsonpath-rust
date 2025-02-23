@@ -128,6 +128,8 @@ impl<'a, T: Queryable> Data<'a, T> {
             (Data::Refs(data_vec), Data::Refs(data_vec2)) => {
                 Data::Refs(data_vec.into_iter().chain(data_vec2).collect())
             }
+            (d @ (Data::Ref(_) | Data::Refs(..)), Data::Nothing) => d,
+            (Data::Nothing, d @ (Data::Ref(_) | Data::Refs(..))) => d,
             _ => Data::Nothing,
         }
     }

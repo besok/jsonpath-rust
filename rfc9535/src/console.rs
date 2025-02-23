@@ -32,7 +32,7 @@ pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result
         total, passed_count, failed_count, date
     )?;
 
-    clean_file(5)?;
+    clean_file(10)?;
 
     println!(
         "\n{}:\n{}\n{}\n{}\n{}",

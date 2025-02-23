@@ -2,9 +2,8 @@ use colored::Colorize;
 use jsonpath_rust::{JsonPath, JsonPathParserError};
 use serde_json::Value;
 use std::str::FromStr;
-use jsonpath_rust::parser::model2::JpQuery;
-use jsonpath_rust::parser::parser2::parse_json_path;
-use jsonpath_rust::query::{js_path, js_path_vals};
+use jsonpath_rust::parser2::parse_json_path;
+use jsonpath_rust::query::{ js_path_vals};
 use crate::console::TestResult;
 
 type SkippedCases = usize;
@@ -88,8 +87,7 @@ pub fn handle_test_case2(case: &TestCase) -> TestResult {
             let result = js_path_vals(p,doc);
 
             if result.is_err(){
-                println!("path: {}", p);
-                println!("value: {}", doc);
+                println!("path: {} | value: {} | res: {:?}", p, doc, result);
                 return Err(TestFailure::invalid(case));
             }
             let result = result.unwrap();

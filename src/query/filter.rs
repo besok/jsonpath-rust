@@ -1,4 +1,4 @@
-use crate::parser::model2::Filter;
+use crate::parser2::model2::Filter;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -59,7 +59,6 @@ impl Filter {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parser2::parse_json_path;
     use crate::query::{js_path, js_path_vals, QueryResult};
     use serde_json::json;
 

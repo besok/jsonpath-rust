@@ -1,4 +1,4 @@
-use crate::parser::model2::Test;
+use crate::parser2::model2::Test;
 use crate::query::queryable::Queryable;
 use crate::query::state::State;
 use crate::query::Query;

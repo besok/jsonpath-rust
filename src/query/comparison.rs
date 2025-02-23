@@ -1,4 +1,4 @@
-use crate::parser::model2::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
+use crate::parser2::model2::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -63,7 +63,7 @@ fn eq_arrays<T: PartialEq>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::model2::{
+    use crate::parser2::model2::{
         Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
     };
     use crate::q_segments;

@@ -1,4 +1,4 @@
-use crate::parser::model2::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, SingularQuery, Test};
+use crate::parser2::model2::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, SingularQuery, Test};
 
 #[macro_export]
 macro_rules! lit {
@@ -117,29 +117,29 @@ macro_rules! test {
 #[macro_export]
 macro_rules! or {
     ($($items:expr),*) => {
-       crate::parser::model2::Filter::Or(vec![ $($items),* ])
+       crate::parser2::model2::Filter::Or(vec![ $($items),* ])
     };
 }
 
 #[macro_export]
 macro_rules! and {
     ($($items:expr),*) => {
-        crate::parser::model2::Filter::And(vec![ $($items),* ])
+        crate::parser2::model2::Filter::And(vec![ $($items),* ])
     };
 }
 
 #[macro_export]
 macro_rules! filter_ {
     ($item:expr) => {
-        crate::parser::model2::Filter::Atom($item)
+        crate::parser2::model2::Filter::Atom($item)
     };
 
     (or $($items:expr),*) => {
-       crate::parser::model2::Filter::Or(vec![ $($items),* ])
+       crate::parser2::model2::Filter::Or(vec![ $($items),* ])
     };
 
     (and $($items:expr),*) => {
-        crate::parser::model2::Filter::And(vec![ $($items),* ])
+        crate::parser2::model2::Filter::And(vec![ $($items),* ])
     };
 }
 

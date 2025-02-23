@@ -1,17 +1,21 @@
 #![allow(clippy::empty_docs)]
+pub mod errors2;
+mod macros2;
+pub mod model2;
+mod tests;
 
-use crate::parser::errors2::JsonPathError;
-use crate::parser::model2::{
+use crate::parser2::errors2::JsonPathError;
+use crate::parser2::model2::{
     Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector,
     SingularQuery, SingularQuerySegment, Test, TestFunction,
 };
 use crate::path::JsonLike;
 use crate::JsonPath;
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::Pair;
 use pest::Parser;
 
 #[derive(Parser)]
-#[grammar = "parser/grammar/json_path_9535.pest"]
+#[grammar = "parser2/grammar/json_path_9535.pest"]
 pub(super) struct JSPathParser;
 const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
@@ -39,10 +43,14 @@ pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
 }
 
 pub fn segments(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
-    next_down(rule)?.into_inner().map(segment).collect()
+    rule.into_inner().next().map_or(
+        Ok(vec![]),
+        |child| child.into_inner().map(segment).collect(),
+    )
 }
 
 pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
+    println!("next: {:?}", rule);
     let child = next_down(rule)?;
     match child.as_rule() {
         Rule::child_segment => {
@@ -80,7 +88,11 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
         Rule::name_selector => Ok(Selector::Name(child.as_str().trim().to_string())),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
         Rule::index_selector => Ok(Selector::Index(
-            child.as_str().parse::<i64>().map_err(|e| (e, "int"))?,
+            child
+                .as_str()
+                .trim()
+                .parse::<i64>()
+                .map_err(|e| (e, "int"))?,
         )),
         Rule::slice_selector => {
             let (start, end, step) = slice_selector(child)?;

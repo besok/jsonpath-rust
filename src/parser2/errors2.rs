@@ -2,7 +2,7 @@ use std::num::{ParseFloatError, ParseIntError};
 use std::str::ParseBoolError;
 use pest::iterators::Pair;
 use thiserror::Error;
-use crate::parser::parser2::Rule;
+use crate::parser2::Rule;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum JsonPathError {

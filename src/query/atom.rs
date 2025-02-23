@@ -1,4 +1,4 @@
-use crate::parser::model2::FilterAtom;
+use crate::parser2::model2::FilterAtom;
 use crate::query::queryable::Queryable;
 use crate::query::state::State;
 use crate::query::Query;
@@ -38,11 +38,11 @@ fn invert_bool<T:Queryable>(state: State<T>) -> State<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::model2::Comparable;
-    use crate::parser::model2::Literal;
-    use crate::parser::model2::SingularQuery;
-    use crate::parser::model2::SingularQuerySegment;
-    use crate::parser::model2::{Comparison, FilterAtom};
+    use crate::parser2::model2::Comparable;
+    use crate::parser2::model2::Literal;
+    use crate::parser2::model2::SingularQuery;
+    use crate::parser2::model2::SingularQuerySegment;
+    use crate::parser2::model2::{Comparison, FilterAtom};
     use crate::query::queryable::Queryable;
     use crate::query::state::State;
     use crate::query::Query;
