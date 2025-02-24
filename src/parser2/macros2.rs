@@ -203,8 +203,8 @@ macro_rules! selector {
 
 #[macro_export]
 macro_rules! segment {
-    (..) => {
-        Segment::Descendant
+    (..$segment:expr) => {
+        Segment::Descendant(Box::new($segment))
     };
     ($selector:expr) => {
         Segment::Selector($selector)

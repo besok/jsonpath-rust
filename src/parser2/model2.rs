@@ -25,7 +25,7 @@ impl Display for JpQuery {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Segment {
     /// Represents a descendant segment.
-    Descendant,
+    Descendant(Box<Segment>),
     /// Represents a selector segment.
     Selector(Selector),
     /// Represents multiple selectors.
@@ -41,7 +41,7 @@ impl Segment {
 impl Display for Segment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Segment::Descendant => write!(f, ".."),
+            Segment::Descendant(s) => write!(f, "..{}",s),
             Segment::Selector(selector) => write!(f, "{}", selector),
             Segment::Selectors(selectors) => write!(f, "{}", selectors.iter().map(|s| s.to_string()).collect::<String>()),
         }

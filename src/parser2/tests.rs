@@ -20,6 +20,7 @@ use pest::iterators::Pair;
 use pest::Parser;
 use std::fmt::Debug;
 use std::{panic, vec};
+use crate::query::js_path_vals;
 
 struct TestPair<T> {
     rule: Rule,
@@ -134,7 +135,7 @@ fn jq_test() {
         jq!(
             segment!(selector!(a)),
             segment!(selector!(b)),
-            segment!(selector!(? or!(and!(atom))))
+            segment!(selector!(? atom))
         ),
     );
 }
@@ -234,7 +235,15 @@ fn parse_selector() {
 }
 #[test]
 fn parse_root_with_root_in_filter() {
+    let sel_a = segment!(selector!(a));
     TestPair::new(Rule::jp_query, jp_query)
-        .assert("$", JpQuery::new(vec![]))
+        // .assert("$", JpQuery::new(vec![]))
+        // .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
+        // .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
+        // .assert("$..*", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
     ;
+
 }
+

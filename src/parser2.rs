@@ -32,52 +32,60 @@ pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
         .map_err(Box::new)?
         .next()
         .ok_or(JsonPathError::UnexpectedPestOutput)
+        .and_then(next_down)
         .and_then(jp_query)
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
+
     Ok(JpQuery::new(segments(next_down(rule)?)?))
 }
 pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
-    segments(rule)
+    segments(next_down(rule)?)
 }
 
 pub fn segments(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
     rule.into_inner().next().map_or(
         Ok(vec![]),
-        |child| child.into_inner().map(segment).collect(),
+        |child| {
+            child.into_inner().map(segment).collect()
+        },
     )
 }
 
-pub fn segment(rule: Pair<Rule>) -> Parsed<Segment> {
-    println!("next: {:?}", rule);
-    let child = next_down(rule)?;
-    match child.as_rule() {
-        Rule::child_segment => {
-            let next = next_down(child)?;
-            match next.as_rule() {
-                Rule::wildcard_selector => Ok(Segment::Selector(Selector::Wildcard)),
-                Rule::member_name_shorthand => Ok(Segment::name(next.as_str().trim())),
-                Rule::bracketed_selection => {
-                    let mut selectors = vec![];
-                    for r in next.into_inner() {
-                        selectors.push(selector(r)?);
-                    }
-                    if selectors.len() == 1 {
-                        Ok(Segment::Selector(
-                            selectors
-                                .into_iter()
-                                .next()
-                                .ok_or(JsonPathError::empty("selector"))?,
-                        ))
-                    } else {
-                        Ok(Segment::Selectors(selectors))
-                    }
-                }
-                _ => Err(next.into()),
+
+pub fn child_segment(rule: Pair<Rule>) -> Parsed<Segment> {
+    match rule.as_rule() {
+        Rule::wildcard_selector => Ok(Segment::Selector(Selector::Wildcard)),
+        Rule::member_name_shorthand => Ok(Segment::name(rule.as_str().trim())),
+        Rule::bracketed_selection => {
+            let mut selectors = vec![];
+            for r in rule.into_inner() {
+                selectors.push(selector(r)?);
+            }
+            if selectors.len() == 1 {
+                Ok(Segment::Selector(
+                    selectors
+                        .into_iter()
+                        .next()
+                        .ok_or(JsonPathError::empty("selector"))?,
+                ))
+            } else {
+                Ok(Segment::Selectors(selectors))
             }
         }
-        Rule::descendant_segment => Ok(Segment::Descendant),
+        _ => Err(rule.into()),
+    }
+}
+
+pub fn segment(child: Pair<Rule>) -> Parsed<Segment> {
+    match child.as_rule() {
+        Rule::child_segment => {
+            child_segment(next_down(child)?)
+        }
+        Rule::descendant_segment => {
+            Ok(Segment::Descendant(Box::new(child_segment(next_down(child)?)?)))
+        },
         _ => Err(child.into()),
     }
 }
@@ -177,6 +185,7 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
                 segments.push(SingularQuerySegment::Index(
                     next_down(r)?
                         .as_str()
+                        .trim()
                         .parse::<i64>()
                         .map_err(|e| (e, "int"))?,
                 ));
@@ -200,7 +209,7 @@ pub fn slice_selector(rule: Pair<Rule>) -> Parsed<(Option<i64>, Option<i64>, Opt
     let mut start = None;
     let mut end = None;
     let mut step = None;
-    let get_int = |r: Pair<Rule>| r.as_str().parse::<i64>().map_err(|e| (e, "int"));
+    let get_int = |r: Pair<Rule>| r.as_str().trim().parse::<i64>().map_err(|e| (e, "int"));
 
     for r in rule.into_inner() {
         match r.as_rule() {
@@ -251,7 +260,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
         if num.contains('.') {
             Ok(Literal::Float(num.parse::<f64>().map_err(|e| (e, num))?))
         } else {
-            let num = num.parse::<i64>().map_err(|e| (e, num))?;
+            let num = num.trim().parse::<i64>().map_err(|e| (e, num))?;
             if num > MAX_VAL || num < MIN_VAL {
                 Err(JsonPathError::InvalidNumber(format!(
                     "number out of bounds: {}",
