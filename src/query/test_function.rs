@@ -132,7 +132,7 @@ fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -
     };
 
     match (to_str(lhs), to_str(rhs)) {
-        (Some(lhs), Some(rhs)) => Regex::new(&rhs)
+        (Some(lhs), Some(rhs)) => Regex::new(rhs.trim_matches(|c| c == '\'' || c == '"'))
             .map(|re| to_state(regex(&lhs, re)))
             .unwrap_or(to_state(false)),
         _ => to_state(false),
@@ -156,7 +156,7 @@ mod tests {
     use crate::parser2::model2::Test;
     use crate::parser2::model2::TestFunction;
     use crate::query::state::{Data, Pointer, State};
-    use crate::query::test_function::FnArg;
+    use crate::query::test_function::{regex, FnArg};
     use crate::query::Query;
     use crate::{arg, q_segment, segment, selector, test, test_fn};
     use serde_json::json;
@@ -195,5 +195,16 @@ mod tests {
         let res = query.process(state);
 
         assert_eq!(res.ok_val(), Some(json!(1)));
+    }
+
+    #[test]
+    fn test_search() {
+        let json = json!("123");
+        let state = State::root(&json);
+        let reg = State::str("[a-z]+",&json,);
+
+        let res = regex(state, reg, true);
+
+        assert_eq!(res.ok_val(), Some(json!(false)));
     }
 }

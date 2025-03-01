@@ -276,6 +276,23 @@ pub enum Test {
     Function(Box<TestFunction>),
 }
 
+impl Test {
+    pub fn is_res_bool(&self) -> bool {
+        match self {
+            Test::RelQuery(_) => false,
+            Test::AbsQuery(_) => false,
+            Test::Function(func) => match **func {
+                TestFunction::Custom(_, _) => false,
+                TestFunction::Length(_) => false,
+                TestFunction::Value(_) => false,
+                TestFunction::Count(_) => false,
+                TestFunction::Search(_, _) => true,
+                TestFunction::Match(_, _) => true,
+            },
+        }
+    }
+}
+
 impl Display for Test {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

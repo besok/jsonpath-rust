@@ -41,6 +41,7 @@ fn lt<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>) -> bool {
 }
 
 fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> bool {
+    println!("eq: {} == {}", lhs_state, rhs_state);
     match (lhs_state.data, rhs_state.data) {
         (Data::Value(lhs), Data::Value(rhs)) => lhs == rhs,
         (Data::Value(v), Data::Ref(p)) | (Data::Ref(p), Data::Value(v)) => v == *p.inner,

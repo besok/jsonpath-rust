@@ -18,6 +18,7 @@ where
         + PartialEq,
 {
     /// Retrieves a reference to the value associated with the given key.
+    /// It is the responsibility of the implementation to handle enclosing single and double quotes.
     fn get(&self, key: &str) -> Option<&Self>;
 
     fn as_array(&self) -> Option<&Vec<Self>>;
@@ -39,6 +40,7 @@ where
 
 impl Queryable for Value {
     fn get(&self, key: &str) -> Option<&Self> {
+        let key = key.trim_matches(|c| c == '\'' || c == '"').trim();
         self.get(key)
     }
 

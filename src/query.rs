@@ -19,15 +19,15 @@ use state::State;
 use std::borrow::Cow;
 use crate::parser2::parse_json_path;
 
-type QueryPath = String;
-type Queried<T> = Result<T, JsonPathError>;
+pub type QueryPath = String;
+pub type Queried<T> = Result<T, JsonPathError>;
 
 pub trait Query {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum QueryResult<'a, T: Queryable> {
+pub enum QueryResult<'a, T: Queryable> {
     Val(T),
     Ref(&'a T, QueryPath),
 }

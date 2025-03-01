@@ -303,4 +303,20 @@ mod tests {
 
         Ok(())
     }
+    #[test]
+    fn multi_selector_space() -> Queried<()>{
+        let json = json!({
+        "a": "ab",
+        "b": "bc"
+      });
+
+        let vec = js_path("$['a',\r'b']", &json)?;
+
+        assert_eq!(vec, vec![
+            (&json!("ab"), "$.[''a'']".to_string()).into(),
+            (&json!("bc"), "$.[''b'']".to_string()).into(),
+        ]);
+
+        Ok(())
+    }
 }

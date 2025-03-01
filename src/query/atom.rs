@@ -17,10 +17,19 @@ impl Query for FilterAtom {
             FilterAtom::Test { expr, not } => {
                 let new_state = |b| State::bool(b, state.root);
                 let res = expr.process(state.clone());
-                if res.is_nothing() {
-                    new_state(*not)
+
+                if expr.is_res_bool() {
+                    if *not {
+                        invert_bool(res)
+                    } else {
+                        res
+                    }
                 } else {
-                    new_state(!*not)
+                    if res.is_nothing() {
+                        new_state(*not)
+                    } else {
+                        new_state(!*not)
+                    }
                 }
             }
             FilterAtom::Comparison(cmp) => cmp.process(state),
@@ -28,7 +37,7 @@ impl Query for FilterAtom {
     }
 }
 
-fn invert_bool<T:Queryable>(state: State<T>) -> State<T> {
+fn invert_bool<T: Queryable>(state: State<T>) -> State<T> {
     let root = state.root;
     State::bool(
         !state.ok_val().and_then(|v| v.as_bool()).unwrap_or_default(),

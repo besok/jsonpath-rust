@@ -97,7 +97,7 @@
 //!
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
-
+#![allow(warnings)]
 pub use parser::model::JsonPath;
 pub use parser::JsonPathParserError;
 use serde_json::Value;

@@ -37,7 +37,6 @@ pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
-
     Ok(JpQuery::new(segments(next_down(rule)?)?))
 }
 pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
@@ -45,14 +44,12 @@ pub fn rel_query(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
 }
 
 pub fn segments(rule: Pair<Rule>) -> Parsed<Vec<Segment>> {
-    rule.into_inner().next().map_or(
-        Ok(vec![]),
-        |child| {
-            child.into_inner().map(segment).collect()
-        },
-    )
+    let mut segments = vec![];
+    for r in rule.into_inner() {
+        segments.push(segment(next_down(r)?)?);
+    }
+    Ok(segments)
 }
-
 
 pub fn child_segment(rule: Pair<Rule>) -> Parsed<Segment> {
     match rule.as_rule() {
@@ -80,12 +77,10 @@ pub fn child_segment(rule: Pair<Rule>) -> Parsed<Segment> {
 
 pub fn segment(child: Pair<Rule>) -> Parsed<Segment> {
     match child.as_rule() {
-        Rule::child_segment => {
-            child_segment(next_down(child)?)
-        }
-        Rule::descendant_segment => {
-            Ok(Segment::Descendant(Box::new(child_segment(next_down(child)?)?)))
-        },
+        Rule::child_segment => child_segment(next_down(child)?),
+        Rule::descendant_segment => Ok(Segment::Descendant(Box::new(child_segment(next_down(
+            child,
+        )?)?))),
         _ => Err(child.into()),
     }
 }
@@ -274,7 +269,13 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     let first = next_down(rule)?;
 
     match first.as_rule() {
-        Rule::string => Ok(Literal::String(first.as_str().to_string())),
+        Rule::string => Ok(Literal::String(
+            first
+                .as_str()
+                .trim_matches(|c| c == '\'' || c == '"')
+                .trim()
+                .to_owned(),
+        )),
         Rule::number => parse_number(first.as_str()),
         Rule::bool => Ok(Literal::Bool(first.as_str().parse::<bool>()?)),
         Rule::null => Ok(Literal::Null),

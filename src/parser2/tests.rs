@@ -241,7 +241,8 @@ fn parse_root_with_root_in_filter() {
         // .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
         // .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
         // .assert("$..*", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        // .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
         // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
     ;
 

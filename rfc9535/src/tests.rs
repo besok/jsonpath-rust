@@ -1,6 +1,6 @@
 use serde_json::json;
 use jsonpath_rust::{JsonPathParserError, JsonPathQuery};
-
+use jsonpath_rust::query::{js_path, Queried};
 
 #[test]
 fn slice_selector_zero_step() -> Result<(),JsonPathParserError> {
@@ -79,5 +79,78 @@ fn field_num() -> Result<(),JsonPathParserError> {
 #[test]
 fn field_surrogate_pair() -> Result<(),JsonPathParserError> {
     assert_eq!(json!([]).path("$['\\uD834\\uDD1E']")?, json!([]) );
+    Ok(())
+}
+
+#[test]
+fn union_quotes() -> Queried<()> {
+    let json = json!({
+        "a": "ab",
+        "b": "bc"
+      });
+
+    let vec = js_path("$['a',\r'b']", &json)?;
+
+    assert_eq!(vec, vec![
+        (&json!("ab"), "$.[''a'']".to_string()).into(),
+        (&json!("bc"), "$.[''b'']".to_string()).into(),
+    ]);
+
+    Ok(())
+}
+
+#[test]
+fn space_between_selectors() -> Queried<()> {
+    let json = json!({
+        "a": {
+          "b": "ab"
+        }
+      });
+
+    let vec = js_path("$['a'] \r['b']", &json)?;
+
+    assert_eq!(vec, vec![
+        (&json!("ab"), "$.[''a''].[''b'']".to_string()).into(),
+
+    ]);
+
+    Ok(())
+}
+#[test]
+fn space_in_search() -> Queried<()> {
+    let json = json!([
+        "foo",
+        "123"
+      ]);
+
+    let vec = js_path("$[?search(@\n,'[a-z]+')]", &json)?;
+
+    assert_eq!(vec, vec![
+        (&json!("foo"), "$[0]".to_string()).into(),
+
+    ]);
+
+    Ok(())
+}
+#[test]
+fn filter_key() -> Queried<()> {
+    let json = json!([
+        {
+          "a": "b",
+          "d": "e"
+        },
+        {
+          "a": 1,
+          "d": "f"
+        }
+      ]);
+
+    let vec = js_path("$[?@.a!=\"b\"]", &json)?;
+
+    assert_eq!(vec, vec![
+        (&json!({"a":1, "d":"f"}), "$[1]".to_string()).into(),
+
+    ]);
+
     Ok(())
 }
