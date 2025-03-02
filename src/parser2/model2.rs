@@ -1,24 +1,29 @@
-use std::fmt::{Display, Formatter};
 use crate::parser2::errors2::JsonPathError;
 use crate::parser2::Parsed;
+use std::fmt::{Display, Formatter};
 
 /// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone, PartialEq)]
-pub struct JpQuery  {
-    pub segments: Vec<Segment>
+pub struct JpQuery {
+    pub segments: Vec<Segment>,
 }
 
 impl JpQuery {
     pub fn new(segments: Vec<Segment>) -> Self {
-        JpQuery {
-            segments
-        }
+        JpQuery { segments }
     }
 }
 
 impl Display for JpQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", self.segments.iter().map(|s| s.to_string()).collect::<String>())
+        write!(
+            f,
+            "${}",
+            self.segments
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<String>()
+        )
     }
 }
 /// Enum representing different types of segments in a JSONPath query.
@@ -33,7 +38,7 @@ pub enum Segment {
 }
 
 impl Segment {
-    pub fn name(name:&str) -> Self{
+    pub fn name(name: &str) -> Self {
         Segment::Selector(Selector::Name(name.to_string()))
     }
 }
@@ -41,9 +46,13 @@ impl Segment {
 impl Display for Segment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Segment::Descendant(s) => write!(f, "..{}",s),
+            Segment::Descendant(s) => write!(f, "..{}", s),
             Segment::Selector(selector) => write!(f, "{}", selector),
-            Segment::Selectors(selectors) => write!(f, "{}", selectors.iter().map(|s| s.to_string()).collect::<String>()),
+            Segment::Selectors(selectors) => write!(
+                f,
+                "{}",
+                selectors.iter().map(|s| s.to_string()).collect::<String>()
+            ),
         }
     }
 }
@@ -68,10 +77,13 @@ impl Display for Selector {
             Selector::Name(name) => write!(f, "{}", name),
             Selector::Wildcard => write!(f, "*"),
             Selector::Index(index) => write!(f, "{}", index),
-            Selector::Slice(start, end, step) => write!(f, "{}:{}:{}",
-                                                        start.unwrap_or(0),
-                                                        end.unwrap_or(0),
-                                                        step.unwrap_or(1)),
+            Selector::Slice(start, end, step) => write!(
+                f,
+                "{}:{}:{}",
+                start.unwrap_or(0),
+                end.unwrap_or(0),
+                step.unwrap_or(1)
+            ),
             Selector::Filter(filter) => write!(f, "[?{}]", filter),
         }
     }
@@ -89,9 +101,13 @@ pub enum Filter {
 
 impl Display for Filter {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-
-        let items_to_str = |items: &Vec<Filter>, sep:&str|
-            items.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(sep);
+        let items_to_str = |items: &Vec<Filter>, sep: &str| {
+            items
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<_>>()
+                .join(sep)
+        };
 
         match self {
             Filter::Or(filters) => write!(f, "{}", items_to_str(filters, " || ")),
@@ -105,26 +121,26 @@ impl Display for Filter {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FilterAtom {
     /// Represents a nested filter with an optional NOT flag.
-    Filter {
-        expr: Box<Filter>,
-        not: bool,
-    },
+    Filter { expr: Box<Filter>, not: bool },
     /// Represents a test filter with an optional NOT flag.
-    Test {
-        expr: Box<Test>,
-        not: bool,
-    },
+    Test { expr: Box<Test>, not: bool },
     /// Represents a comparison filter.
     Comparison(Box<Comparison>),
 }
 
 impl FilterAtom {
     pub fn filter(expr: Filter, not: bool) -> Self {
-        FilterAtom::Filter { expr:Box::new(expr), not }
+        FilterAtom::Filter {
+            expr: Box::new(expr),
+            not,
+        }
     }
 
     pub fn test(expr: Test, not: bool) -> Self {
-        FilterAtom::Test { expr:Box::new(expr), not }
+        FilterAtom::Test {
+            expr: Box::new(expr),
+            not,
+        }
     }
 
     pub fn cmp(cmp: Box<Comparison>) -> Self {
@@ -179,7 +195,10 @@ impl Comparison {
             ">=" => Ok(Comparison::Gte(left, right)),
             "<" => Ok(Comparison::Lt(left, right)),
             "<=" => Ok(Comparison::Lte(left, right)),
-            _ => Err(JsonPathError::InvalidJsonPath(format!("Invalid comparison operator: {}", op))),
+            _ => Err(JsonPathError::InvalidJsonPath(format!(
+                "Invalid comparison operator: {}",
+                op
+            ))),
         }
     }
 
@@ -241,8 +260,16 @@ pub enum SingularQuery {
 impl Display for SingularQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SingularQuery::Current(segments) => write!(f, "@.{}", segments.iter().map(|s| s.to_string()).collect::<String>()),
-            SingularQuery::Root(segments) => write!(f, "$.{}", segments.iter().map(|s| s.to_string()).collect::<String>()),
+            SingularQuery::Current(segments) => write!(
+                f,
+                "@.{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
+            SingularQuery::Root(segments) => write!(
+                f,
+                "$.{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
         }
     }
 }
@@ -296,7 +323,11 @@ impl Test {
 impl Display for Test {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Test::RelQuery(segments) => write!(f, "{}", segments.iter().map(|s| s.to_string()).collect::<String>()),
+            Test::RelQuery(segments) => write!(
+                f,
+                "{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
             Test::AbsQuery(query) => write!(f, "{}", query),
             Test::Function(func) => write!(f, "{}", func),
         }
@@ -322,15 +353,37 @@ pub enum TestFunction {
 
 impl TestFunction {
     pub fn try_new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
-        match (name,args.as_slice()) {
-            ("length",[a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
-            ("value",[a]) => Ok(TestFunction::Value(a.clone())),
-            ("count",[a]) => Ok(TestFunction::Count(a.clone())),
-            ("search",[a,b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
-            ("match", [a,b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
-            ("length" | "value" | "count" | "match" | "search", args ) =>
-                Err(JsonPathError::InvalidJsonPath(format!("Invalid number of arguments for the function `{}`: got {}", name, args.len()))),
-            (custom,_) => Ok(TestFunction::Custom(custom.to_string(), args)),
+        fn with_node_type_validation<'a>(a: &'a FnArg,name: &str ) -> Result<&'a FnArg, JsonPathError> {
+            if a.is_lit() {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid argument for the function `{}`: expected a node, got a literal",
+                    name
+                )))
+            } else if a.is_filter() {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid argument for the function `{}`: expected a node, got a filter",
+                    name
+                )))
+            } else {
+                Ok(a)
+            }
+        }
+
+
+        match (name, args.as_slice()) {
+            ("length", [a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
+            ("value", [a]) => Ok(TestFunction::Value(a.clone())),
+            ("count", [a]) => Ok(TestFunction::Count(with_node_type_validation(a,name)?.clone())),
+            ("search", [a, b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
+            ("match", [a, b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
+            ("length" | "value" | "count" | "match" | "search", args) => {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid number of arguments for the function `{}`: got {}",
+                    name,
+                    args.len()
+                )))
+            }
+            (custom, _) => Ok(TestFunction::Custom(custom.to_string(), args)),
         }
     }
 }
@@ -338,7 +391,12 @@ impl TestFunction {
 impl Display for TestFunction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestFunction::Custom(name, args) => write!(f, "{}({})", name, args.iter().map(|a| a.to_string()).collect::<String>()),
+            TestFunction::Custom(name, args) => write!(
+                f,
+                "{}({})",
+                name,
+                args.iter().map(|a| a.to_string()).collect::<String>()
+            ),
             TestFunction::Length(arg) => write!(f, "length({})", arg),
             TestFunction::Value(arg) => write!(f, "value({})", arg),
             TestFunction::Count(arg) => write!(f, "count({})", arg),
@@ -357,6 +415,15 @@ pub enum FnArg {
     Test(Box<Test>),
     /// Represents a filter argument.
     Filter(Filter),
+}
+
+impl FnArg {
+    pub fn is_lit(&self) -> bool {
+        matches!(self, FnArg::Literal(_))
+    }
+    pub fn is_filter(&self) -> bool {
+        matches!(self, FnArg::Filter(_))
+    }
 }
 
 impl Display for FnArg {

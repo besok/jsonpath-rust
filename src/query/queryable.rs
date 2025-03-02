@@ -19,6 +19,7 @@ where
 {
     /// Retrieves a reference to the value associated with the given key.
     /// It is the responsibility of the implementation to handle enclosing single and double quotes.
+    /// The key will be normalized (quotes trimmed, whitespace handled, the escape symbols handled) before lookup.
     fn get(&self, key: &str) -> Option<&Self>;
 
     fn as_array(&self) -> Option<&Vec<Self>>;

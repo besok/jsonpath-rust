@@ -132,11 +132,37 @@ fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -
     };
 
     match (to_str(lhs), to_str(rhs)) {
-        (Some(lhs), Some(rhs)) => Regex::new(rhs.trim_matches(|c| c == '\'' || c == '"'))
+        (Some(lhs), Some(rhs)) => Regex::new(&prepare_regex(rhs, substr))
             .map(|re| to_state(regex(&lhs, re)))
             .unwrap_or(to_state(false)),
         _ => to_state(false),
     }
+}
+
+fn prepare_regex(pattern: String, substring: bool) -> String {
+    let pattern = if !substring {
+        let pattern = if pattern.starts_with('^') {
+            pattern
+        } else {
+            format!("^{}", pattern)
+        };
+        let pattern = if pattern.ends_with('$') {
+            pattern
+        } else {
+            format!("{}$", pattern)
+        };
+        pattern
+    } else {
+        pattern.to_string()
+    };
+
+    let pattern = if pattern.contains("\\\\") {
+        pattern.replace("\\\\", "\\")
+    } else {
+        pattern.to_string()
+    };
+
+    pattern.trim_matches(|c| c == '\'' || c == '"').to_string()
 }
 
 fn value<T: Queryable>(state: State<T>) -> State<T> {
@@ -201,9 +227,20 @@ mod tests {
     fn test_search() {
         let json = json!("123");
         let state = State::root(&json);
-        let reg = State::str("[a-z]+",&json,);
+        let reg = State::str("[a-z]+", &json);
 
         let res = regex(state, reg, true);
+
+        assert_eq!(res.ok_val(), Some(json!(false)));
+    }
+
+    #[test]
+    fn test_match() {
+        let json = json!("bbab");
+        let state = State::root(&json);
+        let reg = State::str("^b.?b$", &json);
+
+        let res = regex(state, reg, false);
 
         assert_eq!(res.ok_val(), Some(json!(false)));
     }

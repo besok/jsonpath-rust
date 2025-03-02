@@ -113,12 +113,67 @@ fn process_slice<'a, T: Queryable>(
         .unwrap_or_default()
 }
 
+
+/// Processes escape sequences in JSON strings
+/// - Replaces `\\` with `\`
+/// - Replaces `\/` with `/`
+/// - Preserves other valid escapes like `\"` and `\'`
+fn normalize_json_key(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(&next) = chars.peek() {
+                match next {
+                    '\\' => {
+                        result.push('\\');
+                        chars.next(); // consume the second backslash
+                    },
+                    '/' => {
+                        result.push('/');
+                        chars.next(); // consume the forward slash
+                    },
+                    '\'' => {
+                        result.push('\\');
+                        result.push('\'');
+                        chars.next(); // consume the quote
+                    },
+                    '"' => {
+                        result.push('\\');
+                        result.push('"');
+                        chars.next(); // consume the quote
+                    },
+                    'b' | 'f' | 'n' | 'r' | 't' | 'u' => {
+                        // Preserve these standard JSON escape sequences
+                        result.push('\\');
+                        result.push(next);
+                        chars.next();
+                    },
+                    _ => {
+                        // Invalid escape - just keep as-is
+                        result.push('\\');
+                    }
+                }
+            } else {
+                // Trailing backslash
+                result.push('\\');
+            }
+        } else {
+            result.push(c);
+        }
+    }
+
+    result
+}
+
+
 pub fn process_key<'a, T: Queryable>(
     Pointer { inner, path }: Pointer<'a, T>,
     key: &str,
 ) -> Data<'a, T> {
     inner
-        .get(key)
+        .get(normalize_json_key(key).as_str())
         .map(|v| Data::new_ref(Pointer::key(v, path, key)))
         .unwrap_or_default()
 }
