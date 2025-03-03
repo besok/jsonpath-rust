@@ -70,7 +70,7 @@ S = _{ WHITESPACE* }
 hexchar = _{ non_surrogate | (high_surrogate ~ "\\" ~ "u" ~ low_surrogate) }
 number = { (int | "-0") ~ frac? ~ exp? }
 frac = { "." ~ DIGIT+ }
-exp = { "e" ~ ("-" | "+")? ~ DIGIT+ }
+exp = { ("e" | "E") ~ ("-" | "+")? ~ DIGIT+ }
 non_surrogate = _{ (DIGIT | "A" | "B" | "C" | "E" | "F") ~ HEXDIG{3} | ("D" ~ ('0'..'7') ~ HEXDIG{2}) }
 
 high_surrogate = _{ "D" ~ ("8" | "9" | "A" | "B") ~ HEXDIG{2} }

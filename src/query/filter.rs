@@ -36,8 +36,8 @@ impl Query for Filter {
 impl Filter {
     fn process_elem<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         let process_cond = |filter: &Filter| {
-            let state1 = filter.process(state.clone());
-            state1
+            filter
+                .process(state.clone())
                 .ok_val()
                 .and_then(|v| v.as_bool())
                 .unwrap_or_default()
@@ -50,6 +50,7 @@ impl Filter {
     }
 
     fn filter_item<'a, T: Queryable>(&self, item: Pointer<'a, T>, root: &T) -> bool {
+
         self.process_elem(State::data(root, Data::Ref(item.clone())))
             .ok_val()
             .and_then(|v| v.as_bool())

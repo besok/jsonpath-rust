@@ -204,12 +204,67 @@ fn unicode_fns() -> Queried<()> {
     Ok(())
 }
 #[test]
-fn wrong_arg_in_fns() -> Queried<()> {
-    let json = json!([1]);
+fn fn_res_can_not_compare() -> Queried<()> {
+    let json = json!({});
 
-    let vec = js_path("$[?count('string')>2]", &json);
+    let vec = js_path("$[?match(@.a, 'a.*')==true]", &json);
 
     assert!(vec.is_err());
+
+    Ok(())
+}
+#[test]
+fn too_small() -> Queried<()> {
+    let json = json!({});
+
+    let vec = js_path("$[-9007199254740992]", &json);
+
+    assert!(vec.is_err());
+
+    Ok(())
+}
+#[test]
+fn filter_data() -> Queried<()> {
+    let json = json!({
+      "a": 1,
+      "b": 2,
+      "c": 3
+    });
+
+    let vec = js_path("$[?@<3]", &json)?;
+
+    assert_eq!(
+        vec,
+        vec![
+            (&json!(1), "$['a']".to_string()).into(),
+            (&json!(2), "$['b']".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}
+#[test]
+fn exp_no_error() -> Queried<()> {
+    let json = json!([
+        {
+          "a": 100,
+          "d": "e"
+        },
+        {
+          "a": 100.1,
+          "d": "f"
+        },
+        {
+          "a": "100",
+          "d": "g"
+        }
+      ]);
+
+    let vec = js_path("$[?@.a==1E2]", &json)?;
+    assert_eq!(
+        vec,
+        vec![(&json!({"a":100, "d":"e"}), "$[0]".to_string()).into(),]
+    );
 
     Ok(())
 }

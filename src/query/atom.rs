@@ -17,7 +17,6 @@ impl Query for FilterAtom {
             FilterAtom::Test { expr, not } => {
                 let new_state = |b| State::bool(b, state.root);
                 let res = expr.process(state.clone());
-
                 if expr.is_res_bool() {
                     if *not {
                         invert_bool(res)

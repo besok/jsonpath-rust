@@ -90,13 +90,13 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
     match child.as_rule() {
         Rule::name_selector => Ok(Selector::Name(child.as_str().trim().to_string())),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
-        Rule::index_selector => Ok(Selector::Index(
+        Rule::index_selector => Ok(Selector::Index(validate_range(
             child
                 .as_str()
                 .trim()
                 .parse::<i64>()
-                .map_err(|e| (e, "int"))?,
-        )),
+                .map_err(|e| (e, "wrong integer"))?,
+        )?)),
         Rule::slice_selector => {
             let (start, end, step) = slice_selector(child)?;
             Ok(Selector::Slice(start, end, step))
@@ -252,7 +252,8 @@ pub fn comp_expr(rule: Pair<Rule>) -> Parsed<Comparison> {
 pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     fn parse_number(num: &str) -> Parsed<Literal> {
         let num = num.trim();
-        if num.contains('.') {
+
+        if num.contains('.') || num.contains('e') || num.contains('E') {
             Ok(Literal::Float(num.parse::<f64>().map_err(|e| (e, num))?))
         } else {
             let num = num.trim().parse::<i64>().map_err(|e| (e, num))?;
@@ -328,7 +329,17 @@ pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable> {
     match rule.as_rule() {
         Rule::literal => Ok(Comparable::Literal(literal(rule)?)),
         Rule::singular_query => Ok(Comparable::SingularQuery(singular_query(rule)?)),
-        Rule::function_expr => Ok(Comparable::Function(function_expr(rule)?)),
+        Rule::function_expr => {
+            let tf = function_expr(rule)?;
+            if tf.is_comparable() {
+                Ok(Comparable::Function(tf))
+            } else {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Function {} is not comparable",
+                    tf.to_string()
+                )))
+            }
+        }
         _ => Err(rule.into()),
     }
 }

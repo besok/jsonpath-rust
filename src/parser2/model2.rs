@@ -386,6 +386,17 @@ impl TestFunction {
             (custom, _) => Ok(TestFunction::Custom(custom.to_string(), args)),
         }
     }
+
+    pub fn is_comparable(&self) -> bool {
+        match self {
+            TestFunction::Length(_) => true,
+            TestFunction::Value(_) => true,
+            TestFunction::Count(_) => true,
+            TestFunction::Custom(_, _) => false,
+            TestFunction::Search(_, _) => false,
+            TestFunction::Match(_, _) => false,
+        }
+    }
 }
 
 impl Display for TestFunction {

@@ -1,4 +1,6 @@
-use crate::parser2::model2::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
+use crate::parser2::model2::{
+    Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
+};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -34,7 +36,7 @@ fn lt<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>) -> bool {
     match (lhs.data, rhs.data) {
         (Data::Value(lhs), Data::Value(rhs)) => cmp(&lhs, &rhs),
         (Data::Value(v), Data::Ref(p)) => cmp(&v, p.inner),
-        (Data::Ref(p), Data::Value(v)) => cmp(&v, p.inner),
+        (Data::Ref(p), Data::Value(v)) => cmp(p.inner, &v),
         (Data::Ref(lhs), Data::Ref(rhs)) => cmp(lhs.inner, rhs.inner),
         _ => false,
     }
@@ -42,23 +44,35 @@ fn lt<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>) -> bool {
 
 fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> bool {
     match (lhs_state.data, rhs_state.data) {
-        (Data::Value(lhs), Data::Value(rhs)) => lhs == rhs,
-        (Data::Value(v), Data::Ref(p)) | (Data::Ref(p), Data::Value(v)) => v == *p.inner,
-        (Data::Ref(lhs), Data::Ref(rhs)) => lhs.inner == rhs.inner,
+        (Data::Value(lhs), Data::Value(rhs)) => eq_json(&lhs, &rhs),
+        (Data::Value(v), Data::Ref(p)) => eq_json(&v, p.inner),
+        (Data::Ref(p), Data::Value(v)) => eq_json(&v, p.inner),
+        (Data::Ref(lhs), Data::Ref(rhs)) => eq_json(lhs.inner, rhs.inner),
         (Data::Refs(lhs), Data::Refs(rhs)) => lhs == rhs,
         (Data::Ref(r), Data::Refs(rhs)) => eq_ref_to_array(r, &rhs),
         _ => false,
     }
 }
+/// Compare two JSON values for equality.
+/// For numbers, it should implement interoperability for integer and float
+fn eq_json<T: Queryable>(lhs: &T, rhs: &T) -> bool {
+    let lhs_f64 = lhs.as_f64().or_else(|| lhs.as_i64().map(|v| v as f64));
+    let rhs_f64 = rhs.as_f64().or_else(|| rhs.as_i64().map(|v| v as f64));
 
+    if let (Some(lhs_num), Some(rhs_num)) = (lhs_f64, rhs_f64) {
+        (lhs_num - rhs_num).abs() < f64::EPSILON
+    } else {
+        lhs == rhs
+    }
+}
 fn eq_ref_to_array<T: Queryable>(r: Pointer<T>, rhs: &Vec<Pointer<T>>) -> bool {
     r.inner.as_array().map_or(false, |array| {
         eq_arrays(array, &rhs.iter().map(|p| p.inner).collect::<Vec<_>>())
     })
 }
 
-fn eq_arrays<T: PartialEq>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
-    lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| a == *b)
+fn eq_arrays<T: Queryable>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
+    lhs.len() == rhs.len() && lhs.iter().zip(rhs.iter()).all(|(a, b)| eq_json(a, *b))
 }
 
 #[cfg(test)]
@@ -144,5 +158,18 @@ mod tests {
         );
         let result = comparison.process(state);
         assert_eq!(result.ok_val(), Some(json!(false)));
+    }
+
+    #[test]
+    fn less_true() {
+        let data = json!({"key": 1});
+        let state = State::root(&data);
+
+        let comparison = Comparison::Lt(
+            comparable!(> singular_query!(@ key)),
+            comparable!(lit!(i 2)),
+        );
+        let result = comparison.process(state);
+        assert_eq!(result.ok_val(), Some(json!(true)));
     }
 }

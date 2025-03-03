@@ -47,6 +47,13 @@ impl From<(ParseIntError, &str)> for JsonPathError {
         JsonPathError::InvalidNumber(format!("{:?} for `{}`", err, val))
     }
 }
+
+impl From<(JsonPathError, &str)> for JsonPathError {
+    fn from((err, val): (JsonPathError, &str)) -> Self {
+        JsonPathError::InvalidJsonPath(format!("{:?} for `{}`", err, val))
+    }
+}
+
 impl From<(ParseFloatError, &str)> for JsonPathError {
     fn from((err, val): (ParseFloatError, &str)) -> Self {
         JsonPathError::InvalidNumber(format!("{:?} for `{}`", err, val))
