@@ -49,7 +49,9 @@ impl<T: PartialEq + Debug> TestPair<T> {
                     panic!("expected error, got {:?}", r);
                 }
             }
-            Err(_) => {}
+            Err(e) => {
+                println!("parsing error `{}`", e);
+            }
         }
         self
     }
@@ -218,6 +220,7 @@ fn parse_path_desc() {
     TestPair::new(Rule::segment, segment).assert(".*", Segment::Selector(Selector::Wildcard));
 }
 
+
 #[test]
 fn parse_segment() {
     TestPair::new(Rule::segment, segment).assert(
@@ -247,7 +250,8 @@ fn parse_root_with_root_in_filter() {
         // .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
         // .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
         // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        // .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert_fail("$..\ra", )
     ;
 
 }

@@ -78,9 +78,23 @@ pub fn child_segment(rule: Pair<Rule>) -> Parsed<Segment> {
 pub fn segment(child: Pair<Rule>) -> Parsed<Segment> {
     match child.as_rule() {
         Rule::child_segment => child_segment(next_down(child)?),
-        Rule::descendant_segment => Ok(Segment::Descendant(Box::new(child_segment(next_down(
-            child,
-        )?)?))),
+        Rule::descendant_segment => {
+            let symb = child
+                .as_str()
+                .chars()
+                .nth(2)
+                .ok_or(JsonPathError::empty(child.as_str()))?;
+            if symb.is_whitespace() {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid descendant segment `{}`",
+                    child.as_str()
+                )))
+            } else {
+                Ok(Segment::Descendant(Box::new(child_segment(next_down(
+                    child,
+                )?)?)))
+            }
+        }
         _ => Err(child.into()),
     }
 }
