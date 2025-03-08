@@ -163,7 +163,6 @@ fn normalize_json_key(input: &str) -> String {
             result.push(c);
         }
     }
-
     result
 }
 

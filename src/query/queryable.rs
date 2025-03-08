@@ -42,8 +42,15 @@ where
 
 impl Queryable for Value {
     fn get(&self, key: &str) -> Option<&Self> {
-        let key = key.trim_matches(|c| c == '\'' || c == '"').trim();
-        self.get(key)
+        let key = if key.starts_with("'") && key.ends_with("'") {
+            key.trim_matches(|c| c == '\'')
+        } else if key.starts_with('"') && key.ends_with('"') {
+            key.trim_matches(|c| c == '"')
+        } else {
+            key
+        };
+
+        self.get(key.trim())
     }
 
     fn as_array(&self) -> Option<&Vec<Self>> {

@@ -11,13 +11,13 @@ mod test;
 mod test_function;
 
 use crate::parser2::errors2::JsonPathError;
+use crate::parser2::parse_json_path;
 use crate::path::JsonLike;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer};
 use serde_json::Value;
 use state::State;
 use std::borrow::Cow;
-use crate::parser2::parse_json_path;
 
 pub type QueryPath = String;
 pub type Queried<T> = Result<T, JsonPathError>;
@@ -39,10 +39,10 @@ impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryResult<'a, T> {
 }
 
 impl<'a, T: Queryable> QueryResult<'a, T> {
-    pub fn val(self) -> T {
+    pub fn val(self) -> Cow<'a, T> {
         match self {
-            QueryResult::Val(v) => v.clone(),
-            QueryResult::Ref(v, _) => v.clone(),
+            QueryResult::Val(v) => Cow::Owned(v),
+            QueryResult::Ref(v, _) => Cow::Borrowed(v),
         }
     }
     pub fn path(self) -> Option<QueryPath> {
@@ -73,10 +73,33 @@ pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryR
     }
 }
 
-pub fn js_path_vals<T: Queryable>(path: &str, value: &T) -> Queried<T> {
+pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<Cow<'a, T>>> {
     Ok(js_path(path, value)?
         .into_iter()
         .map(|r| r.val())
-        .collect::<Vec<_>>()
-        .into())
+        .collect::<Vec<_>>())
+}
+pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<Option<String>>> {
+    Ok(js_path(path, value)?
+        .into_iter()
+        .map(|r| r.path())
+        .collect::<Vec<_>>())
+}
+
+pub trait JsonPath: Queryable {
+    fn query_with_path(&self, path: &str) -> Queried<Vec<QueryResult<Self>>> {
+        js_path(path, self)
+    }
+    fn query_only_path(&self, path: &str) -> Queried<Vec<Option<String>>> {
+        js_path_path(path, self)
+    }
+    fn query(&self, path: &str) -> Queried<Vec<Cow<Self>>> {
+        js_path_vals(path, self)
+    }
+}
+
+impl JsonPath for Value {}
+
+fn x(v: &'static Value) -> Queried<Vec<Cow<'static, Value>>> {
+    v.query("a")
 }

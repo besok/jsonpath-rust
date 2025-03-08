@@ -28,12 +28,18 @@ pub(super) type Parsed<T> = Result<T, JsonPathError>;
 ///
 /// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
-    JSPathParser::parse(Rule::main, jp_str)
-        .map_err(Box::new)?
-        .next()
-        .ok_or(JsonPathError::UnexpectedPestOutput)
-        .and_then(next_down)
-        .and_then(jp_query)
+    if jp_str != jp_str.trim() {
+        Err(JsonPathError::InvalidJsonPath(
+            "Leading or trailing whitespaces".to_string(),
+        ))
+    } else {
+        JSPathParser::parse(Rule::main, jp_str)
+            .map_err(Box::new)?
+            .next()
+            .ok_or(JsonPathError::UnexpectedPestOutput)
+            .and_then(next_down)
+            .and_then(jp_query)
+    }
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
@@ -121,24 +127,39 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
 }
 
 pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
+    let fn_str = rule.as_str();
     let mut elems = rule.into_inner();
     let name = elems
         .next()
-        .map(|e| e.as_str().trim())
+        .map(|e| e.as_str())
         .ok_or(JsonPathError::empty("function expression"))?;
-    let mut args = vec![];
-    for arg in elems {
-        let next = next_down(arg)?;
-        match next.as_rule() {
-            Rule::literal => args.push(FnArg::Literal(literal(next)?)),
-            Rule::test => args.push(FnArg::Test(Box::new(test(next)?))),
-            Rule::logical_expr => args.push(FnArg::Filter(logical_expr(next)?)),
 
-            _ => return Err(next.into()),
+    // Check if the function name is valid namely nothing between the name and the opening parenthesis
+    if fn_str
+        .chars()
+        .nth(name.len())
+        .map(|c| c != '(')
+        .unwrap_or_default()
+    {
+        Err(JsonPathError::InvalidJsonPath(format!(
+            "Invalid function expression `{}`",
+            fn_str
+        )))
+    } else {
+        let mut args = vec![];
+        for arg in elems {
+            let next = next_down(arg)?;
+            match next.as_rule() {
+                Rule::literal => args.push(FnArg::Literal(literal(next)?)),
+                Rule::test => args.push(FnArg::Test(Box::new(test(next)?))),
+                Rule::logical_expr => args.push(FnArg::Filter(logical_expr(next)?)),
+
+                _ => return Err(next.into()),
+            }
         }
-    }
 
-    TestFunction::try_new(name, args)
+        TestFunction::try_new(name, args)
+    }
 }
 
 pub fn test(rule: Pair<Rule>) -> Parsed<Test> {

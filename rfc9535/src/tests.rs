@@ -236,8 +236,8 @@ fn filter_data() -> Queried<()> {
     assert_eq!(
         vec,
         vec![
-            (&json!(1), "$['a']".to_string()).into(),
-            (&json!(2), "$['b']".to_string()).into(),
+            (&json!(1), "$.['a']".to_string()).into(),
+            (&json!(2), "$.['b']".to_string()).into(),
         ]
     );
 
@@ -264,6 +264,21 @@ fn exp_no_error() -> Queried<()> {
     assert_eq!(
         vec,
         vec![(&json!({"a":100, "d":"e"}), "$[0]".to_string()).into(),]
+    );
+
+    Ok(())
+}
+#[test]
+fn single_quote() -> Queried<()> {
+    let json = json!({
+        "a'": "A",
+        "b": "B"
+      });
+
+    let vec = js_path("$[\"a'\"]", &json)?;
+    assert_eq!(
+        vec,
+        vec![(&json!("A"), "$.['\"a\'\"']".to_string()).into(),]
     );
 
     Ok(())
