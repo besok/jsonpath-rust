@@ -4,25 +4,24 @@
 [![docs.rs](https://img.shields.io/docsrs/jsonpath-rust)](https://docs.rs/jsonpath-rust/latest/jsonpath_rust)
 [![Rust CI](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml)
 
-The library provides the basic functionality to find the set of the data according to the filtering query. The idea
-comes from XPath for XML structures. The details can be found [there](https://datatracker.ietf.org/doc/html/rfc9535)
-Therefore JsonPath is a query language for JSON, similar to XPath for XML. The JsonPath query is a set of assertions to
-specify the JSON fields that need to be verified.
+The library provides the extensive functionality to find data sets according to filtering queries. 
+Inspired by XPath for XML structures, JsonPath is a query language for JSON. 
+The specification is described in [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html).
 
-Python bindings ([jsonpath-rust-bindings](https://github.com/night-crawler/jsonpath-rust-bindings)) are available on
-pypi:
-
-```bash
-pip install jsonpath-rust-bindings
-```
+# Important note
+The version 1.0.0 is a breaking change. The library has been rewritten from scratch to provide compliance with the RFC 9535.
+The changes are:
+- The library is now fully compliant with the RFC 9535.
+- The api and structures have been changed completely.
+- The functions in, nin, noneOf, anyOf, subsetOf are now implemented as custom filter expressions. (TBD)
 
 ## The compliance with RFC 9535
 
-The library is fully compliant with the standard [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535)
+The library is fully compliant with the standard [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html)
 
-## Simple examples
+## Examples
 
-Let's suppose we have a following json:
+The following json is given:
 
 ```json
 {
@@ -46,9 +45,10 @@ Let's suppose we have a following json:
   }
 }
  ```
+The following query is given (find all orders id that have the field 'active'):
+  - `$.shop.orders[?@.active].id`
 
-And we pursue to find all orders id having the field 'active'. We can construct the jsonpath instance like
-that  ```$.shop.orders[?@.active].id``` and get the result ``` [1,4] ```
+The result is `[1,4]`
 
 ## The jsonpath description
 
@@ -239,65 +239,7 @@ Given the json
 
 ## Library Usage
 
-The library intends to provide the basic functionality for ability to find the slices of data using the syntax, saying
-above. The dependency can be found as following:
-``` jsonpath-rust = *```
-
-The basic example is the following one:
-
-The library returns a `json path value` as a result.
-This is enum type which represents:
-
-- `Slice` - a point to the passed original json
-- `NewValue` - a new json data that has been generated during the path( for instance length operator)
-- `NoValue` - indicates there is no match between given json and jsonpath in the most cases due to absent fields or
-  inconsistent data.
-
-To extract data there are two methods, provided on the `value`:
-
-```rust
-let v:JsonPathValue<Value> =...
-v.to_data();
-v.slice_or( & some_dafault_value)
-```
-
-### Find
-
-there are 4 different functions to find data inside a `value`.
-All take references, to increase reusability. Especially json parsing and jsonpath parsing can take significant time,
-compared to a simple find.
-
-The methods `find`, `find_as_path`, `find_slice` and `find_slice_ptr` take the same inputs, but handle them differently
-depending on your usecase. They are further described in
-the [docs](https://docs.rs/jsonpath-rust/latest/jsonpath_rust/enum.JsonPath.html#implementations).
-
-```rust
-use jsonpath_rust::{JsonPath, JsonPathValue};
-use serde_json::json;
-use std::str::FromStr;
-
-fn main() {
-    let data = json!({"first":{"second":[{"active":1},{"passive":1}]}});
-    let path = JsonPath::from_str("$.first.second[?@.active]").unwrap();
-    let slice_of_data = path.find_slice(&data);
-
-    let expected_value = json!({"active":1});
-    let expected_path = "$.['first'].['second'][0]".to_string();
-
-    assert_eq!(
-        slice_of_data,
-        vec![JsonPathValue::Slice(&expected_value, expected_path)]
-    );
-}
-```
-
-### The structure
-
-The internal structure of the `JsonPath` can be found here:
-https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPath.html
-
-The internal structure of the `JsonPathIndex` can be found here:
-https://docs.rs/jsonpath-rust/latest/jsonpath_rust/parser/model/enum.JsonPathIndex.html
+   
 
 ### JsonLike
 
@@ -357,6 +299,14 @@ fn update_by_path_test() -> Result<(), JsonPathParserError> {
 
     Ok(())
 }
+```
+
+### Python bindings
+Python bindings ([jsonpath-rust-bindings](https://github.com/night-crawler/jsonpath-rust-bindings)) are available on
+pypi:
+
+```bash
+pip install jsonpath-rust-bindings
 ```
 
 ## How to contribute

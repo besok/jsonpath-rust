@@ -55,7 +55,10 @@ pub fn handle_test_case2(case: &TestCase) -> TestResult {
             });
 
             if result.is_err() {
-                println!("path: {} | value: {} | res: {:?}", p, doc, result);
+                println!("---- Parsing error: '{}'", case.name);
+                println!("reason: {}", result.as_ref().err().unwrap());
+                println!("selector: {}", case.selector);
+                println!("document: {}", doc);
                 return Err(TestFailure::invalid(case));
             }
             let result = result.unwrap();

@@ -123,7 +123,7 @@ impl<'a, T: Queryable> Data<'a, T> {
         match (self, other) {
             (Data::Ref(data), Data::Ref(data2)) => Data::Refs(vec![data, data2]),
             (Data::Ref(data), Data::Refs(data_vec)) => {
-                Data::Refs(data_vec.into_iter().chain(vec![data]).collect())
+                Data::Refs(vec![data].into_iter().chain(data_vec).collect())
             }
             (Data::Refs(data_vec), Data::Ref(data)) => {
                 Data::Refs(data_vec.into_iter().chain(vec![data]).collect())

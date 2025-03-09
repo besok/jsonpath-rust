@@ -1,3 +1,34 @@
 [
-
+  {
+    "name": "functions, value, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution"
+  },
+  {
+    "name": "functions, length, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution"
+  },
+  {
+    "name": "functions, count, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution"
+  },
+  {
+    "name": "functions, length, non-singular query arg",
+    "reason": "To handle it later either at the parser level or during execution"
+  },
+  {
+    "name": "functions, search, dot matcher on \\u2029",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)"
+  },
+  {
+    "name": "functions, search, dot matcher on \\u2028",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)"
+  },
+  {
+    "name": "functions, match, dot matcher on \\u2029",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)"
+  },
+  {
+    "name": "functions, match, dot matcher on \\u2028",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)"
+  }
 ]

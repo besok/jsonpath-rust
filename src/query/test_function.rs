@@ -132,14 +132,17 @@ fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -
     };
 
     match (to_str(lhs), to_str(rhs)) {
-        (Some(lhs), Some(rhs)) => Regex::new(&prepare_regex(rhs, substr))
-            .map(|re| to_state(regex(&lhs, re)))
-            .unwrap_or(to_state(false)),
+        (Some(lhs), Some(rhs)) => {
+            Regex::new(&prepare_regex(rhs, substr))
+                .map(|re| to_state(regex(&lhs, re)))
+                .unwrap_or(to_state(false))
+        },
         _ => to_state(false),
     }
 }
 
 fn prepare_regex(pattern: String, substring: bool) -> String {
+
     let pattern = if !substring {
         let pattern = if pattern.starts_with('^') {
             pattern
@@ -155,7 +158,6 @@ fn prepare_regex(pattern: String, substring: bool) -> String {
     } else {
         pattern.to_string()
     };
-
     let pattern = if pattern.contains("\\\\") {
         pattern.replace("\\\\", "\\")
     } else {

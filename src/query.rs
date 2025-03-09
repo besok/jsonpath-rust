@@ -19,13 +19,19 @@ use serde_json::Value;
 use state::State;
 use std::borrow::Cow;
 
+/// A type that can be queried with JSONPath, typically string
 pub type QueryPath = String;
+
+/// A type that can be queried with JSONPath, typically Result
 pub type Queried<T> = Result<T, JsonPathError>;
 
+/// Main internal trait to implement the logic of processing jsonpath.
 pub trait Query {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T>;
 }
 
+/// The resulting type of a JSONPath query.
+/// It can either be a value or a reference to a value with its path.
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueryResult<'a, T: Queryable> {
     Val(T),
@@ -64,6 +70,8 @@ impl<'a, T: Queryable> From<Pointer<'a, T>> for QueryResult<'a, T> {
     }
 }
 
+/// The main function to process a JSONPath query.
+/// It takes a path and a value, and returns a vector of `QueryResult` thus values + paths.
 pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryResult<'a, T>>> {
     match parse_json_path(path)?.process(State::root(value)).data {
         Data::Ref(p) => Ok(vec![p.into()]),
@@ -73,12 +81,15 @@ pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryR
     }
 }
 
+/// A convenience function to process a JSONPath query and return a vector of values, omitting the path.
 pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<Cow<'a, T>>> {
     Ok(js_path(path, value)?
         .into_iter()
         .map(|r| r.val())
         .collect::<Vec<_>>())
 }
+
+/// A convenience function to process a JSONPath query and return a vector of paths, omitting the values.
 pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<Option<String>>> {
     Ok(js_path(path, value)?
         .into_iter()
@@ -86,20 +97,23 @@ pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<Option<S
         .collect::<Vec<_>>())
 }
 
+/// A trait for types that can be queried with JSONPath.
 pub trait JsonPath: Queryable {
+
+    /// Queries the value with a JSONPath expression and returns a vector of `QueryResult`.
     fn query_with_path(&self, path: &str) -> Queried<Vec<QueryResult<Self>>> {
         js_path(path, self)
     }
+
+    /// Queries the value with a JSONPath expression and returns a vector of values.
     fn query_only_path(&self, path: &str) -> Queried<Vec<Option<String>>> {
         js_path_path(path, self)
     }
+
+    /// Queries the value with a JSONPath expression and returns a vector of values, omitting the path.
     fn query(&self, path: &str) -> Queried<Vec<Cow<Self>>> {
         js_path_vals(path, self)
     }
 }
 
 impl JsonPath for Value {}
-
-fn x(v: &'static Value) -> Queried<Vec<Cow<'static, Value>>> {
-    v.query("a")
-}

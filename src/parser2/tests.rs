@@ -240,10 +240,12 @@ fn parse_i64() {
 }
 #[test]
 fn parse_selector() {
-    TestPair::new(Rule::selector, selector).assert("1:1", Selector::Slice(Some(1), Some(1), None));
+    TestPair::new(Rule::selector, selector)
+        .assert("1:1", Selector::Slice(Some(1), Some(1), None))
+    ;
 }
 #[test]
-fn parse_root_with_root_in_filter() {
+fn parse_global() {
     let sel_a = segment!(selector!(a));
     TestPair::new(Rule::jp_query, jp_query)
         // .assert("$", JpQuery::new(vec![]))
@@ -254,7 +256,8 @@ fn parse_root_with_root_in_filter() {
         // .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
         // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
         // .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert_fail("$..\ra", )
+        // .assert_fail("$..\ra", )
+        .assert_fail("$[\"☺\"]", )
     ;
 
 }

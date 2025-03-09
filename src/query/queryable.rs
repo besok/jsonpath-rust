@@ -3,6 +3,7 @@ use crate::{JsonPathParserError, JsonPathStr};
 use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::fmt::Debug;
+use crate::query::QueryPath;
 
 pub trait Queryable
 where
@@ -37,6 +38,62 @@ where
 
     fn extension_custom(_name: &str, _args: Vec<Cow<Self>>) -> Self {
         Self::null()
+    }
+
+    /// Retrieves a reference to the element at the specified path.
+    /// The path is specified as a string and can be obtained from the query.
+    ///
+    /// # Arguments
+    /// * `path` -  A json path to the element specified as a string (root, field, index only).
+    fn reference<T>(&self, path:T) -> Option<&Self> where T:Into<QueryPath> {
+        None
+    }
+
+    /// Retrieves a mutable reference to the element at the specified path.
+    ///
+    /// # Arguments
+    /// * `path` -  A json path to the element specified as a string (root, field, index only).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use serde_json::json;
+    /// use jsonpath_rust::{JsonPath, JsonPathParserError};
+    /// use jsonpath_rust::path::JsonLike;
+    ///
+    /// let mut json = json!([
+    ///     {"verb": "RUN","distance":[1]},
+    ///     {"verb": "TEST"},
+    ///     {"verb": "DO NOT RUN"}
+    /// ]);
+    ///
+    /// let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?@.verb == 'RUN']").unwrap());
+    /// let elem = path
+    ///     .find_as_path(&json)
+    ///     .get(0)
+    ///     .cloned()
+    ///     .ok_or(JsonPathParserError::InvalidJsonPath("".to_string())).unwrap();
+    ///
+    /// if let Some(v) = json
+    ///     .reference_mut(elem).unwrap()
+    ///     .and_then(|v| v.as_object_mut())
+    ///     .and_then(|v| v.get_mut("distance"))
+    ///     .and_then(|v| v.as_array_mut())
+    /// {
+    ///     v.push(json!(2))
+    /// }
+    ///
+    /// assert_eq!(
+    ///     json,
+    ///     json!([
+    ///         {"verb": "RUN","distance":[1,2]},
+    ///         {"verb": "TEST"},
+    ///         {"verb": "DO NOT RUN"}
+    ///     ])
+    /// );
+    /// ```
+    fn reference_mut<T>(&mut self, path:T) -> Option<&Self> where T:Into<QueryPath> {
+        None
     }
 }
 
@@ -80,5 +137,12 @@ impl Queryable for Value {
 
     fn null() -> Self {
         Value::Null
+    }
+
+    fn reference<T>(&self, path: T) -> Option<&Self>
+    where
+        T: Into<QueryPath>,
+    {
+        todo!()
     }
 }

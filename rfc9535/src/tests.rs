@@ -76,12 +76,12 @@ fn index_neg() -> Result<(), JsonPathParserError> {
 }
 #[test]
 fn field_num() -> Result<(), JsonPathParserError> {
-    assert_eq!(json!([]).path("$.1")?, json!([]));
+    assert!(json!([]).path("$.1").is_err());
     Ok(())
 }
 #[test]
 fn field_surrogate_pair() -> Result<(), JsonPathParserError> {
-    assert_eq!(json!([]).path("$['\\uD834\\uDD1E']")?, json!([]));
+    assert !(json!([]).path("$['\\uD834\\uDD1E']").is_err());
     Ok(())
 }
 
@@ -283,3 +283,31 @@ fn single_quote() -> Queried<()> {
 
     Ok(())
 }
+#[test]
+fn union() -> Queried<()> {
+    let json = json!([
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]);
+
+    let vec = js_path("$[1,5:7]", &json)?;
+    assert_eq!(
+        vec,
+        vec![
+            (&json!(1), "$[1]".to_string()).into(),
+            (&json!(5), "$[5]".to_string()).into(),
+            (&json!(6), "$[6]".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}
+
