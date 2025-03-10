@@ -241,12 +241,12 @@ Given the json
 
    
 
-### JsonLike
+### Queryable
 
-The library provides a trait `JsonLike` that can be implemented for any type.
+The library provides a trait `Queryable` that can be implemented for any type.
 This allows you to use the `JsonPath` methods on your own types.
 
-### Update the JsonLike structure by path
+### Update the Queryable structure by path
 
 The library does not provide the functionality to update the json structure in the query itself.
 Instead, the library provides the ability to update the json structure by the path.

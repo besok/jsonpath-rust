@@ -21,7 +21,7 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
             .filter(|case| {
                 if let Some(f) = filter.iter().find(|filter| case.name == filter.name) {
                     println!(
-                        "Skipping test case: `{}` because of reason: `{}`",
+                        "Skipping test case: `{}` because of the reason: `{}`",
                         case.name.green(),
                         f.reason.green()
                     );
@@ -35,7 +35,7 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
         skipped_cases,
     ))
 }
-pub fn handle_test_case2(case: &TestCase) -> TestResult {
+pub fn handle_test_case(case: &TestCase) -> TestResult {
     let jspath = parse_json_path(case.selector.as_str());
 
     if case.invalid_selector {

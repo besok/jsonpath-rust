@@ -6,7 +6,10 @@ use crate::query::Query;
 impl Query for Segment {
     fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
         match self {
-            Segment::Descendant(segment) => segment.process(step.flat_map(process_descendant)),
+            Segment::Descendant(segment) => {
+                let state = step.flat_map(process_descendant);
+                segment.process(state)
+            }
             Segment::Selector(selector) => selector.process(step),
             Segment::Selectors(selectors) => process_selectors(step, selectors),
         }
@@ -26,22 +29,26 @@ fn process_selectors<'a, T: Queryable>(
 
 fn process_descendant<T: Queryable>(data: Pointer<T>) -> Data<T> {
     if let Some(array) = data.inner.as_array() {
-        Data::new_refs(
-            array
-                .iter()
-                .enumerate()
-                .map(|(i, elem)| Pointer::idx(elem, data.path.clone(), i))
-                .collect(),
+        Data::Ref(data.clone()).reduce(
+            Data::new_refs(
+                array
+                    .iter()
+                    .enumerate()
+                    .map(|(i, elem)| Pointer::idx(elem, data.path.clone(), i))
+                    .collect(),
+            )
+            .flat_map(process_descendant),
         )
-        .reduce(Data::Ref(data))
     } else if let Some(object) = data.inner.as_object() {
-        Data::new_refs(
-            object
-                .into_iter()
-                .map(|(key, value)| Pointer::key(value, data.path.clone(), key))
-                .collect(),
+        Data::Ref(data.clone()).reduce(
+            Data::new_refs(
+                object
+                    .into_iter()
+                    .map(|(key, value)| Pointer::key(value, data.path.clone(), key))
+                    .collect(),
+            )
+            .flat_map(process_descendant),
         )
-        .reduce(Data::Ref(data))
     } else {
         Data::Nothing
     }
@@ -84,6 +91,21 @@ mod tests {
                 Pointer::new(&json!({"name": "John"}), "$[0]".to_string()),
                 Pointer::new(&json!({"name": "doe"}), "$[1]".to_string()),
                 Pointer::new(&json!([{"name": "John"}, {"name": "doe"}]), "$".to_string()),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_process_descendant2() {
+        let value = json!({"o": [0,1,[2,3]]});
+        let segment = Segment::Descendant(Box::new(Segment::Selector(Selector::Index(1))));
+        let step = segment.process(State::root(&value));
+
+        assert_eq!(
+            step.ok_ref(),
+            Some(vec![
+                Pointer::new(&json!(1), "$.['o'][1]".to_string()),
+                Pointer::new(&json!(3), "$.['o'][2][1]".to_string()),
             ])
         );
     }

@@ -104,7 +104,7 @@ impl<'a, T: Queryable> Display for Data<'a, T> {
                 p.iter()
                     .map(|ptr| ptr.to_string())
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join("; ")
             ),
             Data::Value(v) => write!(f, "{:?}", v),
             Data::Nothing => write!(f, "Nothing"),

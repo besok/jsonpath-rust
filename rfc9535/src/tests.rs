@@ -311,3 +311,28 @@ fn union() -> Queried<()> {
     Ok(())
 }
 
+#[test]
+fn basic_descendent() -> Queried<()> {
+    let json = json!({
+        "o": [
+          0,
+          1,
+          [
+            2,
+            3
+          ]
+        ]
+      });
+
+    let vec = js_path("$..[1]", &json)?;
+    assert_eq!(
+        vec,
+        vec![
+            (&json!(1), "$.['o'][1]".to_string()).into(),
+            (&json!(3), "$.['o'][2][1]".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}
+
