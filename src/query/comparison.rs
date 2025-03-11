@@ -50,6 +50,7 @@ fn eq<'a, T: Queryable>(lhs_state: State<'a, T>, rhs_state: State<'a, T>) -> boo
         (Data::Ref(lhs), Data::Ref(rhs)) => eq_json(lhs.inner, rhs.inner),
         (Data::Refs(lhs), Data::Refs(rhs)) => lhs == rhs,
         (Data::Ref(r), Data::Refs(rhs)) => eq_ref_to_array(r, &rhs),
+        (Data::Nothing, Data::Nothing) => true,
         _ => false,
     }
 }

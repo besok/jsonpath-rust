@@ -25,20 +25,28 @@ fn process_wildcard<T: Queryable>(
     }: Pointer<T>,
 ) -> Data<T> {
     if let Some(array) = pointer.as_array() {
-        Data::new_refs(
-            array
-                .iter()
-                .enumerate()
-                .map(|(i, elem)| Pointer::idx(elem, path.clone(), i))
-                .collect(),
-        )
+        if array.is_empty() {
+            Data::Nothing
+        } else {
+            Data::new_refs(
+                array
+                    .iter()
+                    .enumerate()
+                    .map(|(i, elem)| Pointer::idx(elem, path.clone(), i))
+                    .collect(),
+            )
+        }
     } else if let Some(object) = pointer.as_object() {
-        Data::new_refs(
-            object
-                .into_iter()
-                .map(|(key, value)| Pointer::key(value, path.clone(), key))
-                .collect(),
-        )
+        if object.is_empty() {
+            Data::Nothing
+        } else {
+            Data::new_refs(
+                object
+                    .into_iter()
+                    .map(|(key, value)| Pointer::key(value, path.clone(), key))
+                    .collect(),
+            )
+        }
     } else {
         Data::Nothing
     }
@@ -113,7 +121,6 @@ fn process_slice<'a, T: Queryable>(
         .unwrap_or_default()
 }
 
-
 /// Processes escape sequences in JSON strings
 /// - Replaces `\\` with `\`
 /// - Replaces `\/` with `/`
@@ -129,27 +136,27 @@ fn normalize_json_key(input: &str) -> String {
                     '\\' => {
                         result.push('\\');
                         chars.next(); // consume the second backslash
-                    },
+                    }
                     '/' => {
                         result.push('/');
                         chars.next(); // consume the forward slash
-                    },
+                    }
                     '\'' => {
                         result.push('\\');
                         result.push('\'');
                         chars.next(); // consume the quote
-                    },
+                    }
                     '"' => {
                         result.push('\\');
                         result.push('"');
                         chars.next(); // consume the quote
-                    },
+                    }
                     'b' | 'f' | 'n' | 'r' | 't' | 'u' => {
                         // Preserve these standard JSON escape sequences
                         result.push('\\');
                         result.push(next);
                         chars.next();
-                    },
+                    }
                     _ => {
                         // Invalid escape - just keep as-is
                         result.push('\\');
@@ -165,7 +172,6 @@ fn normalize_json_key(input: &str) -> String {
     }
     result
 }
-
 
 pub fn process_key<'a, T: Queryable>(
     Pointer { inner, path }: Pointer<'a, T>,
@@ -202,9 +208,9 @@ pub fn process_index<'a, T: Queryable>(
 mod tests {
     use super::*;
     use crate::parser2::model2::Segment;
+    use crate::query::{js_path, js_path_vals, Queried};
     use serde_json::json;
     use std::vec;
-    use crate::query::{js_path, js_path_vals, Queried};
 
     #[test]
     fn test_process_key() {
@@ -346,30 +352,31 @@ mod tests {
     }
 
     #[test]
-    fn multi_selector() -> Queried<()>{
+    fn multi_selector() -> Queried<()> {
         let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
         let vec = js_path("$['a',1]", &json)?;
 
-        assert_eq!(vec, vec![
-            (&json!(1), "$[1]".to_string()).into(),
-        ]);
+        assert_eq!(vec, vec![(&json!(1), "$[1]".to_string()).into(),]);
 
         Ok(())
     }
     #[test]
-    fn multi_selector_space() -> Queried<()>{
+    fn multi_selector_space() -> Queried<()> {
         let json = json!({
-        "a": "ab",
-        "b": "bc"
-      });
+          "a": "ab",
+          "b": "bc"
+        });
 
         let vec = js_path("$['a',\r'b']", &json)?;
 
-        assert_eq!(vec, vec![
-            (&json!("ab"), "$.[''a'']".to_string()).into(),
-            (&json!("bc"), "$.[''b'']".to_string()).into(),
-        ]);
+        assert_eq!(
+            vec,
+            vec![
+                (&json!("ab"), "$.[''a'']".to_string()).into(),
+                (&json!("bc"), "$.[''b'']".to_string()).into(),
+            ]
+        );
 
         Ok(())
     }

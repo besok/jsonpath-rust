@@ -6,10 +6,7 @@ use crate::query::Query;
 impl Query for Segment {
     fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
         match self {
-            Segment::Descendant(segment) => {
-                let state = step.flat_map(process_descendant);
-                segment.process(state)
-            }
+            Segment::Descendant(segment) => segment.process(step.flat_map(process_descendant)),
             Segment::Selector(selector) => selector.process(step),
             Segment::Selectors(selectors) => process_selectors(step, selectors),
         }

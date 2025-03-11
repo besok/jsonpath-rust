@@ -92,7 +92,7 @@ where
     ///     ])
     /// );
     /// ```
-    fn reference_mut<T>(&mut self, path:T) -> Option<&Self> where T:Into<QueryPath> {
+    fn reference_mut<T>(&mut self, path:T) -> Option<&mut Self> where T:Into<QueryPath> {
         None
     }
 }

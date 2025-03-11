@@ -1,6 +1,7 @@
-use jsonpath_rust::query::{js_path, Queried};
+use jsonpath_rust::query::{js_path, JsonPath, Queried, QueryRes};
 use jsonpath_rust::{JsonPathParserError, JsonPathQuery};
-use serde_json::json;
+use serde_json::{json, Value};
+use std::borrow::Cow;
 
 #[test]
 fn slice_selector_zero_step() -> Result<(), JsonPathParserError> {
@@ -81,7 +82,7 @@ fn field_num() -> Result<(), JsonPathParserError> {
 }
 #[test]
 fn field_surrogate_pair() -> Result<(), JsonPathParserError> {
-    assert !(json!([]).path("$['\\uD834\\uDD1E']").is_err());
+    assert!(json!([]).path("$['\\uD834\\uDD1E']").is_err());
     Ok(())
 }
 
@@ -231,39 +232,37 @@ fn filter_data() -> Queried<()> {
       "c": 3
     });
 
-    let vec = js_path("$[?@<3]", &json)?;
+    let vec: Vec<String> = json
+        .query_only_path("$[?@<3]")?
+        .into_iter()
+        .map(Option::unwrap_or_default)
+        .collect();
 
-    assert_eq!(
-        vec,
-        vec![
-            (&json!(1), "$.['a']".to_string()).into(),
-            (&json!(2), "$.['b']".to_string()).into(),
-        ]
-    );
+    assert_eq!(vec, vec!["$.['a']".to_string(), "$.['b']".to_string()]);
 
     Ok(())
 }
 #[test]
 fn exp_no_error() -> Queried<()> {
     let json = json!([
-        {
-          "a": 100,
-          "d": "e"
-        },
-        {
-          "a": 100.1,
-          "d": "f"
-        },
-        {
-          "a": "100",
-          "d": "g"
-        }
-      ]);
+      {
+        "a": 100,
+        "d": "e"
+      },
+      {
+        "a": 100.1,
+        "d": "f"
+      },
+      {
+        "a": "100",
+        "d": "g"
+      }
+    ]);
 
-    let vec = js_path("$[?@.a==1E2]", &json)?;
+    let vec: Vec<Cow<Value>> = json.query("$[?@.a==1E2]")?;
     assert_eq!(
-        vec,
-        vec![(&json!({"a":100, "d":"e"}), "$[0]".to_string()).into(),]
+        vec.iter().map(Cow::as_ref).collect::<Vec<_>>(),
+        vec![&json!({"a":100, "d":"e"})]
     );
 
     Ok(())
@@ -271,9 +270,9 @@ fn exp_no_error() -> Queried<()> {
 #[test]
 fn single_quote() -> Queried<()> {
     let json = json!({
-        "a'": "A",
-        "b": "B"
-      });
+      "a'": "A",
+      "b": "B"
+    });
 
     let vec = js_path("$[\"a'\"]", &json)?;
     assert_eq!(
@@ -285,20 +284,9 @@ fn single_quote() -> Queried<()> {
 }
 #[test]
 fn union() -> Queried<()> {
-    let json = json!([
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9
-      ]);
+    let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-    let vec = js_path("$[1,5:7]", &json)?;
+    let vec: Vec<QueryRes<Value>> = json.query_with_path("$[1,5:7]")?;
     assert_eq!(
         vec,
         vec![
@@ -314,15 +302,15 @@ fn union() -> Queried<()> {
 #[test]
 fn basic_descendent() -> Queried<()> {
     let json = json!({
-        "o": [
-          0,
-          1,
-          [
-            2,
-            3
-          ]
+      "o": [
+        0,
+        1,
+        [
+          2,
+          3
         ]
-      });
+      ]
+    });
 
     let vec = js_path("$..[1]", &json)?;
     assert_eq!(
@@ -335,4 +323,37 @@ fn basic_descendent() -> Queried<()> {
 
     Ok(())
 }
+#[test]
+fn filter_absent() -> Queried<()> {
+    let json = json!([
+      {
+        "list": [
+          1
+        ]
+      }
+    ]);
 
+    let vec = js_path("$[?@.absent==@.list[9]]", &json)?;
+    assert_eq!(
+        vec,
+        vec![(&json!({"list": [1]}), "$[0]".to_string()).into(),]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn filter_star() -> Queried<()> {
+    let json = json!([1,[],[2],{},{"a": 3}]);
+
+    let vec = json.query_with_path("$[?@.*]")?;
+    assert_eq!(
+        vec,
+        vec![
+            (&json!([2]), "$[2]".to_string()).into(),
+            (&json!({"a": 3}), "$[4]".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}
