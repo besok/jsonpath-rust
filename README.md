@@ -4,22 +4,26 @@
 [![docs.rs](https://img.shields.io/docsrs/jsonpath-rust)](https://docs.rs/jsonpath-rust/latest/jsonpath_rust)
 [![Rust CI](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/besok/jsonpath-rust/actions/workflows/ci.yml)
 
-The library provides the extensive functionality to find data sets according to filtering queries. 
-Inspired by XPath for XML structures, JsonPath is a query language for JSON. 
+The library provides the extensive functionality to find data sets according to filtering queries.
+Inspired by XPath for XML structures, JsonPath is a query language for JSON.
 The specification is described in [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html).
 
 # Important note
-The version 1.0.0 has a breaking change. The library has been rewritten from scratch to provide compliance with the RFC 9535.
+
+The version 1.0.0 has a breaking change. The library has been rewritten from scratch to provide compliance with the RFC
+9535.
 The changes are:
+
 - The library is now fully compliant with the RFC 9535.
 - The api and structures have been changed completely.
-- The functions in, nin, noneOf, anyOf, subsetOf are now implemented as custom filter expressions. (TBD)
+- The functions in, nin, noneOf, anyOf, subsetOf are now implemented as custom filter expressions and renamed to `in`,
+  `nin`, `none_of`, `any_of`, `subset_of` respectively.
 - The function length was removed (the size can be checked using rust native functions).
 
 ## The compliance with RFC 9535
 
 The library is fully compliant with the standard [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html)
- 
+
 ## Examples
 
 Given the json
@@ -85,14 +89,39 @@ Given the json
 
 ## Library Usage
 
+### Extensions
+The library provides the following extensions:
+
+- **in**  
+Checks if the first argument is in the array provided as the second argument. Example: `$.elems[?in(@, $.list)]` 
+Returns elements from `$.elems` that are present in `$.list`.
+
+- **nin**  
+Checks if the first argument is not in the array provided as the second argument. Example: `$.elems[?nin(@, $.list)]`
+Returns elements from `$.elems` that are not present in `$.list`.
+
+- **none_of**  
+Checks if none of the elements in the first array are in the second array. Example: `$.elems[?none_of(@, $.list)]` 
+Returns arrays from `$.elems` that have no elements in common with `$.list`.
+
+- **any_of**  
+Checks if any of the elements in the first array are in the second array. Example: `$.elems[?any_of(@, $.list)]` 
+Returns arrays from `$.elems` that have at least one element in common with `$.list`.
+
+- **subset_of**  
+Checks if all elements in the first array are in the second array. Example: `$.elems[?subset_of(@, $.list)]` 
+Returns arrays from `$.elems` where all elements are present in `$.list`.
+
+
 ### Queryable
 
 The library provides a trait `Queryable` that can be implemented for any type.
 This allows you to use the `JsonPath` methods on your own types.
 
 ### Queried with path
+
 ```rust
- 
+
 fn union() -> Queried<()> {
     let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
@@ -113,6 +142,7 @@ fn union() -> Queried<()> {
 ```
 
 ### Queried without path
+
 ```rust
 fn exp_no_error() -> Queried<()> {
     let json = json!([
@@ -141,6 +171,7 @@ fn exp_no_error() -> Queried<()> {
 ```
 
 ### Queried with only path
+
 ```rust
 fn filter_data() -> Queried<()> {
     let json = json!({
@@ -175,44 +206,46 @@ There are two methods in the `Queryable` trait:
 They accept a `JsonPath` instance and return a `Option<&mut Self>` or `Option<&Self>` respectively.
 
 The path is supported with the limited elements namely only the elements with the direct access:
+
 - root
 - field
-- index 
+- index
 
 ```rust
  fn update_by_path_test() -> Queried<()> {
-  let mut json = json!([
+    let mut json = json!([
             {"verb": "RUN","distance":[1]},
             {"verb": "TEST"},
             {"verb": "DO NOT RUN"}
         ]);
 
-  let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
-  let elem = path.first().cloned().flatten().unwrap_or_default();
+    let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
+    let elem = path.first().cloned().flatten().unwrap_or_default();
 
-  if let Some(v) = json
-          .reference_mut(elem)
-          .and_then(|v| v.as_object_mut())
-          .and_then(|v| v.get_mut("distance"))
-          .and_then(|v| v.as_array_mut())
-  {
-    v.push(json!(2))
-  }
+    if let Some(v) = json
+        .reference_mut(elem)
+        .and_then(|v| v.as_object_mut())
+        .and_then(|v| v.get_mut("distance"))
+        .and_then(|v| v.as_array_mut())
+    {
+        v.push(json!(2))
+    }
 
-  assert_eq!(
-    json,
-    json!([
+    assert_eq!(
+        json,
+        json!([
                 {"verb": "RUN","distance":[1,2]},
                 {"verb": "TEST"},
                 {"verb": "DO NOT RUN"}
             ])
-  );
+    );
 
-  Ok(())
+    Ok(())
 }
 ```
 
 ### Python bindings
+
 Python bindings ([jsonpath-rust-bindings](https://github.com/night-crawler/jsonpath-rust-bindings)) are available on
 pypi:
 

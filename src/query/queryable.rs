@@ -1,9 +1,9 @@
 use crate::query::state::Data;
+use crate::query::QueryPath;
 use crate::{JsonPathParserError, JsonPathStr};
 use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::fmt::Debug;
-use crate::query::QueryPath;
 
 pub trait Queryable
 where
@@ -45,7 +45,10 @@ where
     ///
     /// # Arguments
     /// * `path` -  A json path to the element specified as a string (root, field, index only).
-    fn reference<T>(&self, path:T) -> Option<&Self> where T:Into<QueryPath> {
+    fn reference<T>(&self, path: T) -> Option<&Self>
+    where
+        T: Into<QueryPath>,
+    {
         None
     }
 
@@ -92,7 +95,10 @@ where
     ///     ])
     /// );
     /// ```
-    fn reference_mut<T>(&mut self, path:T) -> Option<&mut Self> where T:Into<QueryPath> {
+    fn reference_mut<T>(&mut self, path: T) -> Option<&mut Self>
+    where
+        T: Into<QueryPath>,
+    {
         None
     }
 }
@@ -144,5 +150,162 @@ impl Queryable for Value {
         T: Into<QueryPath>,
     {
         todo!()
+    }
+
+    /// Custom extension function for JSONPath queries.
+    ///
+    /// This function allows for custom operations to be performed on JSON data
+    /// based on the provided `name` and `args`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A string slice that holds the name of the custom function.
+    /// * `args` - A vector of `Cow<Self>` that holds the arguments for the custom function.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Self` value which is the result of the custom function. If the function
+    /// name is not recognized, it returns `Self::null()`.
+    ///
+    /// # Custom Functions
+    ///
+    /// * `"in"` - Checks if the first argument is in the array provided as the second argument.
+    ///   Example: `$.elems[?in(@, $.list)]` - Returns elements from $.elems that are present in $.list
+    ///
+    /// * `"nin"` - Checks if the first argument is not in the array provided as the second argument.
+    ///   Example: `$.elems[?nin(@, $.list)]` - Returns elements from $.elems that are not present in $.list
+    ///
+    /// * `"none_of"` - Checks if none of the elements in the first array are in the second array.
+    ///   Example: `$.elems[?none_of(@, $.list)]` - Returns arrays from $.elems that have no elements in common with $.list
+    ///
+    /// * `"any_of"` - Checks if any of the elements in the first array are in the second array.
+    ///   Example: `$.elems[?any_of(@, $.list)]` - Returns arrays from $.elems that have at least one element in common with $.list
+    ///
+    /// * `"subset_of"` - Checks if all elements in the first array are in the second array.
+    ///   Example: `$.elems[?subset_of(@, $.list)]` - Returns arrays from $.elems where all elements are present in $.list
+    fn extension_custom(name: &str, args: Vec<Cow<Self>>) -> Self {
+        match name {
+            "in" => match args.as_slice() {
+                [lhs, rhs] => match rhs.as_array() {
+                    Some(elements) => elements.iter().any(|item| item == lhs.as_ref()).into(),
+                    None => Self::null(),
+                },
+                _ => Self::null(),
+            },
+            "nin" => match args.as_slice() {
+                [lhs, rhs] => match rhs.as_array() {
+                    Some(elements) => (!elements.iter().any(|item| item == lhs.as_ref())).into(),
+                    None => Self::null(),
+                },
+                _ => Self::null(),
+            },
+            "none_of" => match args.as_slice() {
+                [lhs, rhs] => match (lhs.as_array(), rhs.as_array()) {
+                    (Some(lhs_arr), Some(rhs_arr)) => lhs_arr
+                        .iter()
+                        .all(|lhs| !rhs_arr.iter().any(|rhs| lhs == rhs))
+                        .into(),
+                    _ => Self::null(),
+                },
+                _ => Self::null(),
+            },
+            "any_of" => match args.as_slice() {
+                [lhs, rhs] => match (lhs.as_array(), rhs.as_array()) {
+                    (Some(lhs_arr), Some(rhs_arr)) => lhs_arr
+                        .iter()
+                        .any(|lhs| rhs_arr.iter().any(|rhs| lhs == rhs))
+                        .into(),
+                    _ => Self::null(),
+                },
+                _ => Self::null(),
+            },
+            "subset_of" => match args.as_slice() {
+                [lhs, rhs] => match (lhs.as_array(), rhs.as_array()) {
+                    (Some(lhs_arr), Some(rhs_arr)) => lhs_arr
+                        .iter()
+                        .all(|lhs| rhs_arr.iter().any(|rhs| lhs == rhs))
+                        .into(),
+                    _ => Self::null(),
+                },
+                _ => Self::null(),
+            },
+            _ => Self::null(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::query::{JsonPath, Queried};
+    use serde_json::json;
+    use std::borrow::Cow;
+
+    #[test]
+    fn in_smoke() -> Queried<()> {
+        let json = json!({
+            "elems": ["test", "t1", "t2"],
+            "list": ["test", "test2", "test3"],
+        });
+
+        let res = json.query("$.elems[?in(@, $.list)]")?;
+
+        assert_eq!(res, [Cow::Borrowed(&json!("test"))]);
+
+        Ok(())
+    }
+    #[test]
+    fn nin_smoke() -> Queried<()> {
+        let json = json!({
+            "elems": ["test", "t1", "t2"],
+            "list": ["test", "test2", "test3"],
+        });
+
+        let res = json.query("$.elems[?nin(@, $.list)]")?;
+
+        assert_eq!(
+            res,
+            [Cow::Borrowed(&json!("t1")), Cow::Borrowed(&json!("t2"))]
+        );
+
+        Ok(())
+    }
+    #[test]
+    fn none_of_smoke() -> Queried<()> {
+        let json = json!({
+            "elems": [  ["t1", "_"], ["t2", "t5"], ["t4"]],
+            "list": ["t1","t2", "t3"],
+        });
+
+        let res = json.query("$.elems[?none_of(@, $.list)]")?;
+
+        assert_eq!(res, [Cow::Borrowed(&json!(["t4"]))]);
+
+        Ok(())
+    }
+    #[test]
+    fn any_of_smoke() -> Queried<()> {
+        let json = json!({
+            "elems": [  ["t1", "_"], ["t4", "t5"], ["t4"]],
+            "list": ["t1","t2", "t3"],
+        });
+
+        let res = json.query("$.elems[?any_of(@, $.list)]")?;
+
+        assert_eq!(res, [Cow::Borrowed(&json!(["t1", "_"]))]);
+
+        Ok(())
+    }
+    #[test]
+    fn subset_of_smoke() -> Queried<()> {
+        let json = json!({
+            "elems": [  ["t1", "t2"], ["t4", "t5"], ["t6"]],
+            "list": ["t1","t2", "t3"],
+        });
+
+        let res = json.query("$.elems[?subset_of(@, $.list)]")?;
+
+        assert_eq!(res, [Cow::Borrowed(&json!(["t1", "t2"]))]);
+
+        Ok(())
     }
 }

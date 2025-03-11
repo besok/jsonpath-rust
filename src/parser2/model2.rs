@@ -309,10 +309,10 @@ impl Test {
             Test::RelQuery(_) => false,
             Test::AbsQuery(_) => false,
             Test::Function(func) => match **func {
-                TestFunction::Custom(_, _) => false,
                 TestFunction::Length(_) => false,
                 TestFunction::Value(_) => false,
                 TestFunction::Count(_) => false,
+                TestFunction::Custom(_, _) => true,
                 TestFunction::Search(_, _) => true,
                 TestFunction::Match(_, _) => true,
             },
