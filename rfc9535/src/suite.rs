@@ -1,9 +1,9 @@
 use crate::console::TestResult;
 use colored::Colorize;
-use jsonpath_rust::parser2::parse_json_path;
-use jsonpath_rust::query::{js_path_vals, JsonPath};
+use jsonpath_rust::parser::parse_json_path;
 use serde_json::Value;
 use std::str::FromStr;
+use jsonpath_rust::JsonPath;
 
 type SkippedCases = usize;
 

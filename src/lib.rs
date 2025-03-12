@@ -81,317 +81,44 @@
 //!
 //! # Examples
 //!```rust
-//! use std::str::FromStr;
-//! use serde_json::{json, Value};
-//! use jsonpath_rust::{jp_v, JsonPathValue, JsonPath};
-//!
-//! fn test() -> Result<(), Box<dyn std::error::Error>> {
-//!     let json = serde_json::from_str(r#"{"first":{"second":[{"active":1},{"passive":1}]}}"#)?;
-//!     let path = JsonPath::try_from("$.first.second[?(@.active)]")?;
-//!     let slice_of_data:Vec<JsonPathValue<Value>> = path.find_slice(&json);
-//!     let js = json!({"active":1});
-//!     assert_eq!(slice_of_data, jp_v![&js;"$.first.second[0]",]);
-//!     # Ok(())
-//! }
+
 //! ```
 //!
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 #![allow(warnings)]
-pub use parser::model::JsonPath;
-pub use parser::JsonPathParserError;
-use serde_json::Value;
-use std::fmt::Debug;
-use std::ops::Deref;
-use JsonPathValue::{NewValue, NoValue, Slice};
 
-mod jsonpath;
-pub mod parser;
-pub mod path;
 pub mod query;
 
 #[allow(clippy::module_inception)]
-pub mod parser2;
+pub mod parser;
 
 #[macro_use]
 extern crate pest_derive;
 extern crate core;
 extern crate pest;
 
-/// the trait allows to query a path on any value by just passing the &str of as JsonPath.
-///
-/// It is equal to
-/// ```rust
-/// # use serde_json::json;
-/// # use std::str::FromStr;
-/// use jsonpath_rust::JsonPath;
-///
-/// let query = "$.hello";
-/// let json_path = JsonPath::from_str(query).unwrap();
-/// json_path.find(&json!({"hello": "world"}));
-/// ```
-///
-/// It is default implemented for [Value].
-///
-/// #Note:
-/// the result is going to be cloned and therefore it can be significant for the huge queries.
-/// if the same &str is used multiple times, it's more efficient to reuse a single JsonPath.
-///
-/// # Examples:
-/// ```
-/// use std::str::FromStr;
-/// use serde_json::{json, Value};
-/// use jsonpath_rust::jp_v;
-/// use jsonpath_rust::{JsonPathQuery, JsonPath, JsonPathValue};
-///
-/// fn test() -> Result<(), Box<dyn std::error::Error>> {
-///     let json: Value = serde_json::from_str("{}")?;
-///     let v = json.path("$..book[?(@.author size 10)].title")?;
-///     assert_eq!(v, json!([]));
-///
-///     let json: Value = serde_json::from_str("{}")?;
-///     let path = json.path("$..book[?(@.author size 10)].title")?;
-///
-///     assert_eq!(path, json!(["Sayings of the Century"]));
-///
-///     let json: Value = serde_json::from_str("{}")?;
-///     let path = JsonPath::try_from("$..book[?(@.author size 10)].title")?;
-///
-///     let v = path.find_slice(&json);
-///     let js = json!("Sayings of the Century");
-///     assert_eq!(v, jp_v![&js;"",]);
-///     # Ok(())
-/// }
-///
-/// ```
-pub trait JsonPathQuery {
-    fn path(self, query: &str) -> Result<Value, JsonPathParserError>;
-}
+use serde_json::Value;
+use std::borrow::Cow;
+use crate::query::{Queried, QueryRes};
+use crate::query::queryable::Queryable;
 
-/// Json paths may return either pointers to the original json or new data. This custom pointer type allows us to handle both cases.
-/// Unlike JsonPathValue, this type does not represent NoValue to allow the implementation of Deref.
-#[derive(Debug, PartialEq, Clone)]
-pub enum JsonPtr<'a, Data> {
-    /// The slice of the initial json data
-    Slice(&'a Data),
-    /// The new data that was generated from the input data (like length operator)
-    NewValue(Data),
-}
+/// A trait for types that can be queried with JSONPath.
+pub trait JsonPath: Queryable {
+    /// Queries the value with a JSONPath expression and returns a vector of `QueryResult`.
+    fn query_with_path(&self, path: &str) -> Queried<Vec<QueryRes<Self>>> {
+        query::js_path(path, self)
+    }
 
-/// Allow deref from json pointer to value.
-impl Deref for JsonPtr<'_, Value> {
-    type Target = Value;
+    /// Queries the value with a JSONPath expression and returns a vector of values.
+    fn query_only_path(&self, path: &str) -> Queried<Vec<Option<String>>> {
+        query::js_path_path(path, self)
+    }
 
-    fn deref(&self) -> &Self::Target {
-        match self {
-            JsonPtr::Slice(v) => v,
-            JsonPtr::NewValue(v) => v,
-        }
+    /// Queries the value with a JSONPath expression and returns a vector of values, omitting the path.
+    fn query(&self, path: &str) -> Queried<Vec<Cow<Self>>> {
+        query::js_path_vals(path, self)
     }
 }
 
-impl JsonPathQuery for Value {
-    fn path(self, query: &str) -> Result<Value, JsonPathParserError> {
-        Ok(JsonPath::try_from(query)?.find(&self))
-    }
-}
-
-
-/// just to create a json path value of data
-/// Example:
-///  - `jp_v(&json) = JsonPathValue::Slice(&json)`
-///  - `jp_v(&json;"foo") = JsonPathValue::Slice(&json, "foo".to_string())`
-///  - `jp_v(&json,) = vec![JsonPathValue::Slice(&json)]`
-///  - `jp_v[&json1,&json1] = vec![JsonPathValue::Slice(&json1),JsonPathValue::Slice(&json2)]`
-///  - `jp_v(json) = JsonPathValue::NewValue(json)`
-/// ```
-/// use std::str::FromStr;
-/// use serde_json::{json, Value};
-/// use jsonpath_rust::{jp_v, JsonPathQuery, JsonPath, JsonPathValue};
-///
-/// fn test() -> Result<(), Box<dyn std::error::Error>> {
-///     let json: Value = serde_json::from_str("{}")?;
-///     let path = JsonPath::try_from("$..book[?(@.author size 10)].title")?;
-///     let v = path.find_slice(&json);
-///
-///     let js = json!("Sayings of the Century");
-///     assert_eq!(v, jp_v![&js;"",]);
-///     # Ok(())
-/// }
-/// ```
-#[macro_export]
-macro_rules! jp_v {
-    (&$v:expr) =>{
-        JsonPathValue::Slice(&$v, String::new())
-    };
-
-    (&$v:expr ; $s:expr) =>{
-        JsonPathValue::Slice(&$v, $s.to_string())
-    };
-
-    ($(&$v:expr;$s:expr),+ $(,)?) =>{
-        {
-            vec![
-                $(
-                    jp_v!(&$v ; $s),
-                )+
-            ]
-        }
-    };
-
-    ($(&$v:expr),+ $(,)?) => {
-        {
-            vec![
-                $(
-                    jp_v!(&$v),
-                )+
-            ]
-        }
-    };
-
-    ($v:expr) =>{
-        JsonPathValue::NewValue($v)
-    };
-
-}
-
-/// Represents the path of the found json data
-pub type JsonPathStr = String;
-
-pub fn jsp_idx(prefix: &str, idx: usize) -> String {
-    format!("{}[{}]", prefix, idx)
-}
-pub fn jsp_obj(prefix: &str, key: &str) -> String {
-    format!("{}.['{}']", prefix, key)
-}
-
-/// A result of json path
-/// Can be either a slice of initial data or a new generated value(like length of array)
-#[derive(Debug, PartialEq, Clone)]
-pub enum JsonPathValue<'a, Data> {
-    /// The slice of the initial json data
-    Slice(&'a Data, JsonPathStr),
-    /// The new data that was generated from the input data (like length operator)
-    NewValue(Data),
-    /// The absent value that indicates the input data is not matched to the given json path (like the absent fields)
-    NoValue,
-}
-
-impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
-    /// Transforms given value into data either by moving value out or by cloning
-    pub fn to_data(self) -> Data {
-        match self {
-            Slice(r, _) => r.clone(),
-            NewValue(val) => val,
-            NoValue => Data::default(),
-        }
-    }
-
-    /// Transforms given value into path
-    pub fn to_path(self) -> Option<JsonPathStr> {
-        match self {
-            Slice(_, path) => Some(path),
-            _ => None,
-        }
-    }
-
-    pub fn from_root(data: &'a Data) -> Self {
-        Slice(data, String::from("$"))
-    }
-    pub fn new_slice(data: &'a Data, path: String) -> Self {
-        Slice(data, path.to_string())
-    }
-}
-
-impl<'a, Data: Clone + Debug + Default> JsonPathValue<'a, Data> {
-    pub fn only_no_value(input: &[JsonPathValue<'a, Data>]) -> bool {
-        !input.is_empty() && input.iter().filter(|v| v.has_value()).count() == 0
-    }
-
-    pub fn map_vec(data: Vec<(&'a Data, JsonPathStr)>) -> Vec<JsonPathValue<'a, Data>> {
-        data.into_iter()
-            .map(|(data, pref)| Slice(data, pref))
-            .collect()
-    }
-
-    pub fn map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-    where
-        F: FnOnce(&'a Data, JsonPathStr) -> Vec<(&'a Data, JsonPathStr)>,
-    {
-        match self {
-            Slice(r, pref) => mapper(r, pref)
-                .into_iter()
-                .map(|(d, s)| Slice(d, s))
-                .collect(),
-
-            NewValue(_) => vec![],
-            no_v => vec![no_v],
-        }
-    }
-
-    pub fn flat_map_slice<F>(self, mapper: F) -> Vec<JsonPathValue<'a, Data>>
-    where
-        F: FnOnce(&'a Data, JsonPathStr) -> Vec<JsonPathValue<'a, Data>>,
-    {
-        match self {
-            Slice(r, pref) => mapper(r, pref),
-            _ => vec![NoValue],
-        }
-    }
-
-    pub fn has_value(&self) -> bool {
-        !matches!(self, NoValue)
-    }
-
-    pub fn vec_as_data(input: Vec<JsonPathValue<'a, Data>>) -> Vec<&'a Data> {
-        input
-            .into_iter()
-            .filter_map(|v| match v {
-                Slice(el, _) => Some(el),
-                _ => None,
-            })
-            .collect()
-    }
-    pub fn vec_as_pair(input: Vec<JsonPathValue<'a, Data>>) -> Vec<(&'a Data, JsonPathStr)> {
-        input
-            .into_iter()
-            .filter_map(|v| match v {
-                Slice(el, v) => Some((el, v)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    /// moves a pointer (from slice) out or provides a default value when the value was generated
-    pub fn slice_or(self, default: &'a Data) -> &'a Data {
-        match self {
-            Slice(r, _) => r,
-            NewValue(_) | NoValue => default,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json::Value;
-
-    use crate::JsonPath;
-    use std::str::FromStr;
-
-
-    #[test]
-    fn to_string_test() {
-        let path: Box<JsonPath<Value>> = Box::from(
-            JsonPath::from_str(
-                "$.['a'].a..book[1:3][*][1]['a','b'][?(@)][?@.verb == 'TEST'].a.length()",
-            )
-            .unwrap(),
-        );
-
-        assert_eq!(
-            path.to_string(),
-            "$.'a'.'a'..book[1:3:1][*][1]['a','b'][?@ exists ][?@.'verb' == \"TEST\"].'a'.length()"
-        );
-    }
-
-}
+impl JsonPath for Value {}

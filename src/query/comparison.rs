@@ -1,4 +1,4 @@
-use crate::parser2::model2::{
+use crate::parser::model::{
     Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
 };
 use crate::query::queryable::Queryable;
@@ -78,7 +78,7 @@ fn eq_arrays<T: Queryable>(lhs: &Vec<T>, rhs: &Vec<&T>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser2::model2::{
+    use crate::parser::model::{
         Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
     };
     use crate::q_segments;

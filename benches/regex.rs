@@ -2,16 +2,18 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use jsonpath_rust::{JsonPath, JsonPathQuery};
 use serde_json::{json, Value};
 use std::str::FromStr;
+use jsonpath_rust::parser::model::JpQuery;
+use jsonpath_rust::query::Query;
 
 struct SearchData {
-    json: serde_json::Value,
-    path: JsonPath,
+    json: Value,
+    path: JpQuery,
 }
 
 const PATH: &str = "$.[?@.author ~= '.*(?i)d\\(Rees\\)']";
 
 fn regex_perf_test_with_reuse(cfg: &SearchData) {
-    let _v = cfg.path.find(&cfg.json);
+    let _v = cfg.path.process(&cfg.json);
 }
 
 fn regex_perf_test_without_reuse() {
@@ -19,7 +21,7 @@ fn regex_perf_test_without_reuse() {
         "author":"abcd(Rees)",
     }));
 
-    let _v = json.path(PATH).expect("the path is correct");
+    let _v = json.query(PATH).expect("the path is correct");
 }
 
 fn json_path_compiling() {

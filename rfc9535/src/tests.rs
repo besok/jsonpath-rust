@@ -1,5 +1,5 @@
-use jsonpath_rust::query::{js_path, JsonPath, Queried, QueryRes};
-use jsonpath_rust::{JsonPathParserError, JsonPathQuery};
+use jsonpath_rust::query::{js_path, Queried, QueryRes};
+use jsonpath_rust::{JsonPath, JsonPathParserError, JsonPathQuery};
 use serde_json::{json, Value};
 use std::borrow::Cow;
 

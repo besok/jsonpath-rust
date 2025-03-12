@@ -1,4 +1,4 @@
-use crate::parser2::model2::Filter;
+use crate::parser::model::Filter;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;

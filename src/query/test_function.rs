@@ -1,4 +1,4 @@
-use crate::parser2::model2::{FnArg, TestFunction};
+use crate::parser::model::{FnArg, TestFunction};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -179,10 +179,10 @@ fn value<T: Queryable>(state: State<T>) -> State<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser2::model2::Segment;
-    use crate::parser2::model2::Selector;
-    use crate::parser2::model2::Test;
-    use crate::parser2::model2::TestFunction;
+    use crate::parser::model::Segment;
+    use crate::parser::model::Selector;
+    use crate::parser::model::Test;
+    use crate::parser::model::TestFunction;
     use crate::query::state::{Data, Pointer, State};
     use crate::query::test_function::{regex, FnArg};
     use crate::query::Query;

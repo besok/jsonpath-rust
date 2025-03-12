@@ -1,18 +1,17 @@
-use crate::parser2::model2::Comparison;
-use crate::parser2::model2::FilterAtom;
-use crate::parser2::model2::FnArg;
-use crate::parser2::model2::JpQuery;
-use crate::parser2::model2::Literal;
-use crate::parser2::model2::Segment;
-use crate::parser2::model2::Selector;
-use crate::parser2::model2::SingularQuery;
-use crate::parser2::model2::SingularQuerySegment;
-use crate::parser2::model2::Test;
-use crate::parser2::model2::TestFunction;
-use crate::parser2::model2::{Comparable, Filter};
-use crate::parser2::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, logical_expr, parse_json_path, segment, segments, selector, singular_query, singular_query_segments, slice_selector, test, JSPathParser, Parsed, Rule};
+use crate::parser::model::Comparison;
+use crate::parser::model::FilterAtom;
+use crate::parser::model::FnArg;
+use crate::parser::model::JpQuery;
+use crate::parser::model::Literal;
+use crate::parser::model::Segment;
+use crate::parser::model::Selector;
+use crate::parser::model::SingularQuery;
+use crate::parser::model::SingularQuerySegment;
+use crate::parser::model::TestFunction;
+use crate::parser::model::{Comparable, Filter};
+use crate::parser::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, parse_json_path, segment, selector, singular_query, singular_query_segments, slice_selector, test, JSPathParser, Parsed, Rule};
 use crate::{
-    and, arg, atom, cmp, comparable, filter, jq, lit, or, q_segment, q_segments, segment, selector,
+    arg, atom, cmp, comparable, jq, lit, or, q_segment, q_segments, segment, selector,
     singular_query, slice, test, test_fn,
 };
 use pest::error::Error;
@@ -20,7 +19,6 @@ use pest::iterators::Pair;
 use pest::Parser;
 use std::fmt::Debug;
 use std::{panic, vec};
-use crate::query::js_path_vals;
 
 struct TestPair<T> {
     rule: Rule,

@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use jsonpath_rust::{JsonPath, JsonPathQuery};
+
 use serde_json::json;
 use std::str::FromStr;
 

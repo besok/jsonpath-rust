@@ -1,4 +1,4 @@
-use crate::parser2::model2::{JpQuery, Segment};
+use crate::parser::model::{JpQuery, Segment};
 use crate::query::queryable::Queryable;
 use crate::query::state::State;
 use crate::query::Query;
@@ -19,7 +19,7 @@ impl Query for Vec<Segment> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser2::model2::{JpQuery, Segment, Selector};
+    use crate::parser::model::{JpQuery, Segment, Selector};
     use crate::query::state::{Data, Pointer, State};
     use crate::query::Query;
     use serde_json::json;

@@ -1,4 +1,4 @@
-use crate::parser2::model2::{Segment, Selector};
+use crate::parser::model::{Segment, Selector};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -53,7 +53,7 @@ fn process_descendant<T: Queryable>(data: Pointer<T>) -> Data<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser2::model2::{Segment, Selector};
+    use crate::parser::model::{Segment, Selector};
     use crate::query::state::{Pointer, State};
     use crate::query::Query;
     use serde_json::json;

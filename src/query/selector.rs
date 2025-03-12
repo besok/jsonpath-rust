@@ -1,4 +1,4 @@
-use crate::parser2::model2::Selector;
+use crate::parser::model::Selector;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -207,7 +207,7 @@ pub fn process_index<'a, T: Queryable>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser2::model2::Segment;
+    use crate::parser::model::Segment;
     use crate::query::{js_path, js_path_vals, Queried};
     use serde_json::json;
     use std::vec;

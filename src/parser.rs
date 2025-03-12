@@ -1,21 +1,20 @@
 #![allow(clippy::empty_docs)]
-pub mod errors2;
-mod macros2;
-pub mod model2;
+pub mod errors;
+mod macros;
+pub mod model;
 mod tests;
 
-use crate::parser2::errors2::JsonPathError;
-use crate::parser2::model2::{
+use crate::parser::errors::JsonPathError;
+use crate::parser::model::{
     Comparable, Comparison, Filter, FilterAtom, FnArg, JpQuery, Literal, Segment, Selector,
     SingularQuery, SingularQuerySegment, Test, TestFunction,
 };
-use crate::path::JsonLike;
-use crate::JsonPath;
+
 use pest::iterators::Pair;
 use pest::Parser;
 
 #[derive(Parser)]
-#[grammar = "parser2/grammar/json_path_9535.pest"]
+#[grammar = "parser/grammar/json_path_9535.pest"]
 pub(super) struct JSPathParser;
 const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript

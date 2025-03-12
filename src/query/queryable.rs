@@ -1,7 +1,8 @@
-use crate::query::state::Data;
+use crate::parser::errors::JsonPathError;
+use crate::parser::model::{JpQuery, Segment, Selector};
+use crate::parser::{parse_json_path, Parsed};
 use crate::query::QueryPath;
-use crate::{JsonPathParserError, JsonPathStr};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
@@ -60,40 +61,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use serde_json::json;
-    /// use jsonpath_rust::{JsonPath, JsonPathParserError};
-    /// use jsonpath_rust::path::JsonLike;
     ///
-    /// let mut json = json!([
-    ///     {"verb": "RUN","distance":[1]},
-    ///     {"verb": "TEST"},
-    ///     {"verb": "DO NOT RUN"}
-    /// ]);
-    ///
-    /// let path: Box<JsonPath> = Box::from(JsonPath::try_from("$.[?@.verb == 'RUN']").unwrap());
-    /// let elem = path
-    ///     .find_as_path(&json)
-    ///     .get(0)
-    ///     .cloned()
-    ///     .ok_or(JsonPathParserError::InvalidJsonPath("".to_string())).unwrap();
-    ///
-    /// if let Some(v) = json
-    ///     .reference_mut(elem).unwrap()
-    ///     .and_then(|v| v.as_object_mut())
-    ///     .and_then(|v| v.get_mut("distance"))
-    ///     .and_then(|v| v.as_array_mut())
-    /// {
-    ///     v.push(json!(2))
-    /// }
-    ///
-    /// assert_eq!(
-    ///     json,
-    ///     json!([
-    ///         {"verb": "RUN","distance":[1,2]},
-    ///         {"verb": "TEST"},
-    ///         {"verb": "DO NOT RUN"}
-    ///     ])
-    /// );
     /// ```
     fn reference_mut<T>(&mut self, path: T) -> Option<&mut Self>
     where
@@ -143,13 +111,6 @@ impl Queryable for Value {
 
     fn null() -> Self {
         Value::Null
-    }
-
-    fn reference<T>(&self, path: T) -> Option<&Self>
-    where
-        T: Into<QueryPath>,
-    {
-        todo!()
     }
 
     /// Custom extension function for JSONPath queries.
@@ -232,13 +193,57 @@ impl Queryable for Value {
             _ => Self::null(),
         }
     }
+
+    fn reference<T>(&self, path: T) -> Option<&Self>
+    where
+        T: Into<QueryPath>,
+    {
+        convert_js_path(&path.into())
+            .ok()
+            .and_then(|p| self.pointer(p.as_str()))
+    }
+
+    fn reference_mut<T>(&mut self, path: T) -> Option<&mut Self>
+    where
+        T: Into<QueryPath>,
+    {
+        convert_js_path(&path.into())
+            .ok()
+            .and_then(|p| self.pointer_mut(p.as_str()))
+    }
+}
+
+fn convert_js_path(path: &str) -> Parsed<String> {
+    let JpQuery { segments } = parse_json_path(path)?;
+
+    let mut path = String::new();
+    for segment in segments {
+        match segment {
+            Segment::Selector(Selector::Name(name)) => {
+                path.push_str(&format!("/{}", name));
+            }
+            Segment::Selector(Selector::Index(index)) => {
+                path.push_str(&format!("/{}", index));
+            }
+            s => {
+                return Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid segment: {:?}",
+                    s
+                )));
+            }
+        }
+    }
+    Ok(path)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::query::{JsonPath, Queried};
+    use crate::query::Queried;
     use serde_json::json;
     use std::borrow::Cow;
+    use crate::JsonPath;
+    use crate::parser::Parsed;
+    use crate::query::queryable::{convert_js_path, Queryable};
 
     #[test]
     fn in_smoke() -> Queried<()> {
@@ -305,6 +310,72 @@ mod tests {
         let res = json.query("$.elems[?subset_of(@, $.list)]")?;
 
         assert_eq!(res, [Cow::Borrowed(&json!(["t1", "t2"]))]);
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn convert_paths() -> Parsed<()> {
+        let r = convert_js_path("$.a.b[2]")?;
+        assert_eq!(r, "/a/b/2");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_references() -> Parsed<()> {
+        let mut json = json!({
+            "a": {
+                "b": {
+                    "c": 42
+                }
+            }
+        });
+
+        let r = convert_js_path("$.a.b.c")?;
+
+        if let Some(v) = json.pointer_mut(r.as_str()) {
+            *v = json!(43);
+        }
+
+        assert_eq!(
+            json,
+            json!({
+                "a": {
+                    "b": {
+                        "c": 43
+                    }
+                }
+            })
+        );
+
+        Ok(())
+    }
+    #[test]
+    fn test_js_reference() ->Parsed<()> {
+        let mut json = json!({
+            "a": {
+                "b": {
+                    "c": 42
+                }
+            }
+        });
+
+        if let Some(v) = json.reference_mut("$.a.b.c") {
+            *v = json!(43);
+        }
+
+        assert_eq!(
+            json,
+            json!({
+                "a": {
+                    "b": {
+                        "c": 43
+                    }
+                }
+            })
+        );
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use crate::parser2::model2::{Comparable, Literal, SingularQuery, SingularQuerySegment};
+use crate::parser::model::{Comparable, Literal, SingularQuery, SingularQuerySegment};
 use crate::query::Query;
 use crate::query::queryable::Queryable;
 use crate::query::selector::{process_index, process_key};
@@ -55,7 +55,7 @@ impl Query for Vec<SingularQuerySegment> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser2::model2::{Comparable, Literal, SingularQuery, SingularQuerySegment};
+    use crate::parser::model::{Comparable, Literal, SingularQuery, SingularQuerySegment};
     use crate::query::state::{Data, Pointer, State};
     use crate::query::Query;
     use serde_json::json;

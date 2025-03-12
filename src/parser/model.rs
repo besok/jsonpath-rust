@@ -1,385 +1,475 @@
-use serde_json::Value;
-
-use crate::path::JsonLike;
-
-use super::errors::JsonPathParserError;
-use super::parse_json_path;
+use crate::parser::errors::JsonPathError;
+use crate::parser::Parsed;
 use std::fmt::{Display, Formatter};
-use std::{convert::TryFrom, str::FromStr};
 
-/// The basic structures for parsing json paths.
-/// The common logic of the structures pursues to correspond the internal parsing structure.
-///
-/// usually it's created by using [`FromStr`] or [`TryFrom<&str>`]
-#[derive(Debug, Clone)]
-pub enum JsonPath<T = Value> {
-    /// The $ operator
-    Root,
-    /// Field represents key
-    Field(String),
-    /// The whole chain of the path.
-    Chain(Vec<JsonPath<T>>),
-    /// The .. operator
-    Descent(String),
-    /// The ..* operator
-    DescentW,
-    /// The indexes for array
-    Index(JsonPathIndex<T>),
-    /// The @ operator
-    Current(Box<JsonPath<T>>),
-    /// The * operator
-    Wildcard,
-    /// The item uses to define the unresolved state
-    Empty,
-    /// Functions that can calculate some expressions
-    Fn(Function),
-}
-
-impl<T: Display> Display for JsonPath<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            JsonPath::Root => "$".to_string(),
-            JsonPath::Field(e) => format!(".'{}'", e),
-            JsonPath::Chain(elems) => elems.iter().map(ToString::to_string).collect::<String>(),
-            JsonPath::Descent(e) => {
-                format!("..{}", e)
-            }
-            JsonPath::DescentW => "..*".to_string(),
-            JsonPath::Index(e) => e.to_string(),
-            JsonPath::Current(e) => format!("@{}", e),
-            JsonPath::Wildcard => "[*]".to_string(),
-            JsonPath::Empty => "".to_string(),
-            JsonPath::Fn(e) => format!(".{}", e),
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl<T> TryFrom<&str> for JsonPath<T>
-where
-    T: JsonLike,
-{
-    type Error = JsonPathParserError;
-
-    /// Parses a string into a [JsonPath].
-    ///
-    /// # Errors
-    ///
-    /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        parse_json_path(value)
-    }
-}
-
-impl<T> FromStr for JsonPath<T>
-where
-    T: JsonLike,
-{
-    type Err = JsonPathParserError;
-
-    /// Parses a string into a [JsonPath].
-    ///
-    /// # Errors
-    ///
-    /// Returns a variant of [JsonPathParserError] if the parsing operation failed.
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        parse_json_path(value)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Function {
-    /// length()
-    Length,
-}
-
-impl Display for Function {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Function::Length => "length()".to_string(),
-        };
-        write!(f, "{}", str)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum JsonPathIndex<T> {
-    /// A single element in array
-    Single(T),
-    /// Union represents a several indexes
-    UnionIndex(Vec<T>),
-    /// Union represents a several keys
-    UnionKeys(Vec<String>),
-    /// DEfault slice where the items are start/end/step respectively
-    Slice(Option<i64>, Option<i64>, Option<i64>),
-    /// Filter ? <expression>
-    Filter(FilterExpression<T>),
-}
-
-impl<T: Display> Display for JsonPathIndex<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            JsonPathIndex::Single(e) => format!("[{}]", e),
-            JsonPathIndex::UnionIndex(elems) => {
-                format!(
-                    "[{}]",
-                    elems
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )
-            }
-            JsonPathIndex::UnionKeys(elems) => {
-                format!(
-                    "[{}]",
-                    elems
-                        .iter()
-                        .map(|el| format!("'{}'", el))
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )
-            }
-            JsonPathIndex::Slice(s, e, st) => {
-                format!(
-                    "[{}:{}:{}]",
-                    s.unwrap_or(0),
-                    e.unwrap_or(0),
-                    st.unwrap_or(1)
-                )
-            }
-            JsonPathIndex::Filter(filter) => format!("[?{}]", filter),
-        };
-        write!(f, "{}", str)
-    }
-}
-
+/// Represents a JSONPath query with a list of segments.
 #[derive(Debug, Clone, PartialEq)]
-pub enum FilterExpression<T> {
-    /// a single expression like a > 2
-    Atom(Operand<T>, FilterSign, Operand<T>),
-    /// and with &&
-    And(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
-    /// or with ||
-    Or(Box<FilterExpression<T>>, Box<FilterExpression<T>>),
-    /// not with !
-    Not(Box<FilterExpression<T>>),
-    /// Extensions
-    Extension(ExtensionImpl, Vec<FilterExpression<T>>),
-}
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExtensionImpl {
-    Length,
-    Count,
-    Value,
-    Search,
-    Match
+pub struct JpQuery {
+    pub segments: Vec<Segment>,
 }
 
-impl Display for ExtensionImpl {
+impl JpQuery {
+    pub fn new(segments: Vec<Segment>) -> Self {
+        JpQuery { segments }
+    }
+}
+
+impl Display for JpQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            ExtensionImpl::Length => "length",
-            ExtensionImpl::Count => "count",
-            ExtensionImpl::Value => "value",
-            ExtensionImpl::Search => "search",
-            ExtensionImpl::Match => "match",
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl ExtensionImpl {
-    pub fn new(val:&str) -> Result<Self, JsonPathParserError> {
-        match val {
-            "length" => Ok(ExtensionImpl::Length),
-            "count" => Ok(ExtensionImpl::Count),
-            "value" => Ok(ExtensionImpl::Value),
-            "search" => Ok(ExtensionImpl::Search),
-            "match" => Ok(ExtensionImpl::Match),
-            _ => Err(JsonPathParserError::UnexpectedNoneLogicError(val.to_string(),
-                                                                   "filter extensions".to_string()))
-        }
-    }
-}
-
-impl<T: Display> Display for FilterExpression<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            FilterExpression::Atom(left, sign, right) => {
-                format!("{} {} {}", left, sign, right)
-            }
-            FilterExpression::And(left, right) => {
-                format!("{} && {}", left, right)
-            }
-            FilterExpression::Or(left, right) => {
-                format!("{} || {}", left, right)
-            }
-            FilterExpression::Not(expr) => {
-                format!("!{}", expr)
-            }
-            FilterExpression::Extension(e, elems) => {
-                format!("{}({})",
-                        e,
-                        elems
-                            .iter()
-                            .map(ToString::to_string)
-                            .collect::<Vec<_>>()
-                            .join(","))
-            }
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl<T> FilterExpression<T> {
-    pub fn exists(op: Operand<T>) -> Self {
-        FilterExpression::Atom(
-            op,
-            FilterSign::Exists,
-            Operand::Dynamic(Box::new(JsonPath::Empty)),
+        write!(
+            f,
+            "${}",
+            self.segments
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<String>()
         )
     }
 }
-
-/// Operand for filtering expressions
-#[derive(Debug, Clone)]
-pub enum Operand<T> {
-    Static(T),
-    Dynamic(Box<JsonPath<T>>),
-}
-
-impl<T: Display> Display for Operand<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Operand::Static(e) => e.to_string(),
-            Operand::Dynamic(e) => e.to_string(),
-        };
-        write!(f, "{}", str)
-    }
-}
-
-#[allow(dead_code)]
-impl<T> Operand<T> {
-    pub fn val(v: T) -> Self {
-        Operand::Static(v)
-    }
-}
-
-/// The operators for filtering functions
+/// Enum representing different types of segments in a JSONPath query.
 #[derive(Debug, Clone, PartialEq)]
-pub enum FilterSign {
-    Equal,
-    Unequal,
-    Less,
-    Greater,
-    LeOrEq,
-    GrOrEq,
-    Regex,
-    In,
-    Nin,
-    Size,
-    NoneOf,
-    AnyOf,
-    SubSetOf,
-    Exists,
+pub enum Segment {
+    /// Represents a descendant segment.
+    Descendant(Box<Segment>),
+    /// Represents a selector segment.
+    Selector(Selector),
+    /// Represents multiple selectors.
+    Selectors(Vec<Selector>),
 }
 
-impl Display for FilterSign {
+impl Segment {
+    pub fn name(name: &str) -> Self {
+        Segment::Selector(Selector::Name(name.to_string()))
+    }
+}
+
+impl Display for Segment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            FilterSign::Equal => "==",
-            FilterSign::Unequal => "!=",
-            FilterSign::Less => "<",
-            FilterSign::Greater => ">",
-            FilterSign::LeOrEq => "<=",
-            FilterSign::GrOrEq => ">=",
-            FilterSign::Regex => "~=",
-            FilterSign::In => "in",
-            FilterSign::Nin => "nin",
-            FilterSign::Size => "size",
-            FilterSign::NoneOf => "noneOf",
-            FilterSign::AnyOf => "anyOf",
-            FilterSign::SubSetOf => "subsetOf",
-            FilterSign::Exists => "exists",
+        match self {
+            Segment::Descendant(s) => write!(f, "..{}", s),
+            Segment::Selector(selector) => write!(f, "{}", selector),
+            Segment::Selectors(selectors) => write!(
+                f,
+                "{}",
+                selectors.iter().map(|s| s.to_string()).collect::<String>()
+            ),
+        }
+    }
+}
+/// Enum representing different types of selectors in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Selector {
+    /// Represents a name selector.
+    Name(String),
+    /// Represents a wildcard selector.
+    Wildcard,
+    /// Represents an index selector.
+    Index(i64),
+    /// Represents a slice selector.
+    Slice(Option<i64>, Option<i64>, Option<i64>),
+    /// Represents a filter selector.
+    Filter(Filter),
+}
+
+impl Display for Selector {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Selector::Name(name) => write!(f, "{}", name),
+            Selector::Wildcard => write!(f, "*"),
+            Selector::Index(index) => write!(f, "{}", index),
+            Selector::Slice(start, end, step) => write!(
+                f,
+                "{}:{}:{}",
+                start.unwrap_or(0),
+                end.unwrap_or(0),
+                step.unwrap_or(1)
+            ),
+            Selector::Filter(filter) => write!(f, "[?{}]", filter),
+        }
+    }
+}
+/// Enum representing different types of filters in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Filter {
+    /// Represents a logical OR filter.
+    Or(Vec<Filter>),
+    /// Represents a logical AND filter.
+    And(Vec<Filter>),
+    /// Represents an atomic filter.
+    Atom(FilterAtom),
+}
+
+impl Display for Filter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let items_to_str = |items: &Vec<Filter>, sep: &str| {
+            items
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<_>>()
+                .join(sep)
         };
-        write!(f, "{}", str)
-    }
-}
 
-impl FilterSign {
-    pub fn new(key: &str) -> Self {
-        match key {
-            "==" => FilterSign::Equal,
-            "!=" => FilterSign::Unequal,
-            "<" => FilterSign::Less,
-            ">" => FilterSign::Greater,
-            "<=" => FilterSign::LeOrEq,
-            ">=" => FilterSign::GrOrEq,
-            "~=" => FilterSign::Regex,
-            "in" => FilterSign::In,
-            "nin" => FilterSign::Nin,
-            "size" => FilterSign::Size,
-            "noneOf" => FilterSign::NoneOf,
-            "anyOf" => FilterSign::AnyOf,
-            "subsetOf" => FilterSign::SubSetOf,
-            _ => FilterSign::Exists,
+        match self {
+            Filter::Or(filters) => write!(f, "{}", items_to_str(filters, " || ")),
+            Filter::And(filters) => write!(f, "{}", items_to_str(filters, " && ")),
+            Filter::Atom(atom) => write!(f, "{}", atom),
         }
     }
 }
 
-impl<T> PartialEq for JsonPath<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (JsonPath::Root, JsonPath::Root) => true,
-            (JsonPath::Descent(k1), JsonPath::Descent(k2)) => k1 == k2,
-            (JsonPath::DescentW, JsonPath::DescentW) => true,
-            (JsonPath::Field(k1), JsonPath::Field(k2)) => k1 == k2,
-            (JsonPath::Wildcard, JsonPath::Wildcard) => true,
-            (JsonPath::Empty, JsonPath::Empty) => true,
-            (JsonPath::Current(jp1), JsonPath::Current(jp2)) => jp1 == jp2,
-            (JsonPath::Chain(ch1), JsonPath::Chain(ch2)) => ch1 == ch2,
-            (JsonPath::Index(idx1), JsonPath::Index(idx2)) => idx1 == idx2,
-            (JsonPath::Fn(fn1), JsonPath::Fn(fn2)) => fn2 == fn1,
-            (_, _) => false,
+/// Enum representing different types of atomic filters in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterAtom {
+    /// Represents a nested filter with an optional NOT flag.
+    Filter { expr: Box<Filter>, not: bool },
+    /// Represents a test filter with an optional NOT flag.
+    Test { expr: Box<Test>, not: bool },
+    /// Represents a comparison filter.
+    Comparison(Box<Comparison>),
+}
+
+impl FilterAtom {
+    pub fn filter(expr: Filter, not: bool) -> Self {
+        FilterAtom::Filter {
+            expr: Box::new(expr),
+            not,
+        }
+    }
+
+    pub fn test(expr: Test, not: bool) -> Self {
+        FilterAtom::Test {
+            expr: Box::new(expr),
+            not,
+        }
+    }
+
+    pub fn cmp(cmp: Box<Comparison>) -> Self {
+        FilterAtom::Comparison(cmp)
+    }
+}
+
+impl Display for FilterAtom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FilterAtom::Filter { expr, not } => {
+                if *not {
+                    write!(f, "!{}", expr)
+                } else {
+                    write!(f, "{}", expr)
+                }
+            }
+            FilterAtom::Test { expr, not } => {
+                if *not {
+                    write!(f, "!{}", expr)
+                } else {
+                    write!(f, "{}", expr)
+                }
+            }
+            FilterAtom::Comparison(cmp) => write!(f, "{}", cmp),
+        }
+    }
+}
+/// Enum representing different types of comparisons in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Comparison {
+    /// Represents an equality comparison.
+    Eq(Comparable, Comparable),
+    /// Represents a non-equality comparison.
+    Ne(Comparable, Comparable),
+    /// Represents a greater-than comparison.
+    Gt(Comparable, Comparable),
+    /// Represents a greater-than-or-equal-to comparison.
+    Gte(Comparable, Comparable),
+    /// Represents a less-than comparison.
+    Lt(Comparable, Comparable),
+    /// Represents a less-than-or-equal-to comparison.
+    Lte(Comparable, Comparable),
+}
+
+impl Comparison {
+    pub fn try_new(op: &str, left: Comparable, right: Comparable) -> Parsed<Self> {
+        match op {
+            "==" => Ok(Comparison::Eq(left, right)),
+            "!=" => Ok(Comparison::Ne(left, right)),
+            ">" => Ok(Comparison::Gt(left, right)),
+            ">=" => Ok(Comparison::Gte(left, right)),
+            "<" => Ok(Comparison::Lt(left, right)),
+            "<=" => Ok(Comparison::Lte(left, right)),
+            _ => Err(JsonPathError::InvalidJsonPath(format!(
+                "Invalid comparison operator: {}",
+                op
+            ))),
+        }
+    }
+
+    pub fn vals(&self) -> (&Comparable, &Comparable) {
+        match self {
+            Comparison::Eq(left, right) => (left, right),
+            Comparison::Ne(left, right) => (left, right),
+            Comparison::Gt(left, right) => (left, right),
+            Comparison::Gte(left, right) => (left, right),
+            Comparison::Lt(left, right) => (left, right),
+            Comparison::Lte(left, right) => (left, right),
         }
     }
 }
 
-impl<T> PartialEq for JsonPathIndex<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (JsonPathIndex::Slice(s1, e1, st1), JsonPathIndex::Slice(s2, e2, st2)) => {
-                s1 == s2 && e1 == e2 && st1 == st2
-            }
-            (JsonPathIndex::Single(el1), JsonPathIndex::Single(el2)) => el1 == el2,
-            (JsonPathIndex::UnionIndex(elems1), JsonPathIndex::UnionIndex(elems2)) => {
-                elems1 == elems2
-            }
-            (JsonPathIndex::UnionKeys(elems1), JsonPathIndex::UnionKeys(elems2)) => {
-                elems1 == elems2
-            }
-            (JsonPathIndex::Filter(left), JsonPathIndex::Filter(right)) => left.eq(right),
-            (_, _) => false,
+impl Display for Comparison {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Comparison::Eq(left, right) => write!(f, "{} == {}", left, right),
+            Comparison::Ne(left, right) => write!(f, "{} != {}", left, right),
+            Comparison::Gt(left, right) => write!(f, "{} > {}", left, right),
+            Comparison::Gte(left, right) => write!(f, "{} >= {}", left, right),
+            Comparison::Lt(left, right) => write!(f, "{} < {}", left, right),
+            Comparison::Lte(left, right) => write!(f, "{} <= {}", left, right),
         }
     }
 }
 
-impl<T> PartialEq for Operand<T>
-where
-    T: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Operand::Static(v1), Operand::Static(v2)) => v1 == v2,
-            (Operand::Dynamic(jp1), Operand::Dynamic(jp2)) => jp1 == jp2,
-            (_, _) => false,
+/// Enum representing different types of comparable values in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Comparable {
+    /// Represents a literal value.
+    Literal(Literal),
+    /// Represents a function.
+    Function(TestFunction),
+    /// Represents a singular query.
+    SingularQuery(SingularQuery),
+}
+
+impl Display for Comparable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Comparable::Literal(literal) => write!(f, "{}", literal),
+            Comparable::Function(func) => write!(f, "{}", func),
+            Comparable::SingularQuery(query) => write!(f, "{}", query),
+        }
+    }
+}
+
+/// Enum representing different types of singular queries in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SingularQuery {
+    /// Represents a current node query.
+    Current(Vec<SingularQuerySegment>),
+    /// Represents a root node query.
+    Root(Vec<SingularQuerySegment>),
+}
+
+impl Display for SingularQuery {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SingularQuery::Current(segments) => write!(
+                f,
+                "@.{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
+            SingularQuery::Root(segments) => write!(
+                f,
+                "$.{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
+        }
+    }
+}
+
+/// Enum representing different types of singular query segments in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SingularQuerySegment {
+    /// Represents an index segment.
+    Index(i64),
+    /// Represents a name segment.
+    Name(String),
+}
+
+impl Display for SingularQuerySegment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SingularQuerySegment::Index(index) => write!(f, "{}", index),
+            SingularQuerySegment::Name(name) => write!(f, "{}", name),
+        }
+    }
+}
+
+/// Enum representing different types of tests in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Test {
+    /// Represents a relative query.
+    RelQuery(Vec<Segment>),
+    /// Represents an absolute query.
+    AbsQuery(JpQuery),
+    /// Represents a function test.
+    Function(Box<TestFunction>),
+}
+
+impl Test {
+    pub fn is_res_bool(&self) -> bool {
+        match self {
+            Test::RelQuery(_) => false,
+            Test::AbsQuery(_) => false,
+            Test::Function(func) => match **func {
+                TestFunction::Length(_) => false,
+                TestFunction::Value(_) => false,
+                TestFunction::Count(_) => false,
+                TestFunction::Custom(_, _) => true,
+                TestFunction::Search(_, _) => true,
+                TestFunction::Match(_, _) => true,
+            },
+        }
+    }
+}
+
+impl Display for Test {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Test::RelQuery(segments) => write!(
+                f,
+                "{}",
+                segments.iter().map(|s| s.to_string()).collect::<String>()
+            ),
+            Test::AbsQuery(query) => write!(f, "{}", query),
+            Test::Function(func) => write!(f, "{}", func),
+        }
+    }
+}
+
+/// Enum representing different types of test functions in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TestFunction {
+    /// Represents a custom function.
+    Custom(String, Vec<FnArg>),
+    /// Represents a length function.
+    Length(Box<FnArg>),
+    /// Represents a value function.
+    Value(FnArg),
+    /// Represents a count function.
+    Count(FnArg),
+    /// Represents a search function.
+    Search(FnArg, FnArg),
+    /// Represents a match function.
+    Match(FnArg, FnArg),
+}
+
+impl TestFunction {
+    pub fn try_new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
+        fn with_node_type_validation<'a>(a: &'a FnArg,name: &str ) -> Result<&'a FnArg, JsonPathError> {
+            if a.is_lit() {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid argument for the function `{}`: expected a node, got a literal",
+                    name
+                )))
+            } else if a.is_filter() {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid argument for the function `{}`: expected a node, got a filter",
+                    name
+                )))
+            } else {
+                Ok(a)
+            }
+        }
+
+
+        match (name, args.as_slice()) {
+            ("length", [a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
+            ("value", [a]) => Ok(TestFunction::Value(a.clone())),
+            ("count", [a]) => Ok(TestFunction::Count(with_node_type_validation(a,name)?.clone())),
+            ("search", [a, b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
+            ("match", [a, b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
+            ("length" | "value" | "count" | "match" | "search", args) => {
+                Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid number of arguments for the function `{}`: got {}",
+                    name,
+                    args.len()
+                )))
+            }
+            (custom, _) => Ok(TestFunction::Custom(custom.to_string(), args)),
+        }
+    }
+
+    pub fn is_comparable(&self) -> bool {
+        match self {
+            TestFunction::Length(_) => true,
+            TestFunction::Value(_) => true,
+            TestFunction::Count(_) => true,
+            TestFunction::Custom(_, _) => false,
+            TestFunction::Search(_, _) => false,
+            TestFunction::Match(_, _) => false,
+        }
+    }
+}
+
+impl Display for TestFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TestFunction::Custom(name, args) => write!(
+                f,
+                "{}({})",
+                name,
+                args.iter().map(|a| a.to_string()).collect::<String>()
+            ),
+            TestFunction::Length(arg) => write!(f, "length({})", arg),
+            TestFunction::Value(arg) => write!(f, "value({})", arg),
+            TestFunction::Count(arg) => write!(f, "count({})", arg),
+            TestFunction::Search(arg1, arg2) => write!(f, "search({}, {})", arg1, arg2),
+            TestFunction::Match(arg1, arg2) => write!(f, "match({}, {})", arg1, arg2),
+        }
+    }
+}
+
+/// Enum representing different types of function arguments in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FnArg {
+    /// Represents a literal argument.
+    Literal(Literal),
+    /// Represents a test argument.
+    Test(Box<Test>),
+    /// Represents a filter argument.
+    Filter(Filter),
+}
+
+impl FnArg {
+    pub fn is_lit(&self) -> bool {
+        matches!(self, FnArg::Literal(_))
+    }
+    pub fn is_filter(&self) -> bool {
+        matches!(self, FnArg::Filter(_))
+    }
+}
+
+impl Display for FnArg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FnArg::Literal(literal) => write!(f, "{}", literal),
+            FnArg::Test(test) => write!(f, "{}", test),
+            FnArg::Filter(filter) => write!(f, "{}", filter),
+        }
+    }
+}
+
+/// Enum representing different types of literal values in a JSONPath query.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    /// Represents an integer literal.
+    Int(i64),
+    /// Represents a floating-point literal.
+    Float(f64),
+    /// Represents a string literal.
+    String(String),
+    /// Represents a boolean literal.
+    Bool(bool),
+    /// Represents a null literal.
+    Null,
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Int(val) => write!(f, "{}", val),
+            Literal::Float(val) => write!(f, "{}", val),
+            Literal::String(val) => write!(f, "\"{}\"", val),
+            Literal::Bool(val) => write!(f, "{}", val),
+            Literal::Null => write!(f, "null"),
         }
     }
 }
