@@ -56,7 +56,7 @@ mod tests {
             result.ok_ref(),
             Some(vec![Pointer::new(
                 &json!("Blaise"),
-                "$.['result'][0].['name'].['first']".to_string()
+                "$['result'][0]['name']['first']".to_string()
             )])
         );
     }

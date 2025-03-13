@@ -221,7 +221,7 @@ mod tests {
 
         assert_eq!(
             step.ok_ref(),
-            Some(vec![Pointer::new(&json!("value"), "$.['key']".to_string())])
+            Some(vec![Pointer::new(&json!("value"), "$['key']".to_string())])
         );
     }
 
@@ -320,8 +320,8 @@ mod tests {
         assert_eq!(
             step.ok_ref(),
             Some(vec![
-                Pointer::new(&json!("value"), "$.['key']".to_string()),
-                Pointer::new(&json!("value2"), "$.['key2']".to_string())
+                Pointer::new(&json!("value"), "$['key']".to_string()),
+                Pointer::new(&json!("value2"), "$['key2']".to_string())
             ])
         );
     }
@@ -373,8 +373,8 @@ mod tests {
         assert_eq!(
             vec,
             vec![
-                (&json!("ab"), "$.[''a'']".to_string()).into(),
-                (&json!("bc"), "$.[''b'']".to_string()).into(),
+                (&json!("ab"), "$[''a'']".to_string()).into(),
+                (&json!("bc"), "$[''b'']".to_string()).into(),
             ]
         );
 

@@ -70,8 +70,8 @@ mod tests {
         assert_eq!(
             step.ok_ref(),
             Some(vec![
-                Pointer::new(&json!("John"), "$.['firstName']".to_string()),
-                Pointer::new(&json!("doe"), "$.['lastName']".to_string())
+                Pointer::new(&json!("John"), "$['firstName']".to_string()),
+                Pointer::new(&json!("doe"), "$['lastName']".to_string())
             ])
         );
     }
@@ -101,8 +101,8 @@ mod tests {
         assert_eq!(
             step.ok_ref(),
             Some(vec![
-                Pointer::new(&json!(1), "$.['o'][1]".to_string()),
-                Pointer::new(&json!(3), "$.['o'][2][1]".to_string()),
+                Pointer::new(&json!(1), "$['o'][1]".to_string()),
+                Pointer::new(&json!(3), "$['o'][2][1]".to_string()),
             ])
         );
     }

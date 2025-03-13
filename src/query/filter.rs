@@ -70,8 +70,8 @@ mod tests {
         assert_eq!(
             js_path("$.a[? @ > 1]", &json),
             Ok(vec![
-                QueryRes::Ref(&json!(2), "$.['a'][1]".to_string()),
-                QueryRes::Ref(&json!(3), "$.['a'][2]".to_string()),
+                QueryRes::Ref(&json!(2), "$['a'][1]".to_string()),
+                QueryRes::Ref(&json!(3), "$['a'][2]".to_string()),
             ])
         );
     }
@@ -92,8 +92,8 @@ mod tests {
         assert_eq!(
             js_path("$.a[?@.b]", &json),
             Ok(vec![
-                (&json!({"b":1}), "$.['a'].['a']".to_string()).into(),
-                (&json!({"b":2}), "$.['a'].['c']".to_string()).into(),
+                (&json!({"b":1}), "$['a']['a']".to_string()).into(),
+                (&json!({"b":2}), "$['a']['c']".to_string()).into(),
             ])
         );
     }
@@ -117,9 +117,9 @@ mod tests {
         assert_eq!(
             js_path("$.a[?@.b || @.b1]", &json),
             Ok(vec![
-                (&json!({"b":1}), "$.['a'].['a']".to_string()).into(),
-                (&json!({"b":2}), "$.['a'].['c']".to_string()).into(),
-                (&json!({"b1":3}), "$.['a'].['d']".to_string()).into(),
+                (&json!({"b":1}), "$['a']['a']".to_string()).into(),
+                (&json!({"b":2}), "$['a']['c']".to_string()).into(),
+                (&json!({"b1":3}), "$['a']['d']".to_string()).into(),
             ])
         );
     }

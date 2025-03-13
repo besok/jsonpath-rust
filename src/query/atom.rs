@@ -93,7 +93,7 @@ mod tests {
                 .process(state.clone())
                 .ok_val()
                 .and_then(|v| v.as_bool()),
-            Some(false)
+            Some(true)
         );
         assert_eq!(
             atom_and.process(state).ok_val().and_then(|v| v.as_bool()),

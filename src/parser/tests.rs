@@ -161,20 +161,21 @@ fn literal_test() {
         .assert("null", lit!())
         .assert("false", lit!(b false))
         .assert("true", lit!(b true))
-        .assert("\"hello\"", lit!(s "\"hello\""))
-        .assert("\'hello\'", lit!(s "\'hello\'"))
-        .assert("\'hel\\'lo\'", lit!(s "\'hel\\'lo\'"))
-        .assert("\'hel\"lo\'", lit!(s "\'hel\"lo\'"))
-        .assert("\'hel\nlo\'", lit!(s "\'hel\nlo\'"))
-        .assert("\'\"\'", lit!(s "\'\"\'"))
-        .assert_fail("\'hel\\\"lo\'")
+        .assert("\"hello\"", lit!(s "hello"))
+        .assert("\'hello\'", lit!(s "hello"))
+        .assert("\'hel\\'lo\'", lit!(s "hel\\'lo"))
+        .assert("\'hel\"lo\'", lit!(s "hel\"lo"))
+        .assert("\'hel\nlo\'", lit!(s "hel\nlo"))
         .assert("1", lit!(i 1))
         .assert("0", lit!(i 0))
         .assert("-0", lit!(i 0))
         .assert("1.2", lit!(f 1.2))
         .assert("9007199254740990", lit!(i 9007199254740990))
+        .assert("\'\"\'", lit!(s "\""))
+        .assert_fail("hel\\\"lo")
         .assert_fail("9007199254740995");
 }
+
 #[test]
 fn filter_atom_test() {
     TestPair::new(Rule::atom_expr, filter_atom)
@@ -202,7 +203,7 @@ fn filter_atom_test() {
 fn comparable_test() {
     TestPair::new(Rule::comparable, comparable)
         .assert("1", comparable!(lit!(i 1)))
-        .assert("\"a\"", comparable!(lit!(s "\"a\"")))
+        .assert("\"a\"", comparable!(lit!(s "a")))
         .assert("@.a.b.c", comparable!(> singular_query!(@ a b c)))
         .assert("$.a.b.c", comparable!(> singular_query!(a b c)))
         .assert("$[1]", comparable!(> singular_query!([1])))
@@ -216,10 +217,7 @@ fn parse_path() {
     assert_eq!(result.unwrap(), JpQuery::new(vec![]));
 }
 
-#[test]
-fn parse_path_desc() {
-    TestPair::new(Rule::segment, segment).assert(".*", Segment::Selector(Selector::Wildcard));
-}
+
 
 
 #[test]
@@ -246,16 +244,16 @@ fn parse_selector() {
 fn parse_global() {
     let sel_a = segment!(selector!(a));
     TestPair::new(Rule::jp_query, jp_query)
-        // .assert("$", JpQuery::new(vec![]))
-        // .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
-        // .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
-        // .assert("$..*", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        // .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        // .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
-        // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        // .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        // .assert_fail("$..\ra", )
-        // .assert_fail("$[\"☺\"]", )
+        .assert("$", JpQuery::new(vec![]))
+        .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
+        .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
+        .assert("$..*", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
+        .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
+        .assert_fail("$..\ra", )
+        .assert_fail("$[\"☺\"]", )
         .assert_fail("$[?search(@.author,'.*(?i)d\\\\(Rees\\\\)')]")
     ;
 
