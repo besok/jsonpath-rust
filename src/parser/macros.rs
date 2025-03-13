@@ -1,5 +1,6 @@
 use crate::parser::model::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, SingularQuery, Test};
 
+
 #[macro_export]
 macro_rules! lit {
     () => {

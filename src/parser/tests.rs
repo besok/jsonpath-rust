@@ -255,7 +255,8 @@ fn parse_global() {
         // .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
         // .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
         // .assert_fail("$..\ra", )
-        .assert_fail("$[\"☺\"]", )
+        // .assert_fail("$[\"☺\"]", )
+        .assert_fail("$[?search(@.author,'.*(?i)d\\\\(Rees\\\\)')]")
     ;
 
 }

@@ -6,6 +6,50 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
+/// A trait that abstracts JSON-like data structures for JSONPath queries
+///
+/// This trait provides the essential operations needed to traverse and query
+/// hierarchical data structures in a JSONPath-compatible way. Implementors of
+/// this trait can be used with the JSONPath query engine.
+///
+/// The trait requires several standard type conversions to be implemented to
+/// ensure that query operations can properly handle various data types.
+///
+/// # Type Requirements
+///
+/// Implementing types must satisfy these trait bounds:
+/// - `Default`: Provides a default value for the type
+/// - `Clone`: Allows creation of copies of values
+/// - `Debug`: Enables debug formatting
+/// - `From<&str>`: Conversion from string slices
+/// - `From<bool>`: Conversion from boolean values
+/// - `From<i64>`: Conversion from 64-bit integers
+/// - `From<f64>`: Conversion from 64-bit floating point values
+/// - `From<Vec<Self>>`: Conversion from vectors of the same type
+/// - `From<String>`: Conversion from owned strings
+/// - `PartialEq`: Allows equality comparisons
+///
+/// # Examples
+///
+/// The trait is primarily implemented for `serde_json::Value` to enable
+/// JSONPath queries on JSON data structures:
+///
+/// ```
+/// use serde_json::json;
+/// use jsonpath_rust::JsonPath;
+///
+/// let data = json!({
+///     "store": {
+///         "books": [
+///             {"title": "Book 1", "price": 10},
+///             {"title": "Book 2", "price": 15}
+///         ]
+///     }
+/// });
+///
+/// // Access data using the Queryable trait
+/// let books = data.query("$.store.books[*].title").expect("no errors");
+/// ```
 pub trait Queryable
 where
     Self: Default
@@ -46,7 +90,7 @@ where
     ///
     /// # Arguments
     /// * `path` -  A json path to the element specified as a string (root, field, index only).
-    fn reference<T>(&self, path: T) -> Option<&Self>
+    fn reference<T>(&self, _path: T) -> Option<&Self>
     where
         T: Into<QueryPath>,
     {
@@ -61,9 +105,34 @@ where
     /// # Examples
     ///
     /// ```
+    /// use serde_json::json;
+    /// use jsonpath_rust::JsonPath;
+    /// use jsonpath_rust::query::queryable::Queryable;
+    /// let mut json = json!({
+    ///             "a": {
+    ///                 "b": {
+    ///                     "c": 42
+    ///                 }
+    ///             }
+    ///         });
+    ///         if let Some(Some(path)) = json.query_only_path("$.a.b.c")?.first() {
+    ///             if let Some(v) = json.reference_mut("$.a.b.c") {
+    ///                 *v = json!(43);
+    ///             }
     ///
-    /// ```
-    fn reference_mut<T>(&mut self, path: T) -> Option<&mut Self>
+    ///             assert_eq!(
+    ///                 json,
+    ///                 json!({
+    ///                     "a": {
+    ///                         "b": {
+    ///                             "c": 43
+    ///                         }
+    ///                     }
+    ///                 })
+    ///             );
+    /// }
+    //// ```
+    fn reference_mut<T>(&mut self, _path: T) -> Option<&mut Self>
     where
         T: Into<QueryPath>,
     {
@@ -242,7 +311,7 @@ mod tests {
     use serde_json::json;
     use std::borrow::Cow;
     use crate::JsonPath;
-    use crate::parser::Parsed;
+    use crate::parser::{parse_json_path, Parsed};
     use crate::query::queryable::{convert_js_path, Queryable};
 
     #[test]
@@ -362,20 +431,27 @@ mod tests {
             }
         });
 
-        if let Some(v) = json.reference_mut("$.a.b.c") {
-            *v = json!(43);
-        }
+        if let Some(Some(path)) = json.query_only_path("$.a.b.c")?.first(){
+            println!("{}", path);
+            println!("{:?}", parse_json_path("$['a']['b']['c']"));
+            if let Some(v) = json.reference_mut("$.['a'].['b'].['c']") {
+                *v = json!(43);
+            }
 
-        assert_eq!(
-            json,
-            json!({
+            assert_eq!(
+                json,
+                json!({
                 "a": {
                     "b": {
                         "c": 43
                     }
                 }
             })
-        );
+            );
+
+        } else {
+            panic!("no path found");
+        }
 
         Ok(())
     }

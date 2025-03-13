@@ -2,6 +2,8 @@ use crate::query::queryable::Queryable;
 use crate::query::QueryPath;
 use std::fmt::{Display, Formatter};
 
+/// Represents the state of a query, including the current data and the root object.
+/// It is used to track the progress of a query as it traverses through the data structure.
 #[derive(Debug, Clone, PartialEq)]
 pub struct State<'a, T: Queryable> {
     pub data: Data<'a, T>,
@@ -86,6 +88,8 @@ impl<'a, T: Queryable> State<'a, T> {
     }
 }
 
+/// Represents the data that is being processed in the query.
+/// It can be a reference to a single object, a collection of references,
 #[derive(Debug, Clone, PartialEq)]
 pub enum Data<'a, T: Queryable> {
     Ref(Pointer<'a, T>),
@@ -157,6 +161,9 @@ impl<'a, T: Queryable> Data<'a, T> {
         }
     }
 
+    /// Returns the inner value if it is a single reference.
+    /// If it is a collection of references, it returns the first one.
+    /// If it is a value, it returns None.
     pub fn ok_ref(self) -> Option<Vec<Pointer<'a, T>>> {
         match self {
             Data::Ref(data) => Some(vec![data]),
@@ -164,6 +171,9 @@ impl<'a, T: Queryable> Data<'a, T> {
             _ => None,
         }
     }
+
+    /// Returns the inner value if it is a single value.
+    /// If it is a reference or a collection of references, it returns None.
     pub fn ok_val(self) -> Option<T> {
         match self {
             Data::Value(v) => Some(v),
@@ -180,6 +190,8 @@ impl<'a, T: Queryable> Data<'a, T> {
     }
 }
 
+/// Represents a pointer to a specific location in the data structure.
+/// It contains a reference to the data and a path that indicates the location of the data in the structure.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pointer<'a, T: Queryable> {
     pub inner: &'a T,

@@ -6,7 +6,7 @@ mod jp_query;
 pub mod queryable;
 mod segment;
 mod selector;
-mod state;
+pub mod state;
 mod test;
 mod test_function;
 
@@ -99,8 +99,8 @@ pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<Option<S
 mod tests {
     use crate::query::queryable::Queryable;
     use crate::query::Queried;
-    use serde_json::json;
     use crate::JsonPath;
+    use serde_json::json;
 
     fn update_by_path_test() -> Queried<()> {
         let mut json = json!([
@@ -931,6 +931,4 @@ mod tests {
     //         Ok(())
     //     }
     // }
-
-
 }

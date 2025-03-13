@@ -4,6 +4,7 @@ use pest::iterators::Pair;
 use thiserror::Error;
 use crate::parser::Rule;
 
+/// This error type is used to represent errors that can occur during the parsing of JSONPath expressions.
 #[derive(Error, Debug, PartialEq)]
 pub enum JsonPathError {
     #[error("Failed to parse rule: {0}")]

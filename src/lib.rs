@@ -79,11 +79,6 @@
 //! - `[<start>:<end>:<step>]`slice operator to get a list of element operating with their indexes. By default step = 1, start = 0, end = array len. The elements can be omitted ```[:]```
 //! - `[?(<expression>)]`the logical expression to filter elements in the list.It is used with arrays preliminary.
 //!
-//! # Examples
-//!```rust
-
-//! ```
-//!
 //!
 //! [`there`]: https://goessner.net/articles/JsonPath/
 #![allow(warnings)]
