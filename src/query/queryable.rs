@@ -289,7 +289,7 @@ fn convert_js_path(path: &str) -> Parsed<String> {
     for segment in segments {
         match segment {
             Segment::Selector(Selector::Name(name)) => {
-                path.push_str(&format!("/{}", name));
+                path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
             }
             Segment::Selector(Selector::Index(index)) => {
                 path.push_str(&format!("/{}", index));
@@ -432,9 +432,7 @@ mod tests {
         });
 
         if let Some(Some(path)) = json.query_only_path("$.a.b.c")?.first(){
-            println!("{}", path);
-            println!("{:?}", parse_json_path("$['a']['b']['c']"));
-            if let Some(v) = json.reference_mut("$.['a'].['b'].['c']") {
+            if let Some(v) = json.reference_mut(path) {
                 *v = json!(43);
             }
 

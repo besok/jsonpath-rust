@@ -212,7 +212,7 @@ impl<'a, T: Queryable> Pointer<'a, T> {
     pub fn key(inner: &'a T, path: QueryPath, key: &str) -> Self {
         Pointer {
             inner,
-            path: format!("{}.['{}']", path, key),
+            path: format!("{}['{}']", path, key),
         }
     }
     pub fn idx(inner: &'a T, path: QueryPath, index: usize) -> Self {
