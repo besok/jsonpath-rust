@@ -1,8 +1,9 @@
+use crate::parser::Rule;
+use crate::query::queryable::Queryable;
+use pest::iterators::Pair;
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::ParseBoolError;
-use pest::iterators::Pair;
 use thiserror::Error;
-use crate::parser::Rule;
 
 /// This error type is used to represent errors that can occur during the parsing of JSONPath expressions.
 #[derive(Error, Debug, PartialEq)]
@@ -32,8 +33,14 @@ pub enum JsonPathError {
 }
 
 impl JsonPathError {
-    pub fn empty(v:&str) -> Self {
+    pub fn empty(v: &str) -> Self {
         JsonPathError::EmptyInner(v.to_string())
+    }
+}
+
+impl<T: Queryable> From<T> for JsonPathError {
+    fn from(val: T) -> Self {
+        JsonPathError::InvalidJsonPath(format!("Result '{:?}' is not a reference", val))
     }
 }
 
@@ -59,18 +66,14 @@ impl From<(ParseFloatError, &str)> for JsonPathError {
     fn from((err, val): (ParseFloatError, &str)) -> Self {
         JsonPathError::InvalidNumber(format!("{:?} for `{}`", err, val))
     }
-}impl From<ParseBoolError> for JsonPathError {
-    fn from(err : ParseBoolError) -> Self {
+}
+impl From<ParseBoolError> for JsonPathError {
+    fn from(err: ParseBoolError) -> Self {
         JsonPathError::InvalidJsonPath(format!("{:?} ", err))
     }
 }
 impl From<Pair<'_, Rule>> for JsonPathError {
     fn from(rule: Pair<Rule>) -> Self {
-        JsonPathError::UnexpectedRuleLogicError(
-            rule.as_rule(),
-            rule.as_str().to_string(),
-
-        )
+        JsonPathError::UnexpectedRuleLogicError(rule.as_rule(), rule.as_str().to_string())
     }
 }
-

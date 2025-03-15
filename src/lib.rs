@@ -93,25 +93,25 @@ extern crate pest_derive;
 extern crate core;
 extern crate pest;
 
+use crate::query::queryable::Queryable;
+use crate::query::{Queried, QueryPath, QueryRef};
 use serde_json::Value;
 use std::borrow::Cow;
-use crate::query::{Queried, QueryRes};
-use crate::query::queryable::Queryable;
 
 /// A trait for types that can be queried with JSONPath.
 pub trait JsonPath: Queryable {
     /// Queries the value with a JSONPath expression and returns a vector of `QueryResult`.
-    fn query_with_path(&self, path: &str) -> Queried<Vec<QueryRes<Self>>> {
+    fn query_with_path(&self, path: &str) -> Queried<Vec<QueryRef<Self>>> {
         query::js_path(path, self)
     }
 
     /// Queries the value with a JSONPath expression and returns a vector of values.
-    fn query_only_path(&self, path: &str) -> Queried<Vec<Option<String>>> {
+    fn query_only_path(&self, path: &str) -> Queried<Vec<QueryPath>> {
         query::js_path_path(path, self)
     }
 
     /// Queries the value with a JSONPath expression and returns a vector of values, omitting the path.
-    fn query(&self, path: &str) -> Queried<Vec<Cow<Self>>> {
+    fn query(&self, path: &str) -> Queried<Vec<&Self>> {
         query::js_path_vals(path, self)
     }
 }

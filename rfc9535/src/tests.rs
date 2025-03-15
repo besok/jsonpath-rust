@@ -1,4 +1,4 @@
-use jsonpath_rust::query::{js_path, Queried, QueryRes};
+use jsonpath_rust::query::{js_path, Queried};
 use jsonpath_rust::{JsonPath,  };
 use serde_json::{json, Value};
 use std::borrow::Cow;
@@ -176,7 +176,7 @@ fn exp_no_error() -> Queried<()> {
       }
     ]);
 
-    let vec: Vec<Cow<Value>> = json.query("$[?@.a==1E2]")?;
+    let vec: Vec<&Value> = json.query("$[?@.a==1E2]")?;
     assert_eq!(
         vec.iter().map(Cow::as_ref).collect::<Vec<_>>(),
         vec![&json!({"a":100, "d":"e"})]

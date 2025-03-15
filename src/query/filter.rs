@@ -60,7 +60,7 @@ impl Filter {
 
 #[cfg(test)]
 mod tests {
-    use crate::query::{js_path, QueryRes};
+    use crate::query::{js_path};
     use serde_json::json;
 
     #[test]
@@ -70,8 +70,8 @@ mod tests {
         assert_eq!(
             js_path("$.a[? @ > 1]", &json),
             Ok(vec![
-                QueryRes::Ref(&json!(2), "$['a'][1]".to_string()),
-                QueryRes::Ref(&json!(3), "$['a'][2]".to_string()),
+                (&json!(2), "$['a'][1]".to_string()).into(),
+                (&json!(3), "$['a'][2]".to_string()).into(),
             ])
         );
     }

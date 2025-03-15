@@ -31,56 +31,42 @@ pub trait Query {
 /// The resulting type of JSONPath query.
 /// It can either be a value or a reference to a value with its path.
 #[derive(Debug, Clone, PartialEq)]
-pub enum QueryRes<'a, T: Queryable> {
-    Val(T),
-    Ref(&'a T, QueryPath),
-}
+pub struct QueryRef<'a, T: Queryable>(&'a T, QueryPath);
 
-impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryRes<'a, T> {
+impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryRef<'a, T> {
     fn from((inner, path): (&'a T, QueryPath)) -> Self {
-        QueryRes::Ref(inner, path)
+        QueryRef(inner, path)
     }
 }
 
-impl<'a, T: Queryable> QueryRes<'a, T> {
-    pub fn val(self) -> Cow<'a, T> {
-        match self {
-            QueryRes::Val(v) => Cow::Owned(v),
-            QueryRes::Ref(v, _) => Cow::Borrowed(v),
-        }
+impl<'a, T: Queryable> QueryRef<'a, T> {
+    pub fn val(self) -> &'a T {
+        self.0
     }
-    pub fn path(self) -> Option<QueryPath> {
-        match self {
-            QueryRes::Val(_) => None,
-            QueryRes::Ref(_, path) => Some(path),
-        }
+    pub fn path(self) -> QueryPath {
+        self.1
     }
 }
 
-impl<T: Queryable> From<T> for QueryRes<'_, T> {
-    fn from(value: T) -> Self {
-        QueryRes::Val(value)
-    }
-}
-impl<'a, T: Queryable> From<Pointer<'a, T>> for QueryRes<'a, T> {
+impl<'a, T: Queryable> From<Pointer<'a, T>> for QueryRef<'a, T> {
     fn from(pointer: Pointer<'a, T>) -> Self {
-        QueryRes::Ref(pointer.inner, pointer.path)
+        QueryRef(pointer.inner, pointer.path)
     }
 }
 
 /// The main function to process a JSONPath query.
 /// It takes a path and a value, and returns a vector of `QueryResult` thus values + paths.
-pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryRes<'a, T>>> {
+pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryRef<'a, T>>> {
     match parse_json_path(path)?.process(State::root(value)).data {
         Data::Ref(p) => Ok(vec![p.into()]),
         Data::Refs(refs) => Ok(refs.into_iter().map(Into::into).collect()),
-        Data::Value(v) => Ok(vec![v.into()]),
+        Data::Value(v) => Err(v.into()),
         Data::Nothing => Ok(vec![]),
     }
 }
 
 /// A convenience function to process a JSONPath query and return a vector of values, omitting the path.
-pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<Cow<'a, T>>> {
+pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<&'a T>> {
     Ok(js_path(path, value)?
         .into_iter()
         .map(|r| r.val())
@@ -88,7 +74,7 @@ pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<C
 }
 
 /// A convenience function to process a JSONPath query and return a vector of paths, omitting the values.
-pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<Option<String>>> {
+pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<QueryPath>> {
     Ok(js_path(path, value)?
         .into_iter()
         .map(|r| r.path())
@@ -110,7 +96,7 @@ mod tests {
         ]);
 
         let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
-        let elem = path.first().cloned().flatten().unwrap_or_default();
+        let elem = path.first().cloned().unwrap_or_default();
 
         if let Some(v) = json
             .reference_mut(elem)

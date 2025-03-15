@@ -307,12 +307,12 @@ fn convert_js_path(path: &str) -> Parsed<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::query::Queried;
-    use serde_json::json;
-    use std::borrow::Cow;
-    use crate::JsonPath;
     use crate::parser::{parse_json_path, Parsed};
     use crate::query::queryable::{convert_js_path, Queryable};
+    use crate::query::Queried;
+    use crate::JsonPath;
+    use serde_json::json;
+    use std::borrow::Cow;
 
     #[test]
     fn in_smoke() -> Queried<()> {
@@ -323,7 +323,7 @@ mod tests {
 
         let res = json.query("$.elems[?in(@, $.list)]")?;
 
-        assert_eq!(res, [Cow::Borrowed(&json!("test"))]);
+        assert_eq!(res, [&json!("test")]);
 
         Ok(())
     }
@@ -336,10 +336,7 @@ mod tests {
 
         let res = json.query("$.elems[?nin(@, $.list)]")?;
 
-        assert_eq!(
-            res,
-            [Cow::Borrowed(&json!("t1")), Cow::Borrowed(&json!("t2"))]
-        );
+        assert_eq!(res, [&json!("t1"), &json!("t2")]);
 
         Ok(())
     }
@@ -352,7 +349,7 @@ mod tests {
 
         let res = json.query("$.elems[?none_of(@, $.list)]")?;
 
-        assert_eq!(res, [Cow::Borrowed(&json!(["t4"]))]);
+        assert_eq!(res, [&json!(["t4"])]);
 
         Ok(())
     }
@@ -365,7 +362,7 @@ mod tests {
 
         let res = json.query("$.elems[?any_of(@, $.list)]")?;
 
-        assert_eq!(res, [Cow::Borrowed(&json!(["t1", "_"]))]);
+        assert_eq!(res, [&json!(["t1", "_"])]);
 
         Ok(())
     }
@@ -378,11 +375,10 @@ mod tests {
 
         let res = json.query("$.elems[?subset_of(@, $.list)]")?;
 
-        assert_eq!(res, [Cow::Borrowed(&json!(["t1", "t2"]))]);
+        assert_eq!(res, [&json!(["t1", "t2"])]);
 
         Ok(())
     }
-
 
     #[test]
     fn convert_paths() -> Parsed<()> {
@@ -422,7 +418,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn test_js_reference() ->Parsed<()> {
+    fn test_js_reference() -> Parsed<()> {
         let mut json = json!({
             "a": {
                 "b": {
@@ -431,7 +427,7 @@ mod tests {
             }
         });
 
-        if let Some(Some(path)) = json.query_only_path("$.a.b.c")?.first(){
+        if let Some(path) = json.query_only_path("$.a.b.c")?.first() {
             if let Some(v) = json.reference_mut(path) {
                 *v = json!(43);
             }
@@ -439,14 +435,13 @@ mod tests {
             assert_eq!(
                 json,
                 json!({
-                "a": {
-                    "b": {
-                        "c": 43
+                    "a": {
+                        "b": {
+                            "c": 43
+                        }
                     }
-                }
-            })
+                })
             );
-
         } else {
             panic!("no path found");
         }

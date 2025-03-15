@@ -10,15 +10,20 @@ The specification is described in [RFC 9535](https://www.rfc-editor.org/rfc/rfc9
 
 # Important note
 
-The version 1.0.0 has a breaking change. The library has been rewritten from scratch to provide compliance with the RFC
-9535.
+The version 1.0.0 has a breaking change. The library has been rewritten from scratch to provide compliance with the RFC9535.
+
 The changes are:
 
 - The library is now fully compliant with the RFC 9535.
-- The api and structures have been changed completely.
+- New structures and apis were introduced to provide the compliance with the RFC 9535.
+  - `Queryable` instead of `JsonLike`
+  - `Queried<Queryable>` instead of  `Result<Value, JsonPathParserError>`
+  - `JsonPath#{query_with_path, query_only_path, query}` to operate with the `Queryable` structure
+  - `JsonPathError` instead of `JsonPathParserError`
+  - `QueryRef` to provide the reference to the value and path
 - The functions in, nin, noneOf, anyOf, subsetOf are now implemented as custom filter expressions and renamed to `in`,
   `nin`, `none_of`, `any_of`, `subset_of` respectively.
-- The function length was removed (the size can be checked using rust native functions).
+- The function length was removed (the size can be checked using rust native functions for using it in filter there is length expression).
 
 ## The compliance with RFC 9535
 
@@ -126,7 +131,7 @@ fn union() -> Queried<()> {
     let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     // QueryRes is a tuple of (value, path) for references and just value for owned values
-    let vec: Vec<QueryRes<Value>> = json.query_with_path("$[1,5:7]")?;
+    let vec: Vec<QueryRef<Value>> = json.query_with_path("$[1,5:7]")?;
     assert_eq!(
         vec,
         vec![
@@ -160,9 +165,9 @@ fn exp_no_error() -> Queried<()> {
       }
     ]);
 
-    let vec: Vec<Cow<Value>> = json.query("$[?@.a==1E2]")?;
+    let vec: Vec<&Value> = json.query("$[?@.a==1E2]")?;
     assert_eq!(
-        vec.iter().map(Cow::as_ref).collect::<Vec<_>>(),
+        vec.iter().collect::<Vec<_>>(),
         vec![&json!({"a":100, "d":"e"})]
     );
 
@@ -186,7 +191,7 @@ fn filter_data() -> Queried<()> {
         .map(Option::unwrap_or_default)
         .collect();
 
-    assert_eq!(vec, vec!["$.['a']".to_string(), "$.['b']".to_string()]);
+    assert_eq!(vec, vec!["$['a']".to_string(), "$['b']".to_string()]);
 
     Ok(())
 }
@@ -220,7 +225,7 @@ The path is supported with the limited elements namely only the elements with th
         ]);
 
     let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
-    let elem = path.first().cloned().flatten().unwrap_or_default();
+    let elem = path.first().unwrap_or_default();
 
     if let Some(v) = json
         .reference_mut(elem)
