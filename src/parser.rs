@@ -312,16 +312,25 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
             }
         }
     }
+
+    fn parse_string(string: &str) -> Parsed<Literal> {
+        let string = string.trim();
+        if string.starts_with('\'') && string.ends_with('\'') {
+            Ok(Literal::String(string[1..string.len() - 1].to_string()))
+        } else if string.starts_with('"') && string.ends_with('"') {
+            Ok(Literal::String(string[1..string.len() - 1].to_string()))
+        } else {
+            Err(JsonPathError::InvalidJsonPath(format!(
+                "Invalid string literal `{}`",
+                string
+            )))
+        }
+    }
+
     let first = next_down(rule)?;
 
     match first.as_rule() {
-        Rule::string => Ok(Literal::String(
-            first
-                .as_str()
-                .trim_matches(|c| c == '\'' || c == '"')
-                .trim()
-                .to_owned(),
-        )),
+        Rule::string => parse_string(first.as_str()),
         Rule::number => parse_number(first.as_str()),
         Rule::bool => Ok(Literal::Bool(first.as_str().parse::<bool>()?)),
         Rule::null => Ok(Literal::Null),

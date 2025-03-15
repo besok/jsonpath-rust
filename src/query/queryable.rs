@@ -115,7 +115,7 @@ where
     ///                 }
     ///             }
     ///         });
-    ///         if let Some(Some(path)) = json.query_only_path("$.a.b.c")?.first() {
+    ///         if let Some(Some(path)) = json.query_only_path("$.a.b.c").unwrap().first() {
     ///             if let Some(v) = json.reference_mut("$.a.b.c") {
     ///                 *v = json!(43);
     ///             }

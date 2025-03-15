@@ -1,4 +1,4 @@
-use crate::parser::model::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, SingularQuery, Test};
+use crate::parser::model::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, Selector, SingularQuery, Test};
 
 
 #[macro_export]
@@ -190,6 +190,9 @@ macro_rules! selector {
     };
     (?$filter:expr) => {
         Selector::Filter($filter)
+    };
+    (slice $slice:expr) => {
+        slice_from($slice)
     };
     ($name:ident) => {
         Selector::Name(stringify!($name).to_string())

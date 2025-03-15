@@ -81,13 +81,11 @@ mod tests {
     use crate::parser::model::{
         Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
     };
-    use crate::q_segments;
     use crate::query::state::{Data, Pointer, State};
     use crate::query::Query;
     use crate::singular_query;
-    use crate::{cmp, comparable, lit, q_segment};
+    use crate::{cmp, comparable,q_segments, lit, q_segment};
     use serde_json::json;
-
     #[test]
     fn eq_comp_val() {
         let data = json!({"key": "value"});

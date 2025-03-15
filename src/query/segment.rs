@@ -87,7 +87,8 @@ mod tests {
             Some(vec![
                 Pointer::new(&json!({"name": "John"}), "$[0]".to_string()),
                 Pointer::new(&json!({"name": "doe"}), "$[1]".to_string()),
-                Pointer::new(&json!([{"name": "John"}, {"name": "doe"}]), "$".to_string()),
+                Pointer::new(&json!("John"), "$[0]['name']".to_string()),
+                Pointer::new(&json!("doe"), "$[1]['name']".to_string()),
             ])
         );
     }

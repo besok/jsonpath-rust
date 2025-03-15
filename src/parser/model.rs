@@ -71,6 +71,10 @@ pub enum Selector {
     Filter(Filter),
 }
 
+pub fn slice_from((start, end, step): (Option<i64>, Option<i64>, Option<i64>)) -> Selector {
+    Selector::Slice(start, end, step)
+}
+
 impl Display for Selector {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -353,7 +357,10 @@ pub enum TestFunction {
 
 impl TestFunction {
     pub fn try_new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
-        fn with_node_type_validation<'a>(a: &'a FnArg,name: &str ) -> Result<&'a FnArg, JsonPathError> {
+        fn with_node_type_validation<'a>(
+            a: &'a FnArg,
+            name: &str,
+        ) -> Result<&'a FnArg, JsonPathError> {
             if a.is_lit() {
                 Err(JsonPathError::InvalidJsonPath(format!(
                     "Invalid argument for the function `{}`: expected a node, got a literal",
@@ -369,11 +376,12 @@ impl TestFunction {
             }
         }
 
-
         match (name, args.as_slice()) {
             ("length", [a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
             ("value", [a]) => Ok(TestFunction::Value(a.clone())),
-            ("count", [a]) => Ok(TestFunction::Count(with_node_type_validation(a,name)?.clone())),
+            ("count", [a]) => Ok(TestFunction::Count(
+                with_node_type_validation(a, name)?.clone(),
+            )),
             ("search", [a, b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
             ("match", [a, b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
             ("length" | "value" | "count" | "match" | "search", args) => {

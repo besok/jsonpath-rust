@@ -15,8 +15,8 @@ fn union_quotes() -> Queried<()> {
     assert_eq!(
         vec,
         vec![
-            (&json!("ab"), "$.[''a'']".to_string()).into(),
-            (&json!("bc"), "$.[''b'']".to_string()).into(),
+            (&json!("ab"), "$[''a'']".to_string()).into(),
+            (&json!("bc"), "$[''b'']".to_string()).into(),
         ]
     );
 
@@ -35,7 +35,7 @@ fn space_between_selectors() -> Queried<()> {
 
     assert_eq!(
         vec,
-        vec![(&json!("ab"), "$.[''a''].[''b'']".to_string()).into(),]
+        vec![(&json!("ab"), "$[''a''][''b'']".to_string()).into(),]
     );
 
     Ok(())
@@ -94,7 +94,7 @@ fn regex_key() -> Queried<()> {
 
     assert_eq!(
         vec,
-        vec![(&json!("bab"), "$.['values'][2]".to_string()).into(),]
+        vec![(&json!("bab"), "$['values'][2]".to_string()).into(),]
     );
 
     Ok(())
@@ -107,7 +107,7 @@ fn name_sel() -> Queried<()> {
 
     let vec = js_path("$['\\/']", &json)?;
 
-    assert_eq!(vec, vec![(&json!("A"), "$.[''\\/'']".to_string()).into(),]);
+    assert_eq!(vec, vec![(&json!("A"), "$[''\\/'']".to_string()).into(),]);
 
     Ok(())
 }
@@ -155,7 +155,7 @@ fn filter_data() -> Queried<()> {
         .map(Option::unwrap_or_default)
         .collect();
 
-    assert_eq!(vec, vec!["$.['a']".to_string(), "$.['b']".to_string()]);
+    assert_eq!(vec, vec!["$['a']".to_string(), "$['b']".to_string()]);
 
     Ok(())
 }
@@ -194,7 +194,7 @@ fn single_quote() -> Queried<()> {
     let vec = js_path("$[\"a'\"]", &json)?;
     assert_eq!(
         vec,
-        vec![(&json!("A"), "$.['\"a\'\"']".to_string()).into(),]
+        vec![(&json!("A"), "$['\"a\'\"']".to_string()).into(),]
     );
 
     Ok(())
@@ -233,8 +233,8 @@ fn basic_descendent() -> Queried<()> {
     assert_eq!(
         vec,
         vec![
-            (&json!(1), "$.['o'][1]".to_string()).into(),
-            (&json!(3), "$.['o'][2][1]".to_string()).into(),
+            (&json!(1), "$['o'][1]".to_string()).into(),
+            (&json!(3), "$['o'][2][1]".to_string()).into(),
         ]
     );
 

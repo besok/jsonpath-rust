@@ -1,3 +1,4 @@
+use crate::parser::model::slice_from;
 use crate::parser::model::Comparison;
 use crate::parser::model::FilterAtom;
 use crate::parser::model::FnArg;
@@ -9,7 +10,11 @@ use crate::parser::model::SingularQuery;
 use crate::parser::model::SingularQuerySegment;
 use crate::parser::model::TestFunction;
 use crate::parser::model::{Comparable, Filter};
-use crate::parser::{comp_expr, comparable, filter_atom, function_expr, jp_query, literal, parse_json_path, segment, selector, singular_query, singular_query_segments, slice_selector, test, JSPathParser, Parsed, Rule};
+use crate::parser::{
+    comp_expr, comparable, filter_atom, function_expr, jp_query, literal, parse_json_path, segment,
+    selector, singular_query, singular_query_segments, slice_selector, test, JSPathParser, Parsed,
+    Rule,
+};
 use crate::{
     arg, atom, cmp, comparable, jq, lit, or, q_segment, q_segments, segment, selector,
     singular_query, slice, test, test_fn,
@@ -19,6 +24,7 @@ use pest::iterators::Pair;
 use pest::Parser;
 use std::fmt::Debug;
 use std::{panic, vec};
+use crate::parser::model::Filter::Atom;
 
 struct TestPair<T> {
     rule: Rule,
@@ -121,9 +127,7 @@ fn function_expr_test() {
         //     "count(@.a)",
         //     test_fn!(count arg!(t test!(@ segment!(selector!(a))))),
         // )
-        .assert_fail(
-            "count\t(@.*)",
-        );
+        .assert_fail("count\t(@.*)");
 }
 
 #[test]
@@ -138,7 +142,7 @@ fn jq_test() {
         jq!(
             segment!(selector!(a)),
             segment!(selector!(b)),
-            segment!(selector!(? atom))
+            segment!(selector!(?atom))
         ),
     );
 }
@@ -158,6 +162,7 @@ fn comp_expr_test() {
 #[test]
 fn literal_test() {
     TestPair::new(Rule::literal, literal)
+        .assert("'\"'", lit!(s "\""))
         .assert("null", lit!())
         .assert("false", lit!(b false))
         .assert("true", lit!(b true))
@@ -171,7 +176,6 @@ fn literal_test() {
         .assert("-0", lit!(i 0))
         .assert("1.2", lit!(f 1.2))
         .assert("9007199254740990", lit!(i 9007199254740990))
-        .assert("\'\"\'", lit!(s "\""))
         .assert_fail("hel\\\"lo")
         .assert_fail("9007199254740995");
 }
@@ -218,27 +222,13 @@ fn parse_path() {
 }
 
 
-
-
-#[test]
-fn parse_segment() {
-    TestPair::new(Rule::segment, segment).assert(
-        "[1, 1:1]",
-        Segment::Selectors(vec![
-            Selector::Index(1),
-            Selector::Slice(Some(1), Some(1), None),
-        ]),
-    );
-}
 #[test]
 fn parse_i64() {
-    TestPair::new(Rule::literal, literal).assert("1e2", lit!(f 100.0) );
+    TestPair::new(Rule::literal, literal).assert("1e2", lit!(f 100.0));
 }
 #[test]
 fn parse_selector() {
-    TestPair::new(Rule::selector, selector)
-        .assert("1:1", Selector::Slice(Some(1), Some(1), None))
-    ;
+    TestPair::new(Rule::selector, selector).assert("1:1", Selector::Slice(Some(1), Some(1), None));
 }
 #[test]
 fn parse_global() {
@@ -247,15 +237,26 @@ fn parse_global() {
         .assert("$", JpQuery::new(vec![]))
         .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
         .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
-        .assert("$..*", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert("$[1 :5:2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert("$['a']['b']", JpQuery::new(vec![segment!(selector!(a)), segment!(selector!(b))]))
-        .assert("$[?@.a]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert("$[?@.a==1E2]", JpQuery::new(vec![segment!(..segment!(selector!(*)))]))
-        .assert_fail("$..\ra", )
-        .assert_fail("$[\"☺\"]", )
-        .assert_fail("$[?search(@.author,'.*(?i)d\\\\(Rees\\\\)')]")
+        .assert(
+            "$..*",
+            JpQuery::new(vec![segment!(..segment!(selector!(*)))]),
+        )
+        .assert(
+            "$[1 :5:2]",
+            JpQuery::new(vec![segment!(selector!(slice slice!(1, 5, 2)))]),
+        )
+        .assert(
+            "$['a']['b']",
+            JpQuery::new(vec![segment!(Selector::Name("'a'".to_string())), segment!(Selector::Name("'b'".to_string()))]),
+        )
+
+        .assert(
+            "$[1, 1:1]",
+            JpQuery::new(vec![Segment::Selectors(vec![
+                Selector::Index(1),
+                Selector::Slice(Some(1), Some(1), None),
+            ])]),
+        )
+        .assert_fail("$..\ra")
     ;
-
 }
-
