@@ -307,12 +307,11 @@ fn convert_js_path(path: &str) -> Parsed<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{parse_json_path, Parsed};
+    use crate::parser::Parsed;
     use crate::query::queryable::{convert_js_path, Queryable};
     use crate::query::Queried;
     use crate::JsonPath;
     use serde_json::json;
-    use std::borrow::Cow;
 
     #[test]
     fn in_smoke() -> Queried<()> {

@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use serde_json::{json, Value};
-use std::str::FromStr;
 use jsonpath_rust::JsonPath;
 use jsonpath_rust::parser::model::JpQuery;
 use jsonpath_rust::parser::parse_json_path;

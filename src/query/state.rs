@@ -193,7 +193,7 @@ impl<'a, T: Queryable> Data<'a, T> {
 /// Represents a pointer to a specific location in the data structure.
 /// It contains a reference to the data and a path that indicates the location of the data in the structure.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Pointer<'a, T: Queryable> {
+pub(crate) struct Pointer<'a, T: Queryable> {
     pub inner: &'a T,
     pub path: QueryPath,
 }
