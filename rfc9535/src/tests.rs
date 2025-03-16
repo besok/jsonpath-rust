@@ -284,3 +284,20 @@ fn space_test() -> Queried<()> {
 
     Ok(())
 }
+#[test]
+fn neg_idx() -> Queried<()> {
+    let json = json!([
+        "first",
+        "second"
+      ]);
+
+    let vec = json.query_with_path("$[-2]")?;
+    assert_eq!(
+        vec,
+        vec![
+            (&json!("first"), "$[0]".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}

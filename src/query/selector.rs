@@ -190,15 +190,21 @@ pub fn process_index<'a, T: Queryable>(
     inner
         .as_array()
         .map(|array| {
-            if (idx.abs() as usize) < array.len() {
-                let i = if *idx < 0 {
-                    array.len() - idx.abs() as usize
+            if *idx >= 0 {
+                if *idx >= array.len() as i64 {
+                    Data::Nothing
                 } else {
-                    *idx as usize
-                };
-                Data::new_ref(Pointer::idx(&array[i], path, i))
+                    let i = *idx as usize;
+                    Data::new_ref(Pointer::idx(&array[i], path, i))
+                }
             } else {
-                Data::Nothing
+                let abs_idx = idx.abs() as usize;
+                if abs_idx > array.len() {
+                    Data::Nothing
+                } else {
+                    let i = array.len() - abs_idx;
+                    Data::new_ref(Pointer::idx(&array[i], path, i))
+                }
             }
         })
         .unwrap_or_default()
