@@ -6,7 +6,11 @@ use std::str::FromStr;
 use jsonpath_rust::JsonPath;
 
 type SkippedCases = usize;
-
+fn escape_control_chars(s: &str) -> String {
+    s.replace("\n", "\\n")
+        .replace("\t", "\\t")
+        .replace("\r", "\\r")
+}
 pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
     let file = std::fs::File::open("test_suite/jsonpath-compliance-test-suite/cts.json")?;
     let suite: TestCases = serde_json::from_reader(std::io::BufReader::new(file))?;
@@ -21,9 +25,9 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
             .filter(|case| {
                 if let Some(f) = filter.iter().find(|filter| case.name == filter.name) {
                     println!(
-                        "Skipping test case: `{}` because of the reason: `{}`",
-                        case.name.green(),
-                        f.reason.green()
+                        r#"Skipping test case:`{}` with the reason: `{}`"#,
+                        escape_control_chars(&case.name).green(),
+                        escape_control_chars(&f.reason).green()
                     );
                     skipped_cases += 1;
                     false

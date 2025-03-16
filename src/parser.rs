@@ -118,7 +118,9 @@ pub fn segment(child: Pair<Rule>) -> Parsed<Segment> {
 pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
     let child = next_down(rule)?;
     match child.as_rule() {
-        Rule::name_selector => Ok(Selector::Name(child.as_str().trim().to_string())),
+        Rule::name_selector => Ok(Selector::Name(
+            validate_js_str(child.as_str().trim())?.to_string(),
+        )),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
         Rule::index_selector => Ok(Selector::Index(validate_range(
             child
@@ -294,6 +296,22 @@ pub fn comp_expr(rule: Pair<Rule>) -> Parsed<Comparison> {
     Comparison::try_new(op, lhs, rhs)
 }
 
+/// Validates a JSONPath string literal according to RFC 9535
+/// Control characters (U+0000 through U+001F and U+007F) are not allowed unescaped
+/// in string literals, whether single-quoted or double-quoted
+fn validate_js_str(s: &str) -> Parsed<&str> {
+    for (i, c) in s.chars().enumerate() {
+        if c <= '\u{001F}' {
+            return Err(JsonPathError::InvalidJsonPath(format!(
+                "Invalid control character U+{:04X} at position {} in string literal",
+                c as u32, i
+            )));
+        }
+    }
+
+    Ok(s)
+}
+
 pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     fn parse_number(num: &str) -> Parsed<Literal> {
         let num = num.trim();
@@ -314,7 +332,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     }
 
     fn parse_string(string: &str) -> Parsed<Literal> {
-        let string = string.trim();
+        let string = validate_js_str(string.trim())?;
         if string.starts_with('\'') && string.ends_with('\'') {
             Ok(Literal::String(string[1..string.len() - 1].to_string()))
         } else if string.starts_with('"') && string.ends_with('"') {

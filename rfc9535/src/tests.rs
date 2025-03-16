@@ -1,7 +1,6 @@
-use jsonpath_rust::query::{js_path, Queried};
-use jsonpath_rust::{JsonPath,  };
+use jsonpath_rust::query::{js_path, Queried, QueryRef};
+use jsonpath_rust::JsonPath;
 use serde_json::{json, Value};
-use std::borrow::Cow;
 
 #[test]
 fn union_quotes() -> Queried<()> {
@@ -152,7 +151,6 @@ fn filter_data() -> Queried<()> {
     let vec: Vec<String> = json
         .query_only_path("$[?@<3]")?
         .into_iter()
-        .map(Option::unwrap_or_default)
         .collect();
 
     assert_eq!(vec, vec!["$['a']".to_string(), "$['b']".to_string()]);
@@ -178,7 +176,7 @@ fn exp_no_error() -> Queried<()> {
 
     let vec: Vec<&Value> = json.query("$[?@.a==1E2]")?;
     assert_eq!(
-        vec.iter().map(Cow::as_ref).collect::<Vec<_>>(),
+        vec,
         vec![&json!({"a":100, "d":"e"})]
     );
 
@@ -192,10 +190,7 @@ fn single_quote() -> Queried<()> {
     });
 
     let vec = js_path("$[\"a'\"]", &json)?;
-    assert_eq!(
-        vec,
-        vec![(&json!("A"), "$['\"a\'\"']".to_string()).into(),]
-    );
+    assert_eq!(vec, vec![(&json!("A"), "$['\"a\'\"']".to_string()).into(),]);
 
     Ok(())
 }
@@ -203,7 +198,7 @@ fn single_quote() -> Queried<()> {
 fn union() -> Queried<()> {
     let json = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-    let vec: Vec<QueryRes<Value>> = json.query_with_path("$[1,5:7]")?;
+    let vec: Vec<QueryRef<Value>> = json.query_with_path("$[1,5:7]")?;
     assert_eq!(
         vec,
         vec![
@@ -269,6 +264,21 @@ fn filter_star() -> Queried<()> {
         vec![
             (&json!([2]), "$[2]".to_string()).into(),
             (&json!({"a": 3}), "$[4]".to_string()).into(),
+        ]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn space_test() -> Queried<()> {
+    let json = json!({ " ": "A"});
+
+    let vec = json.query_with_path("$[' ']")?;
+    assert_eq!(
+        vec,
+        vec![
+            (&json!("A"), "$['\' \'']".to_string()).into(),
         ]
     );
 

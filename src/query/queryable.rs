@@ -149,8 +149,7 @@ impl Queryable for Value {
         } else {
             key
         };
-
-        self.get(key.trim())
+        self.get(key)
     }
 
     fn as_array(&self) -> Option<&Vec<Self>> {

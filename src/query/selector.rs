@@ -211,7 +211,18 @@ mod tests {
     use crate::query::{js_path, js_path_vals, Queried};
     use serde_json::json;
     use std::vec;
+    #[test]
+    fn test_process_empty_key() {
+        let value = json!({" ": "value"});
+        let segment = Segment::Selector(Selector::Name(" ".to_string()));
 
+        let step = segment.process(State::root(&value));
+
+        assert_eq!(
+            step.ok_ref(),
+            Some(vec![Pointer::new(&json!("value"), "$[' ']".to_string())])
+        );
+    }
     #[test]
     fn test_process_key() {
         let value = json!({"key": "value"});

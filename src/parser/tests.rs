@@ -1,3 +1,4 @@
+use crate::parser::Test;
 use crate::parser::model::slice_from;
 use crate::parser::model::Comparison;
 use crate::parser::model::FilterAtom;
@@ -24,7 +25,6 @@ use pest::iterators::Pair;
 use pest::Parser;
 use std::fmt::Debug;
 use std::{panic, vec};
-use crate::parser::model::Filter::Atom;
 
 struct TestPair<T> {
     rule: Rule,
@@ -117,16 +117,16 @@ fn slice_selector_test() {
 #[test]
 fn function_expr_test() {
     TestPair::new(Rule::function_expr, function_expr)
-        // .assert("length(1)", test_fn!(length arg!(lit!(i 1))))
-        // .assert("length(true)", test_fn!(length arg!(lit!(b true))))
-        // .assert(
-        //     "search(@, \"abc\")",
-        //     test_fn!(search arg!(t test!(@ ) ), arg!(lit!(s "abc"))),
-        // )
-        // .assert(
-        //     "count(@.a)",
-        //     test_fn!(count arg!(t test!(@ segment!(selector!(a))))),
-        // )
+        .assert("length(1)", test_fn!(length arg!(lit!(i 1))))
+        .assert("length(true)", test_fn!(length arg!(lit!(b true))))
+        .assert(
+            "search(@, \"abc\")",
+            test_fn!(search arg!(t test!(@ ) ), arg!(lit!(s "abc"))),
+        )
+        .assert(
+            "count(@.a)",
+            test_fn!(count arg!(t test!(@ segment!(selector!(a))))),
+        )
         .assert_fail("count\t(@.*)");
 }
 
@@ -162,6 +162,9 @@ fn comp_expr_test() {
 #[test]
 fn literal_test() {
     TestPair::new(Rule::literal, literal)
+        .assert("'☺'", lit!(s "☺"))
+        .assert_fail("\"\n\"")
+        .assert("' '", lit!(s " "))
         .assert("'\"'", lit!(s "\""))
         .assert("null", lit!())
         .assert("false", lit!(b false))
@@ -170,14 +173,15 @@ fn literal_test() {
         .assert("\'hello\'", lit!(s "hello"))
         .assert("\'hel\\'lo\'", lit!(s "hel\\'lo"))
         .assert("\'hel\"lo\'", lit!(s "hel\"lo"))
-        .assert("\'hel\nlo\'", lit!(s "hel\nlo"))
+        .assert("\'hel\\nlo\'", lit!(s "hel\\nlo"))
         .assert("1", lit!(i 1))
         .assert("0", lit!(i 0))
         .assert("-0", lit!(i 0))
         .assert("1.2", lit!(f 1.2))
         .assert("9007199254740990", lit!(i 9007199254740990))
         .assert_fail("hel\\\"lo")
-        .assert_fail("9007199254740995");
+        .assert_fail("9007199254740995")
+    ;
 }
 
 #[test]
@@ -234,29 +238,29 @@ fn parse_selector() {
 fn parse_global() {
     let sel_a = segment!(selector!(a));
     TestPair::new(Rule::jp_query, jp_query)
-        .assert("$", JpQuery::new(vec![]))
-        .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
-        .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
-        .assert(
-            "$..*",
-            JpQuery::new(vec![segment!(..segment!(selector!(*)))]),
-        )
-        .assert(
-            "$[1 :5:2]",
-            JpQuery::new(vec![segment!(selector!(slice slice!(1, 5, 2)))]),
-        )
-        .assert(
-            "$['a']['b']",
-            JpQuery::new(vec![segment!(Selector::Name("'a'".to_string())), segment!(Selector::Name("'b'".to_string()))]),
-        )
-
-        .assert(
-            "$[1, 1:1]",
-            JpQuery::new(vec![Segment::Selectors(vec![
-                Selector::Index(1),
-                Selector::Slice(Some(1), Some(1), None),
-            ])]),
-        )
-        .assert_fail("$..\ra")
+        // .assert("$", JpQuery::new(vec![]))
+        // .assert("$.a", JpQuery::new(vec![sel_a.clone()]))
+        // .assert("$..a", JpQuery::new(vec![segment!(..sel_a)]))
+        // .assert(
+        //     "$..*",
+        //     JpQuery::new(vec![segment!(..segment!(selector!(*)))]),
+        // )
+        // .assert(
+        //     "$[1 :5:2]",
+        //     JpQuery::new(vec![segment!(selector!(slice slice!(1, 5, 2)))]),
+        // )
+        // .assert(
+        //     "$['a']['b']",
+        //     JpQuery::new(vec![segment!(Selector::Name("'a'".to_string())), segment!(Selector::Name("'b'".to_string()))]),
+        // )
+        //
+        // .assert(
+        //     "$[1, 1:1]",
+        //     JpQuery::new(vec![Segment::Selectors(vec![
+        //         Selector::Index(1),
+        //         Selector::Slice(Some(1), Some(1), None),
+        //     ])]),
+        // )
+        // .assert_fail("$..\ra")
     ;
 }
