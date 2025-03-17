@@ -1,6 +1,4 @@
-use crate::parser::model::{
-    Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment,
-};
+use crate::parser::model::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
@@ -24,8 +22,11 @@ impl Query for Comparison {
 
 fn lt<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>) -> bool {
     let cmp = |lhs: &T, rhs: &T| {
-        if let (Some(lhs), Some(rhs)) = (lhs.as_i64(), rhs.as_i64()) {
-            lhs < rhs
+        let lhs_f64 = lhs.as_f64().or_else(|| lhs.as_i64().map(|v| v as f64));
+        let rhs_f64 = rhs.as_f64().or_else(|| rhs.as_i64().map(|v| v as f64));
+
+        if let (Some(lhs_num), Some(rhs_num)) = (lhs_f64, rhs_f64) {
+            lhs_num < rhs_num
         } else if let (Some(lhs), Some(rhs)) = (lhs.as_str(), rhs.as_str()) {
             lhs < rhs
         } else {
@@ -84,7 +85,7 @@ mod tests {
     use crate::query::state::{Data, Pointer, State};
     use crate::query::Query;
     use crate::singular_query;
-    use crate::{cmp, comparable,q_segments, lit, q_segment};
+    use crate::{cmp, comparable, lit, q_segment, q_segments};
     use serde_json::json;
     #[test]
     fn eq_comp_val() {

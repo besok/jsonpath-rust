@@ -14,8 +14,8 @@ fn union_quotes() -> Queried<()> {
     assert_eq!(
         vec,
         vec![
-            (&json!("ab"), "$[''a'']".to_string()).into(),
-            (&json!("bc"), "$[''b'']".to_string()).into(),
+            (&json!("ab"), "$['a']".to_string()).into(),
+            (&json!("bc"), "$['b']".to_string()).into(),
         ]
     );
 
@@ -34,7 +34,7 @@ fn space_between_selectors() -> Queried<()> {
 
     assert_eq!(
         vec,
-        vec![(&json!("ab"), "$[''a''][''b'']".to_string()).into(),]
+        vec![(&json!("ab"), "$['a']['b']".to_string()).into(),]
     );
 
     Ok(())
@@ -106,7 +106,7 @@ fn name_sel() -> Queried<()> {
 
     let vec = js_path("$['\\/']", &json)?;
 
-    assert_eq!(vec, vec![(&json!("A"), "$[''\\/'']".to_string()).into(),]);
+    assert_eq!(vec, vec![(&json!("A"), "$['\\/']".to_string()).into(),]);
 
     Ok(())
 }
@@ -278,7 +278,7 @@ fn space_test() -> Queried<()> {
     assert_eq!(
         vec,
         vec![
-            (&json!("A"), "$['\' \'']".to_string()).into(),
+            (&json!("A"), "$[\' \']".to_string()).into(),
         ]
     );
 

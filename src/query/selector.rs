@@ -214,7 +214,7 @@ pub fn process_index<'a, T: Queryable>(
 mod tests {
     use super::*;
     use crate::parser::model::Segment;
-    use crate::query::{js_path, js_path_vals, Queried};
+    use crate::query::{js_path, Queried};
     use serde_json::json;
     use std::vec;
     #[test]
@@ -390,8 +390,8 @@ mod tests {
         assert_eq!(
             vec,
             vec![
-                (&json!("ab"), "$[''a'']".to_string()).into(),
-                (&json!("bc"), "$[''b'']".to_string()).into(),
+                (&json!("ab"), "$['a']".to_string()).into(),
+                (&json!("bc"), "$['b']".to_string()).into(),
             ]
         );
 
