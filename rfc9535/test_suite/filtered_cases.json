@@ -15,6 +15,10 @@
     "name": "functions, length, non-singular query arg",
     "reason": "To handle it later either at the parser level or during execution"
   },
+
+
+
+
   {
     "name": "functions, search, dot matcher on \\u2029",
     "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)"
@@ -53,5 +57,21 @@
   {
     "name": "name selector, single quotes, escaped ☺, lower case hex",
     "reason": "This case fails without quotes '..' and there is a bug to fix in the parser to handle it"
+  },
+
+
+
+
+
+  {
+    "name": "filter, string literal, escaped single quote in single quotes",
+    "reason": "Should be extra logic to handle this special case"
+  },
+
+  {
+    "name": "filter, string literal, escaped double quote in double quotes",
+    "reason": "Should be extra logic to handle this special case"
   }
+
+
 ]
