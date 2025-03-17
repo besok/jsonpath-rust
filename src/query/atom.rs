@@ -1,6 +1,6 @@
 use crate::parser::model::FilterAtom;
 use crate::query::queryable::Queryable;
-use crate::query::state::State;
+use crate::query::state::{Data, State};
 use crate::query::Query;
 
 impl Query for FilterAtom {
@@ -24,10 +24,29 @@ impl Query for FilterAtom {
                         res
                     }
                 } else {
-                    if res.is_nothing() {
-                        new_state(*not)
-                    } else {
+                    let struct_check = |s: &T| {
+                        if let Some(arr) = s.as_array() {
+                            !arr.is_empty()
+                        } else if let Some(obj) = s.as_object() {
+                            !obj.is_empty()
+                        } else if let Some(str) = s.as_str() {
+                            !str.is_empty()
+                        } else {
+                            true
+                        }
+                    };
+
+                    let struct_presented = match res.data {
+                        Data::Ref(v) => struct_check(v.inner),
+                        Data::Refs(e) if e.is_empty() => false,
+                        Data::Refs(elems) => elems.iter().map(|v| v.inner).all(struct_check),
+                        _ => false,
+                    };
+
+                    if struct_presented {
                         new_state(!*not)
+                    } else {
+                        new_state(*not)
                     }
                 }
             }
@@ -51,12 +70,12 @@ mod tests {
     use crate::parser::model::SingularQuery;
     use crate::parser::model::SingularQuerySegment;
     use crate::parser::model::{Comparison, FilterAtom};
+    use crate::q_segment;
     use crate::query::queryable::Queryable;
     use crate::query::state::State;
     use crate::query::Query;
-    use crate::{and, cmp, or, singular_query};
     use crate::{atom, comparable, lit};
-    use crate::{q_segment};
+    use crate::{cmp, singular_query};
     use crate::{filter_, q_segments};
     use serde_json::json;
 

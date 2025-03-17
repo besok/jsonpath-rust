@@ -1,7 +1,6 @@
 
 mod console;
 mod suite;
-mod tests;
 use crate::suite::get_suite;
 use colored::Colorize;
 use console::TestResult;
