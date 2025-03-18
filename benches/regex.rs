@@ -1,17 +1,20 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use jsonpath_rust::{JsonPath, JsonPathQuery};
+use jsonpath_rust::parser::model::JpQuery;
+use jsonpath_rust::parser::parse_json_path;
+use jsonpath_rust::query::state::State;
+use jsonpath_rust::query::Query;
+use jsonpath_rust::JsonPath;
 use serde_json::{json, Value};
-use std::str::FromStr;
 
 struct SearchData {
-    json: serde_json::Value,
-    path: JsonPath,
+    json: Value,
+    path: JpQuery,
 }
 
-const PATH: &str = "$.[?(@.author ~= '.*(?i)d\\(Rees\\)')]";
+const PATH: &str = "$[?search(@.author,'.*(?i)d\\\\(Rees\\\\)')]";
 
 fn regex_perf_test_with_reuse(cfg: &SearchData) {
-    let _v = cfg.path.find(&cfg.json);
+    let _v = cfg.path.process(State::root(&cfg.json)).data;
 }
 
 fn regex_perf_test_without_reuse() {
@@ -19,11 +22,11 @@ fn regex_perf_test_without_reuse() {
         "author":"abcd(Rees)",
     }));
 
-    let _v = json.path(PATH).expect("the path is correct");
+    let _v = json.query(PATH).expect("the path is correct");
 }
 
 fn json_path_compiling() {
-    let _v = JsonPath::<Value>::from_str(PATH).unwrap();
+    let _v = parse_json_path(PATH).unwrap();
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -31,7 +34,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         json: json!({
             "author":"abcd(Rees)",
         }),
-        path: JsonPath::from_str(PATH).unwrap(),
+        path: parse_json_path(PATH).unwrap(),
     };
     c.bench_function("regex bench with reuse", |b| {
         b.iter(|| regex_perf_test_with_reuse(&data))

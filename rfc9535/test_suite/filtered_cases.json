@@ -1,0 +1,219 @@
+[
+  {
+    "name": "functions, value, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution",
+    "expected_to_fix": true,
+    "issue": 1
+  },
+  {
+    "name": "functions, length, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution",
+    "expected_to_fix": true,
+    "issue": 1
+  },
+  {
+    "name": "functions, count, result must be compared",
+    "reason": "To handle it later either at the parser level or during execution",
+    "expected_to_fix": true,
+    "issue": 1
+  },
+  {
+    "name": "functions, length, non-singular query arg",
+    "reason": "To handle it later either at the parser level or during execution",
+    "expected_to_fix": true,
+    "issue": 1
+  },
+
+  {
+    "name": "functions, search, dot matcher on \\u2029",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)",
+    "expected_to_fix": true,
+    "issue": 2
+  },
+  {
+    "name": "functions, search, dot matcher on \\u2028",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)",
+    "expected_to_fix": true,
+    "issue": 2
+  },
+  {
+    "name": "functions, match, dot matcher on \\u2029",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)",
+    "expected_to_fix": true,
+    "issue": 2
+  },
+  {
+    "name": "functions, match, dot matcher on \\u2028",
+    "reason": "Rust by default handles \r as a symbol and rfc9485 it is not a symbol(\\n, \\r, \\u2028, and \\u2029).)",
+    "expected_to_fix": true,
+    "issue": 2
+  },
+
+  {
+    "name": "basic, descendant segment, multiple selectors",
+    "reason": "The result is correct but the order differs from expected since we process selector by selector",
+    "expected_to_fix": false,
+    "issue": 0
+  } ,
+  {
+    "name": "basic, descendant segment, object traversal, multiple selectors",
+    "reason": "The result is correct but the order differs from expected since we process selector by selector",
+    "expected_to_fix": false,
+    "issue": 0
+  },
+
+  {
+    "name": "name selector, double quotes, escaped ☺, lower case hex",
+    "reason": "This case fails without quotes '..' and there is a bug to fix in the parser to handle it",
+    "expected_to_fix": true,
+    "issue": 3
+  },
+  {
+    "name": "name selector, single quotes, escaped ☺, lower case hex",
+    "reason": "This case fails without quotes '..' and there is a bug to fix in the parser to handle it",
+    "expected_to_fix": true,
+    "issue": 3
+  },
+
+  {
+    "name": "filter, string literal, escaped single quote in single quotes",
+    "reason": "Should be extra logic to handle this special case",
+    "expected_to_fix": true,
+    "issue": 4
+  },
+
+  {
+    "name": "filter, string literal, escaped double quote in double quotes",
+    "reason": "Should be extra logic to handle this special case",
+    "expected_to_fix": true,
+    "issue": 4
+  },
+
+  {
+    "name": "name selector, single quotes, surrogate pair \uD83D\uDE00",
+    "reason": "As test it works but in the doc it has double \\",
+    "expected_to_fix": false,
+    "issue": 0
+  } ,
+  {
+    "name": "name selector, single quotes, surrogate pair \uD834\uDD1E",
+    "reason": "As test it works but in the doc it has double \\",
+    "expected_to_fix": false,
+    "issue": 0
+  },
+  {
+    "name": "name selector, single quotes, escaped tab",
+    "reason": "As rust test it passes",
+    "expected_to_fix": false,
+    "issue": 0
+  },
+  {
+    "name": "name selector, single quotes, escaped ☺, upper case hex",
+    "reason": "As rust test it passes",
+    "expected_to_fix": false,
+    "issue": 0
+  },
+  {
+    "name": "name selector, single quotes, escaped carriage return",
+    "reason": "As rust test it passes",
+    "expected_to_fix": false,
+    "issue": 0
+  },
+
+  {
+    "name": "name selector, double quotes, escaped double quote",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped backspace",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped form feed",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped line feed",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped carriage return",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped tab",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, single quotes, escaped backspace",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, single quotes, escaped form feed",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, single quotes, escaped line feed",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, escaped ☺, upper case hex",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 5
+  },
+  {
+    "name": "name selector, double quotes, surrogate pair \uD834\uDD1E",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 6
+  },
+  {
+    "name": "name selector, double quotes, surrogate pair \uD83D\uDE00",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 6
+  },
+  {
+    "name": "name selector, double quotes, before high surrogates",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 6
+  },
+  {
+    "name": "name selector, double quotes, after low surrogates",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 6
+  },
+  {
+    "name": "name selector, single quotes, escaped single quote",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 7
+  },
+  {
+    "name": "filter, nested",
+    "reason": "Figure out if it is a bug in the parser or in the test",
+    "expected_to_fix": true,
+    "issue": 8
+  }
+]
