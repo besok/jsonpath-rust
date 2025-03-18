@@ -21,6 +21,7 @@ RFC9535 Compliance tests:
 Total: 671
 Passed: 209
 Failed: 462
+Skipped: 25 where 18 to fix in 5 issues
 
 ```
 

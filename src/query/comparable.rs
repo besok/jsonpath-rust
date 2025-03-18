@@ -1,8 +1,8 @@
 use crate::parser::model::{Comparable, Literal, SingularQuery, SingularQuerySegment};
-use crate::query::Query;
 use crate::query::queryable::Queryable;
 use crate::query::selector::{process_index, process_key};
 use crate::query::state::{Data, State};
+use crate::query::Query;
 
 impl Query for Comparable {
     fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
@@ -160,9 +160,6 @@ mod tests {
         let state = State::root(&value);
 
         let result = query.process(state);
-        assert_eq!(
-            result.ok_val(),
-            Some(json!("Hello"))
-        );
+        assert_eq!(result.ok_val(), Some(json!("Hello")));
     }
 }

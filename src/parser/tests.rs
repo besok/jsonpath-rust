@@ -1,4 +1,3 @@
-use crate::parser::Test;
 use crate::parser::model::slice_from;
 use crate::parser::model::Comparison;
 use crate::parser::model::FilterAtom;
@@ -11,6 +10,7 @@ use crate::parser::model::SingularQuery;
 use crate::parser::model::SingularQuerySegment;
 use crate::parser::model::TestFunction;
 use crate::parser::model::{Comparable, Filter};
+use crate::parser::Test;
 use crate::parser::{
     comp_expr, comparable, filter_atom, function_expr, jp_query, literal, parse_json_path, segment,
     selector, singular_query, singular_query_segments, slice_selector, test, JSPathParser, Parsed,
@@ -180,8 +180,7 @@ fn literal_test() {
         .assert("1.2", lit!(f 1.2))
         .assert("9007199254740990", lit!(i 9007199254740990))
         .assert_fail("hel\\\"lo")
-        .assert_fail("9007199254740995")
-    ;
+        .assert_fail("9007199254740995");
 }
 
 #[test]
@@ -224,7 +223,6 @@ fn parse_path() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), JpQuery::new(vec![]));
 }
-
 
 #[test]
 fn parse_i64() {

@@ -2,9 +2,14 @@ use crate::suite::TestFailure;
 use chrono::Local;
 use colored::Colorize;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Error};
 use std::io::Write;
-pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result<(), Error> {
+use std::io::{BufRead, BufReader, Error};
+pub fn process_results(
+    results: Vec<TestResult>,
+    skipped_cases: usize,
+    skipped_to_fix: usize,
+    issues: usize,
+) -> Result<(), Error> {
     let (passed, failed): (Vec<_>, Vec<_>) = results.into_iter().partition(TestResult::is_ok);
     let total = passed.len() + failed.len() + skipped_cases;
     let passed_count = passed.len();
@@ -40,12 +45,16 @@ pub fn process_results(results: Vec<TestResult>, skipped_cases: usize) -> Result
         format!("Total: {}", total).bold(),
         format!("Passed: {}", passed_count).green().bold(),
         format!("Failed: {}", failed_count).red().bold(),
-        format!("Skipped: {}", skipped_cases).bold()
+        format!(
+            "Skipped: {} where {} to fix in {} issues",
+            skipped_cases, skipped_to_fix, issues
+        )
+        .bold()
     );
     Ok(())
 }
 
-fn clean_file(limit:usize) -> Result<(), Error> {
+fn clean_file(limit: usize) -> Result<(), Error> {
     let file_path = "test_suite/results.csv";
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
@@ -55,7 +64,10 @@ fn clean_file(limit:usize) -> Result<(), Error> {
         let header = &lines[0];
         let trimmed_lines = [&[header.clone()], &lines[lines.len() - limit..]].concat();
 
-        let mut file = OpenOptions::new().write(true).truncate(true).open(file_path)?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(file_path)?;
         for line in trimmed_lines {
             writeln!(file, "{}", line)?;
         }
@@ -63,6 +75,5 @@ fn clean_file(limit:usize) -> Result<(), Error> {
 
     Ok(())
 }
-
 
 pub type TestResult<'a> = Result<(), TestFailure<'a>>;

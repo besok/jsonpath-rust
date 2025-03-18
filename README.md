@@ -28,6 +28,8 @@ The changes are:
 ## The compliance with RFC 9535
 
 The library is fully compliant with the standard [RFC 9535](https://www.rfc-editor.org/rfc/rfc9535.html)
+To check the compliance with the standard head to [rfc9535 subfolder](rfc9535/README.md)
+
 
 ## Examples
 

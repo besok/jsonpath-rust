@@ -6,7 +6,6 @@ use crate::query::Query;
 impl Query for JpQuery {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
         self.segments.process(state)
-
     }
 }
 
@@ -60,5 +59,4 @@ mod tests {
             )])
         );
     }
-
 }

@@ -1,5 +1,6 @@
-use crate::parser::model::{Comparable, Filter, FilterAtom, FnArg, Literal, Segment, Selector, SingularQuery, Test};
-
+use crate::parser::model::{
+    Comparable, Filter, FilterAtom, FnArg, Literal, Segment, Selector, SingularQuery, Test,
+};
 
 #[macro_export]
 macro_rules! lit {
@@ -104,7 +105,7 @@ macro_rules! arg {
     };
     (f $arg:expr) => {
         FnArg::Filter($arg)
-    }
+    };
 }
 
 #[macro_export]
@@ -165,9 +166,9 @@ macro_rules! atom {
 
 #[macro_export]
 macro_rules! cmp {
-  ($lhs:expr, $op:expr , $rhs:expr) => {
-      Comparison::try_new($op, $lhs, $rhs).unwrap()
-  }
+    ($lhs:expr, $op:expr , $rhs:expr) => {
+        Comparison::try_new($op, $lhs, $rhs).unwrap()
+    };
 }
 
 #[macro_export]

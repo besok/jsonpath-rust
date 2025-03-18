@@ -1,17 +1,20 @@
 use crate::console::TestResult;
 use colored::Colorize;
 use jsonpath_rust::parser::parse_json_path;
+use jsonpath_rust::JsonPath;
 use serde_json::Value;
 use std::str::FromStr;
-use jsonpath_rust::JsonPath;
 
 type SkippedCases = usize;
+type SkippedCasesToFix = usize;
+type Issues = usize;
 fn escape_control_chars(s: &str) -> String {
     s.replace("\n", "\\n")
         .replace("\t", "\\t")
         .replace("\r", "\\r")
 }
-pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
+pub fn get_suite(
+) -> Result<(Vec<TestCase>, SkippedCases, SkippedCasesToFix, Issues), std::io::Error> {
     let file = std::fs::File::open("test_suite/jsonpath-compliance-test-suite/cts.json")?;
     let suite: TestCases = serde_json::from_reader(std::io::BufReader::new(file))?;
     let suite: Vec<TestCase> = suite.tests;
@@ -19,6 +22,8 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
     let filter = std::fs::File::open("test_suite/filtered_cases.json")?;
     let filter: Vec<FilterCase> = serde_json::from_reader(std::io::BufReader::new(filter))?;
     let mut skipped_cases = 0;
+    let mut skipped_cases_to_fix = 0;
+    let mut issues = vec![];
     Ok((
         suite
             .into_iter()
@@ -30,6 +35,12 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
                         escape_control_chars(&f.reason).green()
                     );
                     skipped_cases += 1;
+                    if f.expected_to_fix {
+                        skipped_cases_to_fix += 1;
+                        if !issues.contains(&f.issue) {
+                            issues.push(f.issue);
+                        }
+                    }
                     false
                 } else {
                     true
@@ -37,6 +48,8 @@ pub fn get_suite() -> Result<(Vec<TestCase>, SkippedCases), std::io::Error> {
             })
             .collect(),
         skipped_cases,
+        skipped_cases_to_fix,
+        issues.len(),
     ))
 }
 pub fn handle_test_case(case: &TestCase) -> TestResult {
@@ -94,6 +107,8 @@ pub fn handle_test_case(case: &TestCase) -> TestResult {
 struct FilterCase {
     name: String,
     reason: String,
+    expected_to_fix: bool,
+    issue: usize,
 }
 
 #[derive(serde::Deserialize)]
@@ -113,7 +128,6 @@ pub struct TestCases {
 }
 
 pub struct TestFailure<'a>(pub &'a TestCase, pub String);
-
 
 impl<'a> TestFailure<'a> {
     pub(crate) fn invalid(case: &'a TestCase) -> Self {

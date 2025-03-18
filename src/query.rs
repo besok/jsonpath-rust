@@ -766,4 +766,45 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn surr_pairs() -> Queried<()> {
+        let json = json!({
+          "𝄞": "A"
+        });
+        let vec = json.query_with_path("$['𝄞']")?;
+        assert_eq!(vec, vec![(&json!("A"), "$['𝄞']".to_string()).into()]);
+
+        Ok(())
+    }
+    #[test]
+    fn tab_key() -> Queried<()> {
+        let json = json!({
+          "\\t": "A"
+        });
+        let vec = json.query_with_path("$['\\t']")?;
+        assert_eq!(vec, vec![(&json!("A"), "$['\\t']".to_string()).into()]);
+
+        Ok(())
+    }
+    #[test]
+    fn escaped_up_hex() -> Queried<()> {
+        let json = json!({
+          "☺": "A"
+        });
+        let vec = json.query_with_path("$['☺']")?;
+        assert_eq!(vec, vec![(&json!("A"), "$['☺']".to_string()).into()]);
+
+        Ok(())
+    }
+    #[test]
+    fn carr_return() -> Queried<()> {
+        let json = json!({
+          "\\r": "A"
+        });
+        let vec = json.query_with_path("$['\\r']")?;
+        assert_eq!(vec, vec![(&json!("A"), "$['\\r']".to_string()).into()]);
+
+        Ok(())
+    }
 }

@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use jsonpath_rust::{JsonPath};
-use serde_json::{json, Value};
 use jsonpath_rust::parser::model::JpQuery;
 use jsonpath_rust::parser::parse_json_path;
-use jsonpath_rust::query::Query;
 use jsonpath_rust::query::state::State;
+use jsonpath_rust::query::Query;
+use jsonpath_rust::JsonPath;
+use serde_json::{json, Value};
 
 struct SearchData {
     json: Value,

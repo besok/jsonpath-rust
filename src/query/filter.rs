@@ -50,7 +50,6 @@ impl Filter {
     }
 
     fn filter_item<'a, T: Queryable>(&self, item: Pointer<'a, T>, root: &T) -> bool {
-
         self.process_elem(State::data(root, Data::Ref(item.clone())))
             .ok_val()
             .and_then(|v| v.as_bool())
@@ -60,7 +59,7 @@ impl Filter {
 
 #[cfg(test)]
 mod tests {
-    use crate::query::{js_path};
+    use crate::query::js_path;
     use serde_json::json;
 
     #[test]
