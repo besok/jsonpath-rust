@@ -11,7 +11,8 @@ mod test;
 mod test_function;
 
 use crate::parser::errors::JsonPathError;
-use crate::parser::parse_json_path;
+use crate::parser::model::JpQuery;
+use crate::parser::{parse_json_path, Parsed};
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer};
 use state::State;
@@ -62,7 +63,16 @@ impl<'a, T: Queryable> From<Pointer<'a, T>> for QueryRef<'a, T> {
 /// The main function to process a JSONPath query.
 /// It takes a path and a value, and returns a vector of `QueryResult` thus values + paths.
 pub fn js_path<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<QueryRef<'a, T>>> {
-    match parse_json_path(path)?.process(State::root(value)).data {
+    js_path_process(&parse_json_path(path)?, value)
+}
+
+/// A convenience function to process a JSONPath query
+/// and return a vector of values, omitting the path.
+pub fn js_path_process<'a, 'b, T: Queryable>(
+    path: &'b JpQuery,
+    value: &'a T,
+) -> Queried<Vec<QueryRef<'a, T>>> {
+    match path.process(State::root(value)).data {
         Data::Ref(p) => Ok(vec![p.into()]),
         Data::Refs(refs) => Ok(refs.into_iter().map(Into::into).collect()),
         Data::Value(v) => Err(v.into()),
@@ -89,9 +99,9 @@ pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<QueryPat
 #[cfg(test)]
 mod tests {
     use crate::parser::errors::JsonPathError;
-    use crate::parser::Parsed;
+    use crate::parser::{parse_json_path, Parsed};
     use crate::query::queryable::Queryable;
-    use crate::query::{js_path, Queried, QueryRef};
+    use crate::query::{js_path, js_path_process, Queried, QueryRef};
     use crate::JsonPath;
     use serde_json::{json, Value};
 
@@ -804,6 +814,29 @@ mod tests {
         });
         let vec = json.query_with_path("$['\\r']")?;
         assert_eq!(vec, vec![(&json!("A"), "$['\\r']".to_string()).into()]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_query() -> Queried<()> {
+        let json1 = json!({
+          "a": 1,
+          "b": 2,
+          "c": 3
+        });
+        let json2 = json!({
+          "a": 1,
+          "b": 2,
+          "c": 3
+        });
+
+        let jq = parse_json_path("$[?@<3]")?;
+
+        let v1 = js_path_process(&jq, &json1)?;
+        let v2 = js_path_process(&jq, &json2)?;
+
+        assert_eq!(v1, v2);
 
         Ok(())
     }
