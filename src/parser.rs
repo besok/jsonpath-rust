@@ -19,7 +19,7 @@ pub(super) struct JSPathParser;
 const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
 const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 
-pub(super) type Parsed<T> = Result<T, JsonPathError>;
+pub type Parsed<T> = Result<T, JsonPathError>;
 
 /// Parses a string into a [JsonPath].
 ///

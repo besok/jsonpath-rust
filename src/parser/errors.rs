@@ -6,7 +6,7 @@ use std::str::ParseBoolError;
 use thiserror::Error;
 
 /// This error type is used to represent errors that can occur during the parsing of JSONPath expressions.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Clone)]
 pub enum JsonPathError {
     #[error("Failed to parse rule: {0}")]
     PestError(#[from] Box<pest::error::Error<Rule>>),
