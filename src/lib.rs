@@ -113,7 +113,6 @@ pub trait JsonPath: Queryable {
     fn query(&self, path: &str) -> Queried<Vec<&Self>> {
         query::js_path_vals(path, self)
     }
-
 }
 
 impl JsonPath for Value {}
