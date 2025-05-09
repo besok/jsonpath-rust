@@ -1,10 +1,9 @@
 # Tests for RFC9535
 
 This directory contains tests for the [RFC9535](https://www.rfc-editor.org/info/rfc9535) implementation.
-The tests can be downloaded using `prepare.sh` script.
 
 ## Usage
-Run the main.rs.
+Run  `main.rs`.
 It will print the test results in the console with the following format:
 ```
 ...
