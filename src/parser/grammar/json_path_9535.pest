@@ -11,7 +11,7 @@ root = _{"$"}
 name_selector = {string}
 wildcard_selector   = {"*"}
 index_selector   = {int}
-int = { "0" | ("-"? ~ DIGIT1 ~ DIGIT*) }
+int = { "0" | ("-"? ~ safe_int) }
 step = {":" ~ S ~ int?}
 start = {int}
 end = {int}
@@ -82,3 +82,24 @@ DIGIT = _{ ASCII_DIGIT }
 DIGIT1 = _{ ASCII_NONZERO_DIGIT}
 ALPHA = { ASCII_ALPHA }
 WHITESPACE = _{ " " | "\t" | "\r\n" | "\n" | "\r"}
+
+// Matches any number less than 9007199254740991 early escape for any number <= 999999999999999
+safe_int = _{
+    (
+     DIGIT1 ~ DIGIT{0,14} ~ !ASCII_DIGIT // 1 to 15 digits (well below the max)
+    | '1'..'8' ~ ASCII_DIGIT{15}
+    | "900"  ~ '0'..'6' ~ ASCII_DIGIT{12}
+    | "90070"             ~ ASCII_DIGIT{11}
+    | "90071"  ~ '0'..'8' ~ ASCII_DIGIT{10}
+    | "900719"  ~ '0'..'8' ~ ASCII_DIGIT{9}
+    | "9007199"  ~ '0'..'1' ~ ASCII_DIGIT{8}
+    | "90071992"  ~ '0'..'4' ~ ASCII_DIGIT{7}
+    | "900719925"  ~ '0'..'3' ~ ASCII_DIGIT{6}
+    | "9007199254"  ~ '0'..'6' ~ ASCII_DIGIT{5}
+    | "90071992547"  ~ '0'..'3' ~ ASCII_DIGIT{4}
+    | "9007199254740"  ~ '0'..'8' ~ ASCII_DIGIT{2}
+    | "90071992547409"  ~ '0'..'8' ~ ASCII_DIGIT
+    | "900719925474099"  ~ '0'..'1'
+    ) ~ !ASCII_DIGIT
+}
+
