@@ -64,4 +64,5 @@
     - introduced breaking changes to the API to make it compliant with the RFC9535 
 - **`1.0.1`**
   - add method to process parsed query
-     
+- **`1.0.2`**
+  - improve grammar
