@@ -16,8 +16,8 @@ use pest::Parser;
 #[derive(Parser)]
 #[grammar = "parser/grammar/json_path_9535.pest"]
 pub(super) struct JSPathParser;
-const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
-const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
+// const MAX_VAL: i64 = 9007199254740991; // Maximum safe integer value in JavaScript
+// const MIN_VAL: i64 = -9007199254740991; // Minimum safe integer value in JavaScript
 
 pub type Parsed<T> = Result<T, JsonPathError>;
 
@@ -122,13 +122,13 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
             validate_js_str(child.as_str().trim())?.to_string(),
         )),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
-        Rule::index_selector => Ok(Selector::Index(validate_range(
+        Rule::index_selector => Ok(Selector::Index(
             child
                 .as_str()
                 .trim()
                 .parse::<i64>()
                 .map_err(|e| (e, "wrong integer"))?,
-        )?)),
+        )),
         Rule::slice_selector => {
             let (start, end, step) = slice_selector(child)?;
             Ok(Selector::Slice(start, end, step))
@@ -237,16 +237,7 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     }
     Ok(segments)
 }
-fn validate_range(val: i64) -> Result<i64, JsonPathError> {
-    if val > MAX_VAL || val < MIN_VAL {
-        Err(JsonPathError::InvalidJsonPath(format!(
-            "Value {} is out of range",
-            val
-        )))
-    } else {
-        Ok(val)
-    }
-}
+
 pub fn slice_selector(rule: Pair<Rule>) -> Parsed<(Option<i64>, Option<i64>, Option<i64>)> {
     let mut start = None;
     let mut end = None;
@@ -255,12 +246,12 @@ pub fn slice_selector(rule: Pair<Rule>) -> Parsed<(Option<i64>, Option<i64>, Opt
 
     for r in rule.into_inner() {
         match r.as_rule() {
-            Rule::start => start = Some(validate_range(get_int(r)?)?),
-            Rule::end => end = Some(validate_range(get_int(r)?)?),
+            Rule::start => start = Some(get_int(r)?),
+            Rule::end => end = Some(get_int(r)?),
             Rule::step => {
                 step = {
                     if let Some(int) = r.into_inner().next() {
-                        Some(validate_range(get_int(int)?)?)
+                        Some(get_int(int)?)
                     } else {
                         None
                     }
@@ -319,15 +310,7 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
         if num.contains('.') || num.contains('e') || num.contains('E') {
             Ok(Literal::Float(num.parse::<f64>().map_err(|e| (e, num))?))
         } else {
-            let num = num.trim().parse::<i64>().map_err(|e| (e, num))?;
-            if num > MAX_VAL || num < MIN_VAL {
-                Err(JsonPathError::InvalidNumber(format!(
-                    "number out of bounds: {}",
-                    num
-                )))
-            } else {
-                Ok(Literal::Int(num))
-            }
+            Ok(Literal::Int(num.trim().parse::<i64>().map_err(|e| (e, num))?))
         }
     }
 
