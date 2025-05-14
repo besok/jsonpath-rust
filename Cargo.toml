@@ -17,7 +17,7 @@ regex = "1"
 pest = "2.7.15"
 pest_derive = "2.7.15"
 thiserror = "2.0.9"
-#jsonpath-rust-impl = {path = "jsonpath-rust-impl"}
+jsonpath-rust-impl = {path = "jsonpath-rust-impl"}
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }

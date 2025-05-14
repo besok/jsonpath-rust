@@ -17,18 +17,44 @@ mod kw {
     syn::custom_keyword!(null);
 }
 
+macro_rules! terminating_from_pest {
+    ($wrap:ty, $rule:path, $parser:expr) => {
+        impl<'pest> ::from_pest::FromPest<'pest> for $wrap {
+        type Rule = Rule;
+        type FatalError = ::from_pest::Void;
+        fn from_pest(pest: &mut ::from_pest::pest::iterators::Pairs<'pest, Rule>) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+            let mut clone = pest.clone();
+            let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+            if pair.as_rule() == $rule {
+                let span = pair.as_span();
+                let mut inner = pair.into_inner();
+                let inner = &mut inner;
+                let this = $parser(inner);
+                if inner.clone().next().is_some() {
+                    ::from_pest::log::trace!("when converting {}, found extraneous {:?}" , stringify ! ($wrap), inner );
+                    Err(::from_pest::ConversionError::Extraneous { current_node: stringify!($wrap) })?;
+                }
+                *pest = clone;
+                Ok(this)
+            } else { Err(::from_pest::ConversionError::NoMatch) }
+        }
+    }
+    };
+}
+
 pub mod ast {
     use super::parse::{JSPathParser, Rule};
-    use syn_derive::Parse;
+    use crate::parse::kw;
     use from_pest::{ConversionError, FromPest, Void};
     use pest::iterators::Pairs;
-    use pest::{Parser};
+    use pest::Parser;
     use pest_ast::FromPest;
-    use proc_macro2::Ident;
+    use proc_macro2::{Ident, Span};
     use syn::parse::{Parse, ParseStream};
     use syn::punctuated::Punctuated;
     use syn::{token, LitBool, LitInt, LitStr, Token};
-    use crate::parse::kw;
+    use syn::token::Bracket;
+    use syn_derive::Parse;
 
     pub trait KnowsRule {const RULE: Rule; }
     #[derive(Debug)]
@@ -317,7 +343,7 @@ pub mod ast {
     }
 
     fn validate_member_name_shorthand(input: ParseStream) -> Result<String, syn::Error> {
-        let ident = input.parse::<syn::Ident>()?;
+        let ident = input.parse::<Ident>()?;
         match JSPathParser::parse(Rule::member_name_shorthand, &ident.to_string()) {
             Ok(_) => Ok(ident.to_string()),
             Err(e) => Err(syn::Error::new(ident.span(), e.to_string())),
@@ -834,7 +860,6 @@ pub mod ast {
             let mut clone = pest.clone();
             let pair = clone.next().ok_or(ConversionError::NoMatch)?;
             if pair.as_rule() == Rule::function_expr {
-                let span = pair.as_span();
                 let mut inner = pair.into_inner();
                 let inner = &mut inner;
                 let this = FunctionExpr {
@@ -857,11 +882,10 @@ pub mod ast {
         }
     }
 
-    #[derive(Debug, FromPest, Parse)]
-    #[pest_ast(rule(Rule::function_name))]
+    #[derive(Debug, Parse)]
     pub struct FunctionName {
         #[parse(validate_function_name)]
-        name: syn::Ident,
+        name: Ident,
     }
 
     impl FunctionName {
@@ -871,10 +895,33 @@ pub mod ast {
     }
 
     fn validate_function_name(input: ParseStream) -> Result<Ident, syn::Error> {
-        let ident = input.parse::<syn::Ident>()?;
+        let ident = input.parse::<Ident>()?;
         match JSPathParser::parse(Rule::function_name, &ident.to_string()) {
             Ok(_) => Ok(ident),
             Err(e) => Err(syn::Error::new(ident.span(), e.to_string())),
+        }
+    }
+
+    impl<'pest> FromPest<'pest> for FunctionName {
+        type Rule = Rule;
+        type FatalError = Void;
+
+        fn from_pest(pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+            let mut clone = pest.clone();
+            let pair = clone.next().ok_or(ConversionError::NoMatch)?;
+            if pair.as_rule() == Rule::function_name {
+                let mut inner = pair.into_inner();
+                let inner = &mut inner;
+                let this = FunctionName {
+                    name: Ident::new(inner.to_string().as_str(), Span::call_site()),
+                };
+                if inner.clone().next().is_some() {
+                    from_pest::log::trace!("when converting {}, found extraneous {:?}" , stringify ! (FunctionName ), inner );
+                    Err(ConversionError::Extraneous { current_node: stringify!(FunctionName ) })?;
+                }
+                *pest = clone;
+                Ok(this)
+            } else { Err(ConversionError::NoMatch) }
         }
     }
 
@@ -905,7 +952,7 @@ pub mod ast {
 
     #[derive(Debug, FromPest, Parse)]
     #[pest_ast(rule(Rule::curr))]
-    pub struct Curr(Token![@]);
+    pub struct Curr(PestLiteralWithoutRule<Token![@]>);
     impl Curr {
         fn peek(input: ParseStream) -> bool {
             input.peek(Token![@])
@@ -1015,10 +1062,7 @@ pub mod ast {
     pub enum NameSegment {
         #[parse(peek = token::Bracket)]
         BracketedName(
-            PestLiteralWithoutRule<token::Bracket>,
-            JSString,
-            PestLiteralWithoutRule<token::Bracket>,
-
+            BracketName
         ),
         #[parse(peek = Token![.])]
         DotName(
@@ -1033,13 +1077,37 @@ pub mod ast {
         }
     }
 
-    #[derive(Debug, FromPest, Parse)]
+    #[derive(Debug, FromPest)]
+    #[pest_ast(rule(Rule::name_selector))]
+    pub struct BracketName{
+        // #[syn(bracketed)]
+        bracket: PestLiteralWithoutRule<Bracket>,
+        // #[syn(in = bracket)]
+        name: JSString,
+    }
+
+    impl syn::parse::Parse for BracketName {
+        fn parse(__input: ParseStream) -> syn::Result<Self> {
+            let bracket;
+            Ok(Self { bracket: syn::bracketed!(bracket in __input ).into(), name: bracket.parse()? })
+        }
+    }
+
+
+    #[derive(Debug, FromPest)]
     #[pest_ast(rule(Rule::index_segment))]
     pub struct IndexSegment {
-        #[syn(bracketed)]
-        bracket: token::Bracket,
-        #[syn(in = bracket)]
+        // #[syn(bracketed)]
+        bracket: PestLiteralWithoutRule<Bracket>,
+        // #[syn(in = bracket)]
         index: JSInt,
+    }
+
+    impl syn::parse::Parse for IndexSegment {
+        fn parse(__input: ParseStream) -> syn::Result<Self> {
+            let bracket;
+            Ok(Self { bracket: syn::bracketed!(bracket in __input ).into(), index: bracket.parse()? })
+        }
     }
 
     impl IndexSegment {
@@ -1055,8 +1123,8 @@ pub mod ast {
         Number(Number),
         #[parse(peek_func = JSString::peek)]
         String(JSString),
-        #[parse(peek = Bool::peek)]
-        Bool(bool),
+        #[parse(peek = LitBool)]
+        Bool(Bool),
         #[parse(peek_func = Null::peek)]
         Null(Null),
     }
@@ -1067,16 +1135,24 @@ pub mod ast {
         }
     }
 
-    #[derive(Debug, FromPest, Parse)]
-    #[pest_ast(rule(Rule::number))]
-    pub struct Number {
-        #[parse(validate_number)]
-        value: f64,
+    #[derive(Debug, Parse)]
+    pub enum Number {
+        #[parse(peek_func = JSInt::peek)]
+        Int(JSInt),
+        #[parse(peek = syn::LitFloat)]
+        Float(
+            #[parse(parse_float)]
+            f64
+        )
+    }
+    fn parse_float(input: ParseStream) -> syn::Result<f64> {
+        let f = input.parse::<syn::LitFloat>()?;
+        Ok(f.base10_parse::<f64>()?)
     }
 
     impl Number {
         fn peek(input: ParseStream) -> bool {
-            input.peek(syn::LitInt) || input.peek(syn::LitFloat)
+            JSInt::peek(input) || input.peek(syn::LitFloat)
         }
     }
 
@@ -1093,20 +1169,66 @@ pub mod ast {
             Err(input.error("Expected number"))
         }
     }
+    impl<'pest> FromPest<'pest> for Number {
+        type Rule = Rule;
+        type FatalError = Void;
+        fn from_pest(pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+            let mut clone = pest.clone();
+            let pair = clone.next().ok_or(ConversionError::NoMatch)?;
 
-    #[derive(Debug, FromPest, Parse)]
-    #[pest_ast(rule(Rule::bool))]
-    pub struct Bool(bool);
+            if pair.as_rule() == Rule::number {
+                let mut inner = pair.into_inner();
+                let inner = &mut inner;
+
+                let this = if inner.clone().count() == 1 {
+                    let pair = inner.next().unwrap();
+                        if pair.as_rule() == Rule::int {
+                            let value = pair.as_str().parse::<i64>().expect("int");
+                            Ok(Self::Int(JSInt(value)))
+                        } else {
+                            Err(ConversionError::NoMatch)
+                        }
+
+                } else {
+                    let mut number_str = String::new();
+                    for pair in inner.clone() {
+                        number_str.push_str(pair.as_str());
+                    }
+
+                    let value = number_str.parse::<f64>().expect("float");
+                    Ok(Self::Float(value))
+                }?;
+                if inner.clone().next().is_some() {
+                    from_pest::log::trace!("when converting {}, found extraneous {:?}" , stringify ! (FunctionName ), inner );
+                    Err(ConversionError::Extraneous { current_node: stringify!(FunctionName ) })?;
+                }
+                *pest = clone;
+                Ok(this)
+            } else { Err(ConversionError::NoMatch) }
+        }
+    }
+
+
+    #[derive(Debug, Parse)]
+    pub struct Bool(
+        #[parse(parse_bool)]
+        bool
+    );
+    fn parse_bool(input: ParseStream) -> Result<bool, syn::Error> {
+        let lit_bool = input.parse::<syn::LitBool>()?;
+        Ok(lit_bool.value)
+    }
 
     impl Bool {
         fn peek(input: ParseStream) -> bool {
             input.peek(LitBool)
         }
     }
+    terminating_from_pest!(Bool, Rule::bool, | inner: &mut Pairs<Rule> | Bool(inner.to_string().parse::<bool>().expect("bool")));
 
     #[derive(Debug, FromPest, Parse)]
     #[pest_ast(rule(Rule::null))]
-    pub struct Null(kw::null);
+    pub struct Null(PestLiteralWithoutRule<kw::null>);
 
     impl Null {
         fn peek(input: ParseStream) -> bool {
