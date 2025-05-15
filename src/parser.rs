@@ -310,7 +310,9 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
         if num.contains('.') || num.contains('e') || num.contains('E') {
             Ok(Literal::Float(num.parse::<f64>().map_err(|e| (e, num))?))
         } else {
-            Ok(Literal::Int(num.trim().parse::<i64>().map_err(|e| (e, num))?))
+            Ok(Literal::Int(
+                num.trim().parse::<i64>().map_err(|e| (e, num))?,
+            ))
         }
     }
 
