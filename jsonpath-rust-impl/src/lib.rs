@@ -1,11 +1,18 @@
-mod parse;
 
-use pest::error::InputLocation;
-use proc_macro::{TokenStream, Span};
-use std::ops::Range;
-use syn::__private::IntoSpans;
-use syn::__private::quote::quote;
-use syn::spanned::Spanned;
+
+use proc_macro::TokenStream;
+use std::fmt::format;
+use jsonpath_ast::ast::{ Main, JPQuery };
+use syn::parse_macro_input;
+use quote::{quote, ToTokens};
+
+#[proc_macro]
+pub fn json_query(input: TokenStream) -> TokenStream {
+    let main = parse_macro_input!(input as Main);
+    quote! {#main}.into()
+}
+
+
 
 // #[proc_macro]
 // pub fn json_query(input: TokenStream) -> TokenStream {

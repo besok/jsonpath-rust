@@ -7,12 +7,7 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
-proc-macro2 = { version = "1.0.95", features = ["span-locations"] }
-pest = "2.7.15"
-pest_derive = "2.7.15"
-syn = { version = "2.0.101", features = ["full"] }
-pest-ast = "0.3.5"
-from-pest = "0.3.3"
-syn_derive = "0.2.0"
+jsonpath-ast = {path = "../jsonpath-ast", features = ["compiled-path"]}
+syn = "2.0.101"
+proc-macro2 = "1.0.95"
 quote = "1.0.40"
-derive_more = { version = "2.0.1", features = ["from"] }

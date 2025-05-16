@@ -17,12 +17,15 @@ regex = "1"
 pest = "2.7.15"
 pest_derive = "2.7.15"
 thiserror = "2.0.9"
-jsonpath-rust-impl = {path = "jsonpath-rust-impl"}
+jsonpath-rust-impl = {path = "jsonpath-rust-impl", optional = true}
+jsonpath-ast = {path = "jsonpath-ast"}
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 criterion = "0.5.1"
 
+[features]
+compiled-path = ["jsonpath-ast/compiled-path", "dep:jsonpath-rust-impl"]
 
 [[bench]]
 name = "regex"
