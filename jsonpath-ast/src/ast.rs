@@ -51,13 +51,13 @@ macro_rules! terminating_from_pest {
     };
 }
 
-use derive_new::new;
 use super::parse::{JSPathParser, Rule};
 #[cfg(feature = "compiled-path")]
 use crate::syn_parse::parse_impl::{
     parse_bool, parse_float, validate_function_name, validate_js_int, validate_js_str,
     validate_member_name_shorthand, ParseUtilsExt,
 };
+use derive_new::new;
 use from_pest::{ConversionError, FromPest, Void};
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
@@ -69,7 +69,7 @@ use syn::punctuated::Punctuated;
 use syn::token::Bracket;
 use syn::{token, Ident, LitBool, Token};
 #[cfg(feature = "compiled-path")]
-use syn_derive::{Parse};
+use syn_derive::Parse;
 
 pub trait KnowsRule {
     const RULE: Rule;
@@ -80,7 +80,7 @@ pub struct PestIgnoredPunctuated<T, P>(pub(crate) Punctuated<T, P>);
 
 impl<'pest, T, P> FromPest<'pest> for PestIgnoredPunctuated<T, P>
 where
-    T: FromPest<'pest, Rule = Rule, FatalError = Void> + KnowsRule,
+    T: FromPest<'pest, Rule=Rule, FatalError=Void> + KnowsRule + std::fmt::Debug,
     P: Default,
 {
     type Rule = Rule;
@@ -162,10 +162,16 @@ pub struct Segments {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::segment))]
 pub enum Segment {
+    // THIS MUST BE FIRST
+    #[cfg_attr(feature = "compiled-path", parse(peek_func = DescendantSegment::peek))]
+    Descendant(
+        PestLiteralWithoutRule<Token![.]>,
+        PestLiteralWithoutRule<Token![.]>,
+        DescendantSegment,
+    ),
     #[cfg_attr(feature = "compiled-path", parse(peek_func = ChildSegment::peek))]
     Child(ChildSegment),
-    #[cfg_attr(feature = "compiled-path", parse(peek_func = DescendantSegment::peek))]
-    Descendant(DescendantSegment),
+
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -316,19 +322,9 @@ impl<'pest> from_pest::FromPest<'pest> for JSString {
     fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<Void>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::string {
-            let inner = pair.into_inner();
-            let this = JSString(inner.to_string());
-            if inner.clone().next().is_some() {
-                from_pest::log::trace!(
-                    "when converting {}, found extraneous {:?}",
-                    stringify!(JSString),
-                    inner
-                );
-                Err(ConversionError::Extraneous {
-                    current_node: stringify!(JSString),
-                })?;
-            }
+        if pair.clone().as_rule() == Rule::string {
+            let str = pair.as_str();
+            let this = JSString(str[1..str.len() - 1].to_string());
             *pest = clone;
             Ok(this)
         } else {
@@ -363,7 +359,7 @@ pub enum Selector {
     FilterSelector(FilterSelector),
     // This MUST be the last element to prevent syn::Lit from catching one of the others, it's our "fallback"
     #[cfg_attr(feature = "compiled-path", parse(peek_func = JSString::peek))]
-    NameSelector(JSString),
+    NameSelector(NameSelector),
 }
 impl KnowsRule for Selector {
     const RULE: Rule = Rule::selector;
@@ -438,6 +434,11 @@ pub enum AtomExpr {
 impl KnowsRule for AtomExpr {
     const RULE: Rule = Rule::atom_expr;
 }
+
+#[derive(Debug, new, PartialEq, FromPest)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+#[pest_ast(rule(Rule::name_selector))]
+pub struct NameSelector(pub(crate) JSString);
 
 #[derive(Debug, new, PartialEq)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]

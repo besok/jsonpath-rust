@@ -1,6 +1,6 @@
-main = { SOI ~ jp_query ~ EOI }
+main = ${ SOI ~ jp_query ~ EOI }
 jp_query = {root ~ segments}
-segments = {(S ~ segment)*}
+segments = !{(S ~ segment)*}
 segment = { child_segment | descendant_segment }
 child_segment = { bracketed_selection | ("." ~ (wildcard_selector | member_name_shorthand)) }
 bracketed_selection = { "[" ~ S ~ selector ~ (S ~ "," ~ S ~ selector)* ~ S ~ "]" }

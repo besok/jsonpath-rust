@@ -1,7 +1,7 @@
 #[cfg(feature = "compiled-path")]
 pub(crate) mod parse_impl {
     use crate::ast::parse::{JSPathParser, Rule};
-    use crate::ast::{kw, CompOp, IndexSelector, Main};
+    use crate::ast::{kw, CompOp, IndexSelector, Main, NameSelector};
     use crate::ast::{
         AbsSingularQuery, AtomExpr, Bool, BracketName, BracketedSelection, ChildSegment, CompExpr,
         Comparable, DescendantSegment, FilterSelector, FunctionArgument, FunctionExpr, FunctionName, IndexSegment,
@@ -11,7 +11,7 @@ pub(crate) mod parse_impl {
         SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector, SliceStart, SliceStep, Test, TestExpr,
         WildcardSelector, WildcardSelectorOrMemberNameShorthand, EOI,
     };
-    use pest::Parser;
+    use pest::{Parser};
     use proc_macro2::{Ident, TokenStream};
     use quote::{quote, ToTokens};
     use syn::parse::{Parse, ParseStream};
@@ -296,11 +296,11 @@ pub(crate) mod parse_impl {
                         ::jsonpath_ast::ast::Segment::new_child(#child_tokens)
                     });
                 }
-                Self::Descendant(descendant) => {
+                Self::Descendant(_, _, descendant) => {
                     let mut descendant_tokens = TokenStream::new();
                     descendant.to_tokens(&mut descendant_tokens);
                     tokens.extend(quote! {
-                        ::jsonpath_ast::ast::Segment::new_descendant(#descendant_tokens)
+                        ::jsonpath_ast::ast::Segment::new_descendant(Default::default(), Default::default(), #descendant_tokens)
                     });
                 }
             }
@@ -340,11 +340,16 @@ pub(crate) mod parse_impl {
 
     impl ParseUtilsExt for MemberNameShorthand {
         fn peek(input: ParseStream) -> bool {
-            input.peek(syn::Ident)
+            input.peek(syn::Ident) || input.peek(Token![_])
         }
     }
 
     pub fn validate_member_name_shorthand(input: ParseStream) -> Result<String, syn::Error> {
+        // Special case where syn treats a lone underscore as a token, not an ident
+        if input.peek(Token![_]) {
+            input.parse::<Token![_]>()?;
+            return Ok("_".to_string());
+        }
         let ident = input.parse::<Ident>()?;
         match JSPathParser::parse(Rule::member_name_shorthand, &ident.to_string()) {
             Ok(_) => Ok(ident.to_string()),
@@ -354,9 +359,7 @@ pub(crate) mod parse_impl {
 
     impl ParseUtilsExt for DescendantSegment {
         fn peek(input: ParseStream) -> bool {
-            BracketedSelection::peek(input)
-                || WildcardSelector::peek(input)
-                || MemberNameShorthand::peek(input)
+            input.peek(Token![.]) && input.peek2(Token![.])
         }
     }
 
@@ -415,12 +418,24 @@ pub(crate) mod parse_impl {
     impl ToTokens for SliceSelector {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self(start, _, stop, step) = self;
+            let repr_start = match start {
+                Some(some_start) => quote! {Some(#some_start)},
+                None => quote! {None},
+            };
+            let repr_stop = match stop {
+                Some(some_stop) => quote! {Some(#some_stop)},
+                None => quote! {None},
+            };
+            let repr_step = match step {
+                Some(some_step) => quote! {Some(#some_step)},
+                None => quote! {None},
+            };
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::SliceSelector::new(
-                    #start,
+                    #repr_start,
                     Default::default(),
-                    #stop,
-                    #step,
+                    #repr_stop,
+                    #repr_step,
                 )
             })
         }
@@ -462,6 +477,13 @@ pub(crate) mod parse_impl {
                     #expr,
                 )
             });
+        }
+    }
+
+    impl ToTokens for NameSelector {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let Self(_0) = self;
+            tokens.extend(quote!(::jsonpath_ast::ast::NameSelector::new(#_0)));
         }
     }
 
@@ -844,11 +866,29 @@ pub(crate) mod parse_impl {
         fn peek(input: ParseStream) -> bool {
             input.peek(Token![:])
         }
+
+        fn maybe_parse(input: ParseStream) -> syn::Result<Option<Self>> {
+            if input.peek(Token![:]) {
+                let colon = input.parse()?;
+                if JSInt::peek(input) {
+                    return Ok(Some(Self(colon, input.parse()?)))
+                }
+            }
+            Ok(None)
+        }
     }
 
     impl ParseUtilsExt for SliceStart {
         fn peek(input: ParseStream) -> bool {
-            input.peek(Token![:])
+            input.peek(Token![:]) || input.peek2(Token![:])
+        }
+
+        fn maybe_parse(input: ParseStream) -> syn::Result<Option<Self>> {
+            if input.peek(Token![:]) {
+                return Ok(None);
+            } else {
+                Ok(Some(Self(input.parse()?)))
+            }
         }
     }
 
