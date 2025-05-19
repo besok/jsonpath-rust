@@ -1,14 +1,14 @@
 #[cfg(feature = "compiled-path")]
 pub(crate) mod parse_impl {
     use crate::ast::parse::{JSPathParser, Rule};
-    use crate::ast::{kw, CompOp, Main};
+    use crate::ast::{kw, CompOp, IndexSelector, Main};
     use crate::ast::{
         AbsSingularQuery, AtomExpr, Bool, BracketName, BracketedSelection, ChildSegment, CompExpr,
-        Comparable, DescendantSegment, FilterSelector, FunctionExpr, FunctionName, IndexSegment,
+        Comparable, DescendantSegment, FilterSelector, FunctionArgument, FunctionExpr, FunctionName, IndexSegment,
         JPQuery, JSInt, JSString, Literal, LogicalExpr, LogicalExprAnd, MemberNameShorthand,
         NameSegment, NotOp, Null, Number, ParenExpr, PestIgnoredPunctuated, PestLiteralWithoutRule,
         RelQuery, RelSingularQuery, Root, Segment, Segments, Selector, SingularQuery,
-        SingularQuerySegment, SliceEnd, SliceSelector, SliceStart, SliceStep, Test, TestExpr,
+        SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector, SliceStart, SliceStep, Test, TestExpr,
         WildcardSelector, WildcardSelectorOrMemberNameShorthand, EOI,
     };
     use pest::Parser;
@@ -63,7 +63,7 @@ pub(crate) mod parse_impl {
                         let mut sub = TokenStream::new();
                         val.to_tokens(&mut sub);
                         tokens.extend(
-                            quote! { ::jsonpath_ast::ast::PestLiteralWithoutRule::new(#sub) },
+                            quote! { ::jsonpath_ast::ast::PestLiteralWithoutRule::new(Default::default()) },
                         );
                     };
                     __expr(tokens, __0)
@@ -78,10 +78,10 @@ pub(crate) mod parse_impl {
             self.jp_query.to_tokens(&mut q);
             self.eoi.to_tokens(&mut e);
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::Main {
-                    jp_query: #q,
-                    eoi: #e,
-                }
+                ::jsonpath_ast::ast::Main::new(
+                    #q,
+                    #e,
+                )
             })
         }
     }
@@ -115,7 +115,7 @@ pub(crate) mod parse_impl {
     }
     impl ToTokens for Root {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            tokens.extend(quote! {queryRoot})
+            tokens.extend(quote! (::jsonpath_ast::ast::Root::new()))
         }
     }
 
@@ -141,10 +141,10 @@ pub(crate) mod parse_impl {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self { root, segments } = self;
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::JPQuery {
-                    root: #root,
-                    segments: #segments,
-                }
+                ::jsonpath_ast::ast::JPQuery::new(
+                    #root,
+                    #segments,
+                )
             })
         }
     }
@@ -162,11 +162,10 @@ pub(crate) mod parse_impl {
                 item.to_tokens(&mut items);
                 items.extend(quote!(,))
             }
-            items.extend(quote!(Vec::from([#items])));
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::Segments {
-                    segments: #items,
-                }
+                ::jsonpath_ast::ast::Segments::new(
+                    Vec::from([#items]),
+                )
             })
         }
     }
@@ -222,9 +221,9 @@ pub(crate) mod parse_impl {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let name = &self.name;
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::MemberNameShorthand {
-                    name: #name.to_string()
-                }
+                ::jsonpath_ast::ast::MemberNameShorthand::new(
+                    #name.to_string()
+                )
             });
         }
     }
@@ -234,10 +233,10 @@ pub(crate) mod parse_impl {
             let mut selectors_tokens = TokenStream::new();
             self.selectors.to_tokens(&mut selectors_tokens);
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::BracketedSelection {
-                    arg_bracket: ::syn::token::Bracket::default(),
-                    selectors: #selectors_tokens
-                }
+                ::jsonpath_ast::ast::BracketedSelection::new(
+                    Default::default(),
+                    #selectors_tokens
+                )
             });
         }
     }
@@ -254,7 +253,7 @@ pub(crate) mod parse_impl {
                 items.extend(quote!(,))
             }
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::PestIgnoredPunctuated::new(::syn::punctuated::Punctuated::from_iter(vec![#items]))
+                ::jsonpath_ast::ast::PestIgnoredPunctuated::new(::syn::punctuated::Punctuated::from_iter(Vec::from([#items])))
             });
         }
     }
@@ -294,14 +293,14 @@ pub(crate) mod parse_impl {
                     let mut child_tokens = TokenStream::new();
                     child.to_tokens(&mut child_tokens);
                     tokens.extend(quote! {
-                        ::jsonpath_ast::ast::Segment::Child(#child_tokens)
+                        ::jsonpath_ast::ast::Segment::new_child(#child_tokens)
                     });
                 }
                 Self::Descendant(descendant) => {
                     let mut descendant_tokens = TokenStream::new();
                     descendant.to_tokens(&mut descendant_tokens);
                     tokens.extend(quote! {
-                        ::jsonpath_ast::ast::Segment::Descendant(#descendant_tokens)
+                        ::jsonpath_ast::ast::Segment::new_descendant(#descendant_tokens)
                     });
                 }
             }
@@ -430,20 +429,27 @@ pub(crate) mod parse_impl {
     impl ToTokens for SliceStart {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self(_0) = self;
-            tokens.extend(quote!(SliceStart::new(#_0)));
+            tokens.extend(quote!(::jsonpath_ast::ast::SliceStart::new(#_0)));
         }
     }
     impl ToTokens for SliceEnd {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self(_0) = self;
-            tokens.extend(quote!(SliceEnd::new(#_0)));
+            tokens.extend(quote!(::jsonpath_ast::ast::SliceEnd::new(#_0)));
         }
     }
 
     impl ToTokens for SliceStep {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self(_, _0) = self;
-            tokens.extend(quote!(SliceStep::new(Default::default(), #_0)));
+            tokens.extend(quote!(::jsonpath_ast::ast::SliceStep::new(Default::default(), #_0)));
+        }
+    }
+
+    impl ToTokens for IndexSelector {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let Self(_0) = self;
+            tokens.extend(quote!(::jsonpath_ast::ast::IndexSelector::new(#_0)));
         }
     }
 
@@ -476,13 +482,13 @@ pub(crate) mod parse_impl {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             tokens.extend(match self {
                 AtomExpr::ParenExpr(inner) => {
-                    quote! { ::jsonpath_ast::ast::AtomExpr::new_paren_expr(#inner); }
+                    quote! { ::jsonpath_ast::ast::AtomExpr::new_paren_expr(#inner) }
                 }
                 AtomExpr::CompExpr(inner) => {
-                    quote! { ::jsonpath_ast::ast::AtomExpr::new_comp_expr(#inner); }
+                    quote! { ::jsonpath_ast::ast::AtomExpr::new_comp_expr(#inner) }
                 }
                 AtomExpr::TestExpr(inner) => {
-                    quote! { ::jsonpath_ast::ast::AtomExpr::new_test_expr(#inner); }
+                    quote! { ::jsonpath_ast::ast::AtomExpr::new_test_expr(#inner) }
                 }
             });
         }
@@ -490,6 +496,7 @@ pub(crate) mod parse_impl {
 
     impl ToTokens for ParenExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
+            #[allow(unused_variables)]
             let Self {
                 not_op,
                 paren,
@@ -505,13 +512,14 @@ pub(crate) mod parse_impl {
     }
     impl ToTokens for CompExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self { left, op, right } = self;
+            let Self{left, op, right} = self;
             tokens.extend(quote! {
-            ::jsonpath_ast::ast::CompExpr::new(
-                #left,
-                #op,
-                #right
-            )});
+                ::jsonpath_ast::ast::CompExpr::new(
+                    #left,
+                    #op,
+                    #right
+                )
+            });
         }
     }
 
@@ -558,13 +566,23 @@ pub(crate) mod parse_impl {
         }
     }
 
+    impl ToTokens for FunctionName {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::FunctionName::new(
+                    ::proc_macro2::Ident::new("function_name", ::proc_macro2::Span::call_site())
+                )
+            });
+        }
+    }
+
     impl ToTokens for FunctionExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self{name, paren, args} = self;
+            let Self{name, paren: _, args} = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::FunctionExpr::new(
                     #name,
-                    #paren,
+                    Default::default(),
                     #args
                 )
             });
@@ -585,9 +603,159 @@ pub(crate) mod parse_impl {
         }
     }
 
+    impl ToTokens for RelQuery {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let Self{curr, segments} = self;
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::RelQuery::new(
+                    #curr,
+                    #segments
+                )
+            });
+        }
+    }
+
+    impl ToTokens for RelSingularQuery {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            #[allow(unused_variables)]
+            let Self{curr, segments} = self;
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::RelSingularQuery::new(
+                    Default::default(),
+                    #segments
+                )
+            });
+        }
+    }
+
+    impl ToTokens for AbsSingularQuery {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            #[allow(unused_variables)]
+            let Self{root, segments} = self;
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::RelSingularQuery::new(
+                    Default::default(),
+                    #segments
+                )
+            });
+        }
+    }
+
+    impl ToTokens for SingularQuerySegments {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let mut out = TokenStream::new();
+            for segment in self.segments.iter() {
+                out.extend(quote!(#segment,));
+            }
+            tokens.extend(quote!(::jsonpath_ast::ast::SingularQuerySegments::new(Vec::from([#out]))));
+        }
+    }
+
+    impl ToTokens for SingularQuerySegment {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            match self {
+                Self::NameSegment(segment) => {
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::SingularQuerySegment::new_name_segment(#segment)
+                    });
+                }
+                Self::IndexSegment(segment) => {
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::SingularQuerySegment::new_index_segment(#segment)
+                    });
+                }
+            }
+        }
+    }
+
+    impl ToTokens for NameSegment {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            match self {
+                Self::BracketedName(name) => {
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::NameSegment::BracketedName(#name)
+                    });
+                }
+                Self::DotName(_dot, shorthand) => {
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::NameSegment::DotName(
+                            Default::default(),
+                            #shorthand
+                        )
+                    });
+                }
+            }
+        }
+    }
+
+    impl ToTokens for BracketName {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            #[allow(unused_variables)]
+            let Self { bracket, name } = self;
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::BracketName {
+                    bracket: Default::default(),
+                    name: #name,
+                }
+            });
+        }
+    }
+
+    impl ToTokens for IndexSegment {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            #[allow(unused_variables)]
+            let Self { bracket, index } = self;
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::IndexSegment {
+                    bracket: Default::default(),
+                    index: #index,
+                }
+            });
+        }
+    }
+
+    impl ToTokens for FunctionArgument {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            match self {
+                Self::Literal(literal) => {
+                    let mut literal_tokens = TokenStream::new();
+                    literal.to_tokens(&mut literal_tokens);
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::FunctionArgument::Literal(#literal_tokens)
+                    });
+                }
+                Self::Test(test) => {
+                    let mut test_tokens = TokenStream::new();
+                    test.to_tokens(&mut test_tokens);
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::FunctionArgument::Test(#test_tokens)
+                    });
+                }
+                Self::LogicalExpr(expr) => {
+                    let mut expr_tokens = TokenStream::new();
+                    expr.to_tokens(&mut expr_tokens);
+                    tokens.extend(quote! {
+                        ::jsonpath_ast::ast::FunctionArgument::LogicalExpr(#expr_tokens)
+                    });
+                }
+            }
+        }
+    }
+
+    impl ToTokens for Test {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let variant = match self {
+                Test::RelQuery(inner) => {quote!(new_rel_query(#inner))}
+                Test::JPQuery(inner) => {quote!(new_jp_query(#inner))}
+                Test::FunctionExpr(inner) => {quote!(new_function_expr(#inner))}
+            };
+            tokens.extend(quote!(::jsonpath_ast::ast::Test::#variant));
+        }
+    }
+
     impl ToTokens for TestExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self { not_op, test } = self;
+            let Self{not_op, test} = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::TestExpr::new(
                     #not_op,

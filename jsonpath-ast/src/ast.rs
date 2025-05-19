@@ -69,9 +69,7 @@ use syn::punctuated::Punctuated;
 use syn::token::Bracket;
 use syn::{token, Ident, LitBool, Token};
 #[cfg(feature = "compiled-path")]
-use syn_derive::{Parse, ToTokens};
-#[cfg(feature = "compiled-path")]
-use proc_macro2::TokenStream;
+use syn_derive::{Parse};
 
 pub trait KnowsRule {
     const RULE: Rule;
@@ -241,9 +239,10 @@ impl<'pest> FromPest<'pest> for WildcardSelectorOrMemberNameShorthand {
 
         match pair.as_rule() {
             Rule::wildcard_selector => {
-                let mut inner = pair.clone().into_inner();
-                let inner = &mut inner;
-                let this = Self::WildcardSelector(::from_pest::FromPest::from_pest(inner)?);
+                // let mut inner = pair.clone().into_inner();
+                // let inner = &mut inner;
+                // Self is NOT actually a rule so pass pest, not inner
+                let this = Self::WildcardSelector(::from_pest::FromPest::from_pest(pest)?);
                 // if inner.clone().next().is_some() {
                 //     ::from_pest::log::trace!(
                 //         "when converting {}, found extraneous {:?}",
@@ -257,9 +256,10 @@ impl<'pest> FromPest<'pest> for WildcardSelectorOrMemberNameShorthand {
                 Ok(this)
             }
             Rule::member_name_shorthand => {
-                let mut inner = pair.clone().into_inner();
-                let inner = &mut inner;
-                let this = Self::MemberNameShorthand(::from_pest::FromPest::from_pest(inner)?);
+                // let mut inner = pair.clone().into_inner();
+                // let inner = &mut inner;
+                // Self is NOT actually a rule so pass pest, not inner
+                let this = Self::MemberNameShorthand(::from_pest::FromPest::from_pest(pest)?);
                 // if inner.clone().next().is_some() {
                 //     ::from_pest::log::trace!(
                 //         "when converting {}, found extraneous {:?}",
@@ -295,10 +295,11 @@ impl<'pest> from_pest::FromPest<'pest> for MemberNameShorthand {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::member_name_shorthand {
-            *pest = clone;
-            Ok(MemberNameShorthand {
+            let this = Ok(MemberNameShorthand {
                 name: pest.as_str().to_string(),
-            })
+            });
+            *pest = clone;
+            this
         } else {
             Err(ConversionError::NoMatch)
         }
@@ -357,7 +358,7 @@ pub enum Selector {
     #[cfg_attr(feature = "compiled-path", parse(peek_func = SliceSelector::peek))]
     SliceSelector(SliceSelector),
     #[cfg_attr(feature = "compiled-path", parse(peek_func = JSInt::peek))]
-    IndexSelector(JSInt),
+    IndexSelector(IndexSelector),
     #[cfg_attr(feature = "compiled-path", parse(peek_func = FilterSelector::peek))]
     FilterSelector(FilterSelector),
     // This MUST be the last element to prevent syn::Lit from catching one of the others, it's our "fallback"
@@ -378,28 +379,6 @@ pub struct SliceSelector(
     #[cfg_attr(feature = "compiled-path", parse(SliceStep::maybe_parse))] pub(crate) Option<SliceStep>,
 );
 
-// impl Parse for SliceSelector {
-//     fn parse(input: ParseStream) -> syn::Result<Self> {
-//         let start: Option<SliceStart> = if JSInt::peek(input) {
-//             Some(input.parse()?)
-//         } else {
-//             None
-//         };
-//         let colon: Token![:] = input.parse()?;
-//         let end: Option<SliceEnd> = if input.peek(Token![:]) || input.peek2(Token![:]) {
-//             Some(input.parse()?)
-//         } else {
-//             None
-//         };
-//         let step: Option<SliceStep> = if input.peek(Token![:]) || input.peek2(LitInt) {
-//             Some(input.parse()?)
-//         } else {
-//             None
-//         };
-//         Ok(Self(start, PestLiteralWithoutRule(colon), end, step))
-//     }
-// }
-
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::step))]
@@ -414,6 +393,11 @@ pub struct SliceStart(pub(crate) JSInt);
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::end))]
 pub struct SliceEnd(pub(crate) JSInt);
+
+#[derive(Debug, new, PartialEq, FromPest)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+#[pest_ast(rule(Rule::index_selector))]
+pub struct IndexSelector(pub(crate) JSInt);
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
@@ -469,11 +453,13 @@ impl<'pest> FromPest<'pest> for JSInt {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::int {
-            Ok(JSInt(
+            let this = JSInt(
                 pair.as_str()
                     .parse::<i64>()
                     .expect("int rule should always be a valid i64"),
-            ))
+            );
+            *pest = clone;
+            Ok(this)
         } else {
             Err(ConversionError::NoMatch)
         }
@@ -486,20 +472,20 @@ impl<'pest> FromPest<'pest> for JSInt {
 #[pest_ast(rule(Rule::paren_expr))]
 pub struct ParenExpr {
     // #[cfg_attr(feature = "compiled-path", parse(peek_func = NotOp::peek))]
-    pub not_op: Option<NotOp>,
+    pub(crate) not_op: Option<NotOp>,
     // #[paren]
-    pub paren: PestLiteralWithoutRule<token::Paren>,
+    pub(crate) paren: PestLiteralWithoutRule<token::Paren>,
     // #[inside(paren)]
-    pub expr: LogicalExpr,
+    pub(crate) expr: LogicalExpr,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::comp_expr))]
 pub struct CompExpr {
-    left: Comparable,
-    op: CompOp,
-    right: Comparable,
+    pub(crate) left: Comparable,
+    pub(crate) op: CompOp,
+    pub(crate) right: Comparable,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -507,8 +493,8 @@ pub struct CompExpr {
 #[pest_ast(rule(Rule::test_expr))]
 pub struct TestExpr {
     #[cfg_attr(feature = "compiled-path", parse(NotOp::maybe_parse))]
-    not_op: Option<NotOp>,
-    test: Test,
+    pub(crate) not_op: Option<NotOp>,
+    pub(crate) test: Test,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -662,16 +648,6 @@ impl<'pest> FromPest<'pest> for FunctionName {
             let this = FunctionName {
                 name: Ident::new(inner.to_string().as_str(), Span::call_site()),
             };
-            if inner.clone().next().is_some() {
-                from_pest::log::trace!(
-                    "when converting {}, found extraneous {:?}",
-                    stringify!(FunctionName),
-                    inner
-                );
-                Err(ConversionError::Extraneous {
-                    current_node: stringify!(FunctionName),
-                })?;
-            }
             *pest = clone;
             Ok(this)
         } else {
@@ -699,8 +675,8 @@ impl KnowsRule for FunctionArgument {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::rel_query))]
 pub struct RelQuery {
-    curr: PestLiteralWithoutRule<Token![@]>,
-    segments: Segments,
+    pub(crate) curr: PestLiteralWithoutRule<Token![@]>,
+    pub(crate) segments: Segments,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -717,16 +693,16 @@ pub enum SingularQuery {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::rel_singular_query))]
 pub struct RelSingularQuery {
-    curr: PestLiteralWithoutRule<Token![@]>,
-    segments: SingularQuerySegments,
+    pub(crate) curr: PestLiteralWithoutRule<Token![@]>,
+    pub(crate) segments: SingularQuerySegments,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::abs_singular_query))]
 pub struct AbsSingularQuery {
-    root: PestLiteralWithoutRule<Root>,
-    segments: SingularQuerySegments,
+    pub(crate) root: PestLiteralWithoutRule<Root>,
+    pub(crate) segments: SingularQuerySegments,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -734,7 +710,7 @@ pub struct AbsSingularQuery {
 #[pest_ast(rule(Rule::singular_query_segments))]
 pub struct SingularQuerySegments {
     #[cfg_attr(feature = "compiled-path", parse(SingularQuerySegment::parse_outer))]
-    segments: Vec<SingularQuerySegment>,
+    pub(crate) segments: Vec<SingularQuerySegment>,
 }
 
 #[derive(Debug, new, PartialEq)]
@@ -758,15 +734,13 @@ impl<'pest> FromPest<'pest> for SingularQuerySegment {
 
         match pair.as_rule() {
             Rule::name_segment => {
-                let mut inner = pair.clone().into_inner();
-                let inner = &mut inner;
+                // let mut inner = pair.clone().into_inner();
                 // SingularQueryStatement is NOT actually a rule so pass pest, not inner
                 let this = Self::NameSegment(::from_pest::FromPest::from_pest(pest)?);
                 Ok(this)
             }
             Rule::index_segment => {
-                let mut inner = pair.clone().into_inner();
-                let inner = &mut inner;
+                // let mut inner = pair.clone().into_inner();
                 // SingularQueryStatement is NOT actually a rule so pass pest, not inner
                 let this = Self::IndexSegment(::from_pest::FromPest::from_pest(pest)?);
                 Ok(this)
@@ -790,18 +764,18 @@ pub enum NameSegment {
 #[pest_ast(rule(Rule::name_selector))]
 pub struct BracketName {
     // #[cfg_attr(feature = "compiled-path", syn(bracketed))]
-    pub bracket: PestLiteralWithoutRule<Bracket>,
+    pub(crate) bracket: PestLiteralWithoutRule<Bracket>,
     // #[cfg_attr(feature = "compiled-path", syn(in = bracket))]
-    pub name: JSString,
+    pub(crate) name: JSString,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[pest_ast(rule(Rule::index_segment))]
 pub struct IndexSegment {
     // #[cfg_attr(feature = "compiled-path", syn(bracketed))]
-    pub bracket: PestLiteralWithoutRule<Bracket>,
+    pub(crate) bracket: PestLiteralWithoutRule<Bracket>,
     // #[cfg_attr(feature = "compiled-path", syn(in = bracket))]
-    pub index: JSInt,
+    pub(crate) index: JSInt,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
