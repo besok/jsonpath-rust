@@ -27,18 +27,12 @@ pub type Parsed<T> = Result<T, JsonPathError>;
 ///
 /// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
-    if jp_str != jp_str.trim() {
-        Err(JsonPathError::InvalidJsonPath(
-            "Leading or trailing whitespaces".to_string(),
-        ))
-    } else {
-        JSPathParser::parse(Rule::main, jp_str)
-            .map_err(Box::new)?
-            .next()
-            .ok_or(JsonPathError::UnexpectedPestOutput)
-            .and_then(next_down)
-            .and_then(jp_query)
-    }
+    JSPathParser::parse(Rule::main, jp_str)
+        .map_err(Box::new)?
+        .next()
+        .ok_or(JsonPathError::UnexpectedPestOutput)
+        .and_then(next_down)
+        .and_then(jp_query)
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
