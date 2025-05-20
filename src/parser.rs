@@ -27,20 +27,12 @@ pub type Parsed<T> = Result<T, JsonPathError>;
 ///
 /// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
-    if jp_str != jp_str.trim() {
-        Err(JsonPathError::InvalidJsonPath(
-            "Leading or trailing whitespaces".to_string(),
-        ))
-    } else {
-        JSPathParser::parse(Rule::main, jp_str)
-            .map_err(Box::new)?
-            .next()
-            .ok_or(JsonPathError::UnexpectedPestOutput)
-            // Remove [`main`](src/parser/grammar/json_path_9535.pest:1) rule
-            .and_then(next_down)
-            // Start parsing [`jp_query`](src/parser/grammar/json_path_9535.pest:2) rule
-            .and_then(jp_query)
-    }
+    JSPathParser::parse(Rule::main, jp_str)
+        .map_err(Box::new)?
+        .next()
+        .ok_or(JsonPathError::UnexpectedPestOutput)
+        .and_then(next_down)
+        .and_then(jp_query)
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {
@@ -402,11 +394,8 @@ pub fn comparable(rule: Pair<Rule>) -> Parsed<Comparable> {
 }
 
 fn next_down(rule: Pair<Rule>) -> Parsed<Pair<Rule>> {
-    let dbg_str1 = format!("{:?}", rule.clone());
     let rule_as_str = rule.as_str().to_string();
-    let ret = rule.into_inner()
+    rule.into_inner()
         .next()
-        .ok_or(JsonPathError::InvalidJsonPath(rule_as_str));
-    let dbg_str2 = format!("{:?}", ret);
-    ret
+        .ok_or(JsonPathError::InvalidJsonPath(rule_as_str))
 }
