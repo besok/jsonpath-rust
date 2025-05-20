@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/rfc9535_compile_tests/basic/fails/40_current_node_identifier_without_filter_selector.rs:9:25
+  |
+9 |         json_query! ( $[@.a] ),
+  |                         ^

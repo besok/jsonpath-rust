@@ -1,0 +1,5 @@
+error: expected `,`
+ --> tests/rfc9535_compile_tests/basic/fails/16_multiple_selectors_space_instead_of_comma.rs:9:27
+  |
+9 |         json_query! ( $[0 2] ),
+  |                           ^
