@@ -41,6 +41,15 @@ pub(crate) mod parse_impl {
         pub(crate) fn parse_terminated(input: ParseStream) -> syn::Result<Self> {
             Ok(PestIgnoredPunctuated(Punctuated::parse_terminated(input)?))
         }
+
+        pub(crate) fn parse_terminated_nonempty(input: ParseStream) -> syn::Result<Self> {
+            let res = Punctuated::parse_terminated(input)?;
+            if res.is_empty() {
+                Err(input.error(format!("Expected at least one {}", std::any::type_name::<T>())))
+            } else {
+                Ok(PestIgnoredPunctuated(res))
+            }
+        }
     }
 
     impl<T: Parse, P: Parse> Parse for PestIgnoredPunctuated<T, P> {
