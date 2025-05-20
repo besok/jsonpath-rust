@@ -67,7 +67,9 @@ use proc_macro2::Span;
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Bracket;
-use syn::{token, Ident, LitBool, Token};
+#[allow(unused_imports)]
+use syn::LitBool;
+use syn::{token, Ident, Token};
 #[cfg(feature = "compiled-path")]
 use syn_derive::Parse;
 

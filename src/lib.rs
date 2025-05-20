@@ -88,8 +88,6 @@ pub mod query;
 #[allow(clippy::module_inception)]
 pub mod parser;
 
-pub use jsonpath_ast::{parse, ast};
-
 #[macro_use]
 extern crate pest_derive;
 extern crate core;
