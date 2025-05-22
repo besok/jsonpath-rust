@@ -1,0 +1,7 @@
+error: unexpected end of input
+ --> tests/rfc9535_compile_tests/basic/fails/39_bald_descendant_segment.rs:9:9
+  |
+9 |         json_query! ( $.. ),
+  |         ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `json_query` (in Nightly builds, run with -Z macro-backtrace for more info)

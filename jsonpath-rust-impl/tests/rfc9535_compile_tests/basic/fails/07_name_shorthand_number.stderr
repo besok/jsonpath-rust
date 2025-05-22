@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/rfc9535_compile_tests/basic/fails/07_name_shorthand_number.rs:9:25
+  |
+9 |         json_query! ( $.1 ),
+  |                         ^

@@ -4,6 +4,7 @@ use jsonpath_rust::parser::parse_json_path;
 use jsonpath_rust::JsonPath;
 use serde_json::Value;
 use std::str::FromStr;
+use jsonpath_rust::ast::Main;
 
 type SkippedCases = usize;
 type SkippedCasesToFix = usize;
@@ -100,6 +101,20 @@ pub fn handle_test_case(case: &TestCase) -> TestResult {
         } else {
             Ok(())
         }
+    }
+}
+
+pub fn test_macro(case: &TestCase) -> TestResult {
+    let pest_ast: Main = Main::try_from_pest_parse(case.selector.as_str())
+        .map_err(|_| TestFailure::invalid(case))?;
+
+    let syn_ast: Main = jsonpath_rust::ast::Main::parse_syn_ast_from_string(case.selector.clone())
+        .map_err(|_| { TestFailure::invalid(case) })?;
+
+    if pest_ast == syn_ast {
+        Ok(())
+    } else {
+        Err(TestFailure::invalid(case))
     }
 }
 
