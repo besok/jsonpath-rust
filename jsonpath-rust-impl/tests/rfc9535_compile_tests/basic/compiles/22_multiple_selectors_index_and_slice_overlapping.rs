@@ -6,7 +6,7 @@ use ::jsonpath_rust_impl::json_query;
 
 fn main() {
     assert_eq!(
-        json_query! ( $[1,0:3] ),
+        json_query!( $[1,0:3] ),
         Main::try_from_pest_parse("$[1,0:3]").expect("failed to parse")
     );
 }

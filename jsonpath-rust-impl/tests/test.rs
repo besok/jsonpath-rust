@@ -6,11 +6,11 @@ mod tests {
 
     #[test]
     fn scratch() {
-        json_query! ( $..[1] );
-        json_query! ( $[1,::] );
+        json_query!( $..[1] );
+        json_query!( $[1,::] );
 
         assert_eq!(
-            json_query! ( $["a",1] ),
+            json_query!( $["a",1] ),
             Main::try_from_pest_parse("$['a',1]").expect("failed to parse")
         );
         Main::try_from_pest_parse("$['a',1,4]").expect("failed to parse");
@@ -28,12 +28,12 @@ mod tests {
     #[test]
     fn syn_and_pest_are_equal() {
         let q1 = (
-            json_query! ( $[?@.thing > 4] ),
+            json_query!( $[?@.thing > 4] ),
             Main::try_from_pest_parse("$[?@.thing > 4]").expect("failed to parse"),
         );
 
         assert_eq!(
-            json_query! ( $[?@.thing > 4] ),
+            json_query!( $[?@.thing > 4] ),
             Main::try_from_pest_parse("$[?@.thing > 4]").expect("failed to parse")
         );
 

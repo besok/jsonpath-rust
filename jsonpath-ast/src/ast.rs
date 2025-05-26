@@ -196,7 +196,8 @@ pub struct BracketedSelection {
     #[cfg_attr(feature = "compiled-path", syn(bracketed))]
     pub(crate) arg_bracket: token::Bracket,
     #[cfg_attr(feature = "compiled-path", syn(in = arg_bracket))]
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)))]
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    ))]
     pub(crate) selectors: PestIgnoredPunctuated<Selector, Token![,]>,
 }
 
@@ -304,7 +305,7 @@ impl<'pest> from_pest::FromPest<'pest> for MemberNameShorthand {
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::member_name_shorthand {
             let this = Ok(MemberNameShorthand {
-                name: pest.as_str().to_string(),
+                name: pest.as_str().trim().to_string(),
             });
             *pest = clone;
             this
@@ -316,7 +317,10 @@ impl<'pest> from_pest::FromPest<'pest> for MemberNameShorthand {
 
 #[derive(Debug, new, PartialEq)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct JSString(#[cfg_attr(feature = "compiled-path", parse(validate_js_str))] pub(crate) String);
+pub struct JSString(#[cfg_attr(
+    feature = "compiled-path",
+    parse(validate_js_str)
+)] pub(crate) String);
 
 impl<'pest> from_pest::FromPest<'pest> for JSString {
     type Rule = Rule;
@@ -371,10 +375,19 @@ impl KnowsRule for Selector {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::slice_selector))]
 pub struct SliceSelector(
-    #[cfg_attr(feature = "compiled-path", parse(SliceStart::maybe_parse))] pub(crate) Option<SliceStart>,
+    #[cfg_attr(
+        feature = "compiled-path",
+        parse(SliceStart::maybe_parse)
+    )] pub(crate) Option<SliceStart>,
     pub(crate) PestLiteralWithoutRule<Token![:]>,
-    #[cfg_attr(feature = "compiled-path", parse(SliceEnd::maybe_parse))] pub(crate) Option<SliceEnd>,
-    #[cfg_attr(feature = "compiled-path", parse(SliceStep::maybe_parse))] pub(crate) Option<SliceStep>,
+    #[cfg_attr(
+        feature = "compiled-path",
+        parse(SliceEnd::maybe_parse)
+    )] pub(crate) Option<SliceEnd>,
+    #[cfg_attr(
+        feature = "compiled-path",
+        parse(SliceStep::maybe_parse)
+    )] pub(crate) Option<SliceStep>,
 );
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -409,7 +422,8 @@ pub struct FilterSelector {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr))]
 pub struct LogicalExpr {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)))]
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    ))]
     pub ands: PestIgnoredPunctuated<LogicalExprAnd, Token![||]>,
 }
 
@@ -417,7 +431,8 @@ pub struct LogicalExpr {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr_and))]
 pub struct LogicalExprAnd {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)))]
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    ))]
     pub atoms: PestIgnoredPunctuated<AtomExpr, Token![&&]>,
 }
 impl KnowsRule for LogicalExprAnd {
@@ -459,7 +474,7 @@ impl<'pest> FromPest<'pest> for JSInt {
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::int {
             let this = JSInt(
-                pair.as_str()
+                pair.as_str().trim()
                     .parse::<i64>()
                     .expect("int rule should always be a valid i64"),
             );
@@ -651,7 +666,7 @@ impl<'pest> FromPest<'pest> for FunctionName {
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = FunctionName {
-                name: Ident::new(inner.to_string().as_str(), Span::call_site()),
+                name: Ident::new(inner.to_string().as_str().trim(), Span::call_site()),
             };
             *pest = clone;
             Ok(this)
@@ -859,7 +874,7 @@ impl<'pest> FromPest<'pest> for Number {
 pub struct Bool(#[cfg_attr(feature = "compiled-path", parse(parse_bool))]pub(crate) bool);
 
 terminating_from_pest!(Bool, Rule::bool, |inner: Pair<Rule>| Bool(
-    inner.as_str().parse::<bool>().expect("bool")
+    inner.as_str().trim().parse::<bool>().expect("bool")
 ));
 
 #[derive(Debug, new, PartialEq, FromPest)]

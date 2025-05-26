@@ -6,5 +6,5 @@ use ::jsonpath_rust_impl::json_query;
 
 fn main() {
     let _pest = Main::try_from_pest_parse("$ ").expect_err("Pest cares about whitespace");
-    let _syn = json_query! ( $  );
+    let _syn = json_query!( $  );
 }

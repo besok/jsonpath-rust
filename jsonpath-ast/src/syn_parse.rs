@@ -11,7 +11,7 @@ pub(crate) mod parse_impl {
         SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector, SliceStart, SliceStep, Test, TestExpr,
         WildcardSelector, WildcardSelectorOrMemberNameShorthand, EOI,
     };
-    use pest::{Parser};
+    use pest::Parser;
     use proc_macro2::{Ident, TokenStream};
     use quote::{quote, ToTokens};
     use syn::parse::{Parse, ParseStream};
@@ -124,7 +124,7 @@ pub(crate) mod parse_impl {
     }
     impl ToTokens for Root {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            tokens.extend(quote! (::jsonpath_ast::ast::Root::new()))
+            tokens.extend(quote!(::jsonpath_ast::ast::Root::new()))
         }
     }
 
@@ -543,7 +543,7 @@ pub(crate) mod parse_impl {
     }
     impl ToTokens for CompExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self{left, op, right} = self;
+            let Self { left, op, right } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::CompExpr::new(
                     #left,
@@ -561,17 +561,17 @@ pub(crate) mod parse_impl {
                 Comparable::SingularQuery(inner) => { quote!( new_singular_query(#inner) ) }
                 Comparable::FunctionExpr(inner) => { quote!( new_function_expr(#inner) ) }
             };
-            tokens.extend(quote!(::jsonpath_ast::ast::Comparable::#variant) );
+            tokens.extend(quote!(::jsonpath_ast::ast::Comparable::#variant));
         }
     }
 
     impl ToTokens for Literal {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let variant = match self {
-                Literal::Number(inner) => {quote!(new_number(#inner))}
-                Literal::String(inner) => {quote!(new_string(#inner))}
-                Literal::Bool(inner) => {quote!(new_bool(#inner))}
-                Literal::Null(inner) => {quote!(new_null(#inner))}
+                Literal::Number(inner) => { quote!(new_number(#inner)) }
+                Literal::String(inner) => { quote!(new_string(#inner)) }
+                Literal::Bool(inner) => { quote!(new_bool(#inner)) }
+                Literal::Null(inner) => { quote!(new_null(#inner)) }
             };
             tokens.extend(quote!(::jsonpath_ast::ast::Literal::#variant))
         }
@@ -580,8 +580,8 @@ pub(crate) mod parse_impl {
     impl ToTokens for Number {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let variant = match self {
-                Number::Int(inner) => {quote!(new_int(#inner))}
-                Number::Float(inner) => {quote!(new_float(#inner))}
+                Number::Int(inner) => { quote!(new_int(#inner)) }
+                Number::Float(inner) => { quote!(new_float(#inner)) }
             };
             tokens.extend(quote!(::jsonpath_ast::ast::Number::#variant))
         }
@@ -590,10 +590,10 @@ pub(crate) mod parse_impl {
     impl ToTokens for SingularQuery {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let variant = match self {
-                SingularQuery::RelSingularQuery(inner) => {quote!(new_rel_singular_query(#inner))}
-                SingularQuery::AbsSingularQuery(inner) => {quote!(new_abs_singular_query(#inner))}
+                SingularQuery::RelSingularQuery(inner) => { quote!(new_rel_singular_query(#inner)) }
+                SingularQuery::AbsSingularQuery(inner) => { quote!(new_abs_singular_query(#inner)) }
             };
-            tokens.extend(quote! (::jsonpath_ast::ast::SingularQuery::#variant ))
+            tokens.extend(quote!(::jsonpath_ast::ast::SingularQuery::#variant ))
         }
     }
 
@@ -609,7 +609,7 @@ pub(crate) mod parse_impl {
 
     impl ToTokens for FunctionExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self{name, paren: _, args} = self;
+            let Self { name, paren: _, args } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::FunctionExpr::new(
                     #name,
@@ -622,21 +622,21 @@ pub(crate) mod parse_impl {
 
     impl ToTokens for CompOp {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let variant =match self {
-                CompOp::Eq(_) => {quote!(new_eq)}
-                CompOp::Ne(_) => {quote!(new_ne)}
-                CompOp::Le(_) => {quote!(new_le)}
-                CompOp::Ge(_) => {quote!(new_ge)}
-                CompOp::Lt(_) => {quote!(new_lt)}
-                CompOp::Gt(_) => {quote!(new_gt)}
-            } ;
+            let variant = match self {
+                CompOp::Eq(_) => { quote!(new_eq) }
+                CompOp::Ne(_) => { quote!(new_ne) }
+                CompOp::Le(_) => { quote!(new_le) }
+                CompOp::Ge(_) => { quote!(new_ge) }
+                CompOp::Lt(_) => { quote!(new_lt) }
+                CompOp::Gt(_) => { quote!(new_gt) }
+            };
             tokens.extend(quote!(::jsonpath_ast::ast::CompOp::#variant(Default::default())));
         }
     }
 
     impl ToTokens for RelQuery {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self{curr, segments} = self;
+            let Self { curr, segments } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::RelQuery::new(
                     #curr,
@@ -649,7 +649,7 @@ pub(crate) mod parse_impl {
     impl ToTokens for RelSingularQuery {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             #[allow(unused_variables)]
-            let Self{curr, segments} = self;
+            let Self { curr, segments } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::RelSingularQuery::new(
                     Default::default(),
@@ -662,7 +662,7 @@ pub(crate) mod parse_impl {
     impl ToTokens for AbsSingularQuery {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             #[allow(unused_variables)]
-            let Self{root, segments} = self;
+            let Self { root, segments } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::RelSingularQuery::new(
                     Default::default(),
@@ -776,9 +776,9 @@ pub(crate) mod parse_impl {
     impl ToTokens for Test {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let variant = match self {
-                Test::RelQuery(inner) => {quote!(new_rel_query(#inner))}
-                Test::JPQuery(inner) => {quote!(new_jp_query(#inner))}
-                Test::FunctionExpr(inner) => {quote!(new_function_expr(#inner))}
+                Test::RelQuery(inner) => { quote!(new_rel_query(#inner)) }
+                Test::JPQuery(inner) => { quote!(new_jp_query(#inner)) }
+                Test::FunctionExpr(inner) => { quote!(new_function_expr(#inner)) }
             };
             tokens.extend(quote!(::jsonpath_ast::ast::Test::#variant));
         }
@@ -786,7 +786,7 @@ pub(crate) mod parse_impl {
 
     impl ToTokens for TestExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self{not_op, test} = self;
+            let Self { not_op, test } = self;
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::TestExpr::new(
                     #not_op,
@@ -880,7 +880,7 @@ pub(crate) mod parse_impl {
             if input.peek(Token![:]) {
                 let colon = input.parse()?;
                 if JSInt::peek(input) {
-                    return Ok(Some(Self(colon, input.parse()?)))
+                    return Ok(Some(Self(colon, input.parse()?)));
                 }
             }
             Ok(None)

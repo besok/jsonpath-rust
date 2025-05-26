@@ -11,11 +11,11 @@ fn main() {
     //     Main::try_from_pest_parse("$['a',1]").expect("failed to parse")
     // );
     assert_eq!(
-        json_query! ( $["a",1] ),
+        json_query!( $["a",1] ),
         Main::try_from_pest_parse("$['a',1]").expect("failed to parse")
     );
     assert_eq!(
-        json_query! ( $["a",1] ),
+        json_query!( $["a",1] ),
         Main::try_from_pest_parse("$[\"a\",1]").expect("failed to parse")
     );
 }
