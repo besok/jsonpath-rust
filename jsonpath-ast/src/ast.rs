@@ -54,22 +54,22 @@ macro_rules! terminating_from_pest {
 use super::parse::{JSPathParser, Rule};
 #[cfg(feature = "compiled-path")]
 use crate::syn_parse::parse_impl::{
-    parse_bool, parse_float, validate_function_name, validate_js_int, validate_js_str,
-    validate_member_name_shorthand, ParseUtilsExt,
+    ParseUtilsExt, parse_bool, parse_float, validate_function_name, validate_js_int,
+    validate_js_str, validate_member_name_shorthand,
 };
 use derive_new::new;
 use from_pest::{ConversionError, FromPest, Void};
-use pest::iterators::{Pair, Pairs};
 use pest::Parser;
+use pest::iterators::{Pair, Pairs};
 use pest_ast::FromPest;
 use proc_macro2::Span;
+#[allow(unused_imports)]
+use syn::LitBool;
 #[cfg(feature = "compiled-path")]
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Bracket;
-#[allow(unused_imports)]
-use syn::LitBool;
-use syn::{token, Ident, Token};
+use syn::{Ident, Token, token};
 #[cfg(feature = "compiled-path")]
 use syn_derive::Parse;
 
@@ -82,7 +82,7 @@ pub struct PestIgnoredPunctuated<T, P>(pub(crate) Punctuated<T, P>);
 
 impl<'pest, T, P> FromPest<'pest> for PestIgnoredPunctuated<T, P>
 where
-    T: FromPest<'pest, Rule=Rule, FatalError=Void> + KnowsRule + std::fmt::Debug,
+    T: FromPest<'pest, Rule = Rule, FatalError = Void> + KnowsRule + std::fmt::Debug,
     P: Default,
 {
     type Rule = Rule;
@@ -173,7 +173,6 @@ pub enum Segment {
     ),
     #[cfg_attr(feature = "compiled-path", parse(peek_func = ChildSegment::peek))]
     Child(ChildSegment),
-
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
@@ -317,10 +316,9 @@ impl<'pest> from_pest::FromPest<'pest> for MemberNameShorthand {
 
 #[derive(Debug, new, PartialEq)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct JSString(#[cfg_attr(
-    feature = "compiled-path",
-    parse(validate_js_str)
-)] pub(crate) String);
+pub struct JSString(
+    #[cfg_attr(feature = "compiled-path", parse(validate_js_str))] pub(crate) String,
+);
 
 impl<'pest> from_pest::FromPest<'pest> for JSString {
     type Rule = Rule;
@@ -375,25 +373,21 @@ impl KnowsRule for Selector {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::slice_selector))]
 pub struct SliceSelector(
-    #[cfg_attr(
-        feature = "compiled-path",
-        parse(SliceStart::maybe_parse)
-    )] pub(crate) Option<SliceStart>,
+    #[cfg_attr(feature = "compiled-path", parse(SliceStart::maybe_parse))]
+    pub(crate)  Option<SliceStart>,
     pub(crate) PestLiteralWithoutRule<Token![:]>,
-    #[cfg_attr(
-        feature = "compiled-path",
-        parse(SliceEnd::maybe_parse)
-    )] pub(crate) Option<SliceEnd>,
-    #[cfg_attr(
-        feature = "compiled-path",
-        parse(SliceStep::maybe_parse)
-    )] pub(crate) Option<SliceStep>,
+    #[cfg_attr(feature = "compiled-path", parse(SliceEnd::maybe_parse))] pub(crate) Option<SliceEnd>,
+    #[cfg_attr(feature = "compiled-path", parse(SliceStep::maybe_parse))]
+    pub(crate)  Option<SliceStep>,
 );
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::step))]
-pub struct SliceStep(pub(crate) PestLiteralWithoutRule<Token![:]>, pub(crate) JSInt);
+pub struct SliceStep(
+    pub(crate) PestLiteralWithoutRule<Token![:]>,
+    pub(crate) JSInt,
+);
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
@@ -474,7 +468,8 @@ impl<'pest> FromPest<'pest> for JSInt {
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::int {
             let this = JSInt(
-                pair.as_str().trim()
+                pair.as_str()
+                    .trim()
                     .parse::<i64>()
                     .expect("int rule should always be a valid i64"),
             );
@@ -871,7 +866,7 @@ impl<'pest> FromPest<'pest> for Number {
 
 #[derive(Debug, new, PartialEq)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct Bool(#[cfg_attr(feature = "compiled-path", parse(parse_bool))]pub(crate) bool);
+pub struct Bool(#[cfg_attr(feature = "compiled-path", parse(parse_bool))] pub(crate) bool);
 
 terminating_from_pest!(Bool, Rule::bool, |inner: Pair<Rule>| Bool(
     inner.as_str().trim().parse::<bool>().expect("bool")

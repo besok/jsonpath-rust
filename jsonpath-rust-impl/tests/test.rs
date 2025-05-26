@@ -23,7 +23,8 @@ mod tests {
         );
         let _ = json_query!($["a☺a"]);
         let _ = json_query!($[0,2]);
-        let _ = Main::try_from_pest_parse("$[0,             2]").expect("failed to parse");
+        let _ = Main::try_from_pest_parse("$        [    0          ,             2]")
+            .expect("should work");
         let _ = Main::try_from_pest_parse(" $[0,2]").expect_err("failed to parse");
         let _ = Main::try_from_pest_parse("$[0,2] ").expect_err("failed to parse");
     }

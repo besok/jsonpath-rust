@@ -23,7 +23,8 @@ fn test_04_name_shorthand_extended_unicode_uc() {
     let q_ast = ::jsonpath_rust_impl::json_query!($["☺"]);
     #[allow(unused_variables)]
     let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$.☺"#).expect("failed to parse");
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$["☺"]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$["☺"]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -59,7 +60,8 @@ fn test_09_name_shorthand_array_data() {
 #[test]
 fn test_10_name_shorthand_object_data_nested() {
     let q_ast = ::jsonpath_rust_impl::json_query!($.a.b.c);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$.a.b.c"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$.a.b.c"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -86,7 +88,8 @@ fn test_12_wildcard_shorthand_array_data() {
 #[test]
 fn test_13_wildcard_selector_array_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[*]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -95,7 +98,8 @@ fn test_13_wildcard_selector_array_data() {
 #[test]
 fn test_14_wildcard_shorthand_then_name_shorthand() {
     let q_ast = ::jsonpath_rust_impl::json_query!($.*.a);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$.*.a"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$.*.a"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -104,7 +108,8 @@ fn test_14_wildcard_shorthand_then_name_shorthand() {
 #[test]
 fn test_15_multiple_selectors() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[0,2]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[0,2]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[0,2]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -113,8 +118,10 @@ fn test_15_multiple_selectors() {
 #[test]
 fn test_19_multiple_selectors_name_and_index_array_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($["a",1]);
-    let q_pest_single = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$['a',1]"#).expect("failed to parse");
-    let q_pest_double = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$["a",1]"#).expect("failed to parse");
+    let q_pest_single =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$['a',1]"#).expect("failed to parse");
+    let q_pest_double =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$["a",1]"#).expect("failed to parse");
     assert_eq!(q_pest_single, q_ast);
     assert_eq!(q_pest_single, q_pest_double);
 }
@@ -124,7 +131,8 @@ fn test_19_multiple_selectors_name_and_index_array_data() {
 #[test]
 fn test_20_multiple_selectors_name_and_index_object_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($["a",1]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$['a',1]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$['a',1]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -133,7 +141,8 @@ fn test_20_multiple_selectors_name_and_index_object_data() {
 #[test]
 fn test_21_multiple_selectors_index_and_slice() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[1,5:7]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,5:7]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,5:7]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -142,7 +151,8 @@ fn test_21_multiple_selectors_index_and_slice() {
 #[test]
 fn test_22_multiple_selectors_index_and_slice_overlapping() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[1,0:3]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,0:3]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,0:3]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -151,7 +161,8 @@ fn test_22_multiple_selectors_index_and_slice_overlapping() {
 #[test]
 fn test_23_multiple_selectors_duplicate_index() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[1,1]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,1]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[1,1]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -160,7 +171,8 @@ fn test_23_multiple_selectors_duplicate_index() {
 #[test]
 fn test_24_multiple_selectors_wildcard_and_index() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[*,1]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,1]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,1]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -169,7 +181,8 @@ fn test_24_multiple_selectors_wildcard_and_index() {
 #[test]
 fn test_25_multiple_selectors_wildcard_and_name() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[*,"a"]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,'a']"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,'a']"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -178,7 +191,8 @@ fn test_25_multiple_selectors_wildcard_and_name() {
 #[test]
 fn test_26_multiple_selectors_wildcard_and_slice() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[*,0:2]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,0:2]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,0:2]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -187,7 +201,8 @@ fn test_26_multiple_selectors_wildcard_and_slice() {
 #[test]
 fn test_27_multiple_selectors_multiple_wildcards() {
     let q_ast = ::jsonpath_rust_impl::json_query!($[*,*]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,*]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$[*,*]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -196,7 +211,8 @@ fn test_27_multiple_selectors_multiple_wildcards() {
 #[test]
 fn test_29_descendant_segment_index() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..[1]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[1]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[1]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -205,7 +221,8 @@ fn test_29_descendant_segment_index() {
 #[test]
 fn test_30_descendant_segment_name_shorthand() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..a);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..a"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..a"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -214,7 +231,8 @@ fn test_30_descendant_segment_name_shorthand() {
 #[test]
 fn test_31_descendant_segment_wildcard_shorthand_array_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..*);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -223,7 +241,8 @@ fn test_31_descendant_segment_wildcard_shorthand_array_data() {
 #[test]
 fn test_32_descendant_segment_wildcard_selector_array_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..[*]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -232,7 +251,8 @@ fn test_32_descendant_segment_wildcard_selector_array_data() {
 #[test]
 fn test_33_descendant_segment_wildcard_selector_nested_arrays() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..[*]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -241,7 +261,8 @@ fn test_33_descendant_segment_wildcard_selector_nested_arrays() {
 #[test]
 fn test_34_descendant_segment_wildcard_selector_nested_objects() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..[*]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..[*]"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -250,7 +271,8 @@ fn test_34_descendant_segment_wildcard_selector_nested_objects() {
 #[test]
 fn test_35_descendant_segment_wildcard_shorthand_object_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..*);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -259,7 +281,8 @@ fn test_35_descendant_segment_wildcard_shorthand_object_data() {
 #[test]
 fn test_36_descendant_segment_wildcard_shorthand_nested_data() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..*);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..*"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -268,7 +291,8 @@ fn test_36_descendant_segment_wildcard_shorthand_nested_data() {
 #[test]
 fn test_37_descendant_segment_multiple_selectors() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..["a","d"]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..['a','d']"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..['a','d']"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
 
@@ -277,6 +301,7 @@ fn test_37_descendant_segment_multiple_selectors() {
 #[test]
 fn test_38_descendant_segment_object_traversal_multiple_selectors() {
     let q_ast = ::jsonpath_rust_impl::json_query!($..["a","d"]);
-    let q_pest = ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..['a','d']"#).expect("failed to parse");
+    let q_pest =
+        ::jsonpath_ast::ast::Main::try_from_pest_parse(r#"$..['a','d']"#).expect("failed to parse");
     assert_eq!(q_pest, q_ast);
 }
