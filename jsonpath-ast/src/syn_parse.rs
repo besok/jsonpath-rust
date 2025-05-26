@@ -17,6 +17,7 @@ pub(crate) mod parse_impl {
     use syn::parse::{Parse, ParseStream};
     use syn::punctuated::Punctuated;
     use syn::{token, LitBool, LitInt, LitStr, Token};
+    use syn::token::Token;
 
     pub trait ParseUtilsExt: Parse {
         fn peek(input: ParseStream) -> bool;
@@ -42,8 +43,8 @@ pub(crate) mod parse_impl {
             Ok(PestIgnoredPunctuated(Punctuated::parse_terminated(input)?))
         }
 
-        pub(crate) fn parse_terminated_nonempty(input: ParseStream) -> syn::Result<Self> {
-            let res = Punctuated::parse_terminated(input)?;
+        pub(crate) fn parse_separated_nonempty(input: ParseStream) -> syn::Result<Self> where P: Token {
+            let res = Punctuated::parse_separated_nonempty(input)?;
             if res.is_empty() {
                 Err(input.error(format!("Expected at least one {}", std::any::type_name::<T>())))
             } else {

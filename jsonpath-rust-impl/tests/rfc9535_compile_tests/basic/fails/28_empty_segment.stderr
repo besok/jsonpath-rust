@@ -1,5 +1,0 @@
-error: unexpected end of input, Expected at least one jsonpath_ast::ast::Selector
- --> tests/rfc9535_compile_tests/basic/fails/28_empty_segment.rs:9:25
-  |
-9 |         json_query! ( $[] ),
-  |                         ^

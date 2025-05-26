@@ -1,5 +1,0 @@
-error: unexpected token
- --> tests/rfc9535_compile_tests/basic/fails/17_selector_leading_comma.rs:9:25
-  |
-9 |         json_query! ( $[,0] ),
-  |                         ^

@@ -196,7 +196,7 @@ pub struct BracketedSelection {
     #[cfg_attr(feature = "compiled-path", syn(bracketed))]
     pub(crate) arg_bracket: token::Bracket,
     #[cfg_attr(feature = "compiled-path", syn(in = arg_bracket))]
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
     ))]
     pub(crate) selectors: PestIgnoredPunctuated<Selector, Token![,]>,
 }
@@ -422,7 +422,7 @@ pub struct FilterSelector {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr))]
 pub struct LogicalExpr {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
     ))]
     pub ands: PestIgnoredPunctuated<LogicalExprAnd, Token![||]>,
 }
@@ -431,7 +431,7 @@ pub struct LogicalExpr {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr_and))]
 pub struct LogicalExprAnd {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
     ))]
     pub atoms: PestIgnoredPunctuated<AtomExpr, Token![&&]>,
 }

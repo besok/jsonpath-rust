@@ -1,4 +1,7 @@
 #![allow(non_ascii_idents)]
+
+mod rfc9535_compile_tests;
+
 #[cfg(test)]
 mod tests {
     use jsonpath_ast::ast::Main;
@@ -53,9 +56,7 @@ mod tests {
     /// Common function to run trybuild for all in suite dir
     fn trybuild(dir: &str) {
         let t = ::trybuild::TestCases::new();
-        let pass_path = format!("tests/rfc9535_compile_tests/{}/compiles/*.rs", dir);
-        let fail_path = format!("tests/rfc9535_compile_tests/{}/fails/*.rs", dir);
-        t.pass(pass_path);
+        let fail_path = format!("tests/rfc9535_compile_tests/{}/does_not_compile.rs", dir);
         t.compile_fail(fail_path);
     }
 
