@@ -1092,16 +1092,61 @@ pub(crate) mod parse_impl {
 
     impl ParseUtilsExt for FunctionName {
         fn peek(input: ParseStream) -> bool {
-            input.peek(syn::Ident)
+            input.peek(kw::length)
+                || input.peek(kw::value)
+                || input.peek(kw::count)
+                || input.peek(kw::search)
+                || input.peek(Token![match])
+                || input.peek(Token![in])
+                || input.peek(kw::nin)
+                || input.peek(kw::none_of)
+                || input.peek(kw::any_of)
+                || input.peek(kw::subset_of)
         }
     }
 
     pub fn validate_function_name(input: ParseStream) -> Result<Ident, syn::Error> {
-        let ident = input.parse::<Ident>()?;
-        match JSPathParser::parse(Rule::function_name, &ident.to_string()) {
-            Ok(_) => Ok(ident),
-            Err(e) => Err(syn::Error::new(ident.span(), e.to_string())),
+        if input.peek(kw::length) {
+            input.parse::<kw::length>()?;
+            return Ok(Ident::new("length", input.span()));
+        }    
+        if input.peek(kw::value) {
+            input.parse::<kw::value>()?;
+            return Ok(Ident::new("value", input.span()));
         }
+        if input.peek(kw::count) {
+            input.parse::<kw::count>()?;
+            return Ok(Ident::new("count", input.span()));
+        }
+        if input.peek(kw::search) {
+            input.parse::<kw::search>()?;
+            return Ok(Ident::new("search", input.span()));
+        }
+        if input.peek(Token![match]) {
+            input.parse::<Token![match]>()?;
+            return Ok(Ident::new("match", input.span()));
+        }
+        if input.peek(Token![in]) {
+            input.parse::<Token![in]>()?;
+            return Ok(Ident::new("in", input.span()));
+        }
+        if input.peek(kw::nin) {
+            input.parse::<kw::nin>()?;
+            return Ok(Ident::new("nin", input.span()));
+        }
+        if input.peek(kw::none_of) {
+            input.parse::<kw::none_of>()?;
+            return Ok(Ident::new("none_of", input.span()));
+        }
+        if input.peek(kw::any_of) {
+            input.parse::<kw::any_of>()?;
+            return Ok(Ident::new("any_of", input.span()));
+        }
+        if input.peek(kw::subset_of) {
+            input.parse::<kw::subset_of>()?;
+            return Ok(Ident::new("subset_of", input.span()));
+        }
+        Err(syn::Error::new(input.span(), "invalid function name, expected one of: length, value, count, search, match, in, nin, none_of, any_of, subset_of"))
     }
 
     impl ParseUtilsExt for RelQuery {

@@ -9,6 +9,7 @@ mod tests {
 
     #[test]
     fn scratch() {
+        let q_ast = json_query!($.values[?match(@, $.regex)]).into();
         json_query!( $..[1] );
         json_query!( $[1,::] );
 

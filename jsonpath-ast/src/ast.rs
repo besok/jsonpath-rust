@@ -9,9 +9,16 @@ pub(crate) mod kw {
     // syn::custom_keyword!(in);
     syn::custom_keyword!(nin);
     syn::custom_keyword!(size);
-    syn::custom_keyword!(noneOf);
-    syn::custom_keyword!(anyOf);
-    syn::custom_keyword!(subsetOf);
+    syn::custom_keyword!(none_of);
+    syn::custom_keyword!(any_of);
+    syn::custom_keyword!(subset_of);
+
+    syn::custom_keyword!(length);
+    syn::custom_keyword!(value);
+    syn::custom_keyword!(count);
+    syn::custom_keyword!(search);
+    // reserved
+    // syn::custom_keyword!(match);
 
     syn::custom_keyword!(null);
 }
@@ -657,7 +664,7 @@ impl<'pest> FromPest<'pest> for FunctionName {
     ) -> Result<Self, ConversionError<Self::FatalError>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::function_name {
+        if matches!(pair.as_rule(), Rule::function_name_one_arg | Rule::function_name_two_arg) {
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = FunctionName {
