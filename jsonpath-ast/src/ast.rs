@@ -664,7 +664,10 @@ impl<'pest> FromPest<'pest> for FunctionName {
     ) -> Result<Self, ConversionError<Self::FatalError>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
-        if matches!(pair.as_rule(), Rule::function_name_one_arg | Rule::function_name_two_arg) {
+        if matches!(
+            pair.as_rule(),
+            Rule::function_name_one_arg | Rule::function_name_two_arg
+        ) {
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = FunctionName {

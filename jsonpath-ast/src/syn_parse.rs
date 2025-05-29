@@ -1109,7 +1109,7 @@ pub(crate) mod parse_impl {
         if input.peek(kw::length) {
             input.parse::<kw::length>()?;
             return Ok(Ident::new("length", input.span()));
-        }    
+        }
         if input.peek(kw::value) {
             input.parse::<kw::value>()?;
             return Ok(Ident::new("value", input.span()));
@@ -1146,7 +1146,10 @@ pub(crate) mod parse_impl {
             input.parse::<kw::subset_of>()?;
             return Ok(Ident::new("subset_of", input.span()));
         }
-        Err(syn::Error::new(input.span(), "invalid function name, expected one of: length, value, count, search, match, in, nin, none_of, any_of, subset_of"))
+        Err(syn::Error::new(
+            input.span(),
+            "invalid function name, expected one of: length, value, count, search, match, in, nin, none_of, any_of, subset_of",
+        ))
     }
 
     impl ParseUtilsExt for RelQuery {
