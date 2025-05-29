@@ -251,6 +251,27 @@ The path is supported with the limited elements namely only the elements with th
 }
 ```
 
+### Compiled Paths 
+🚧Under Construction: Unstable/Unimplemented🚧
+
+By enabling the `compiled-path` feature, the following syntax becomes available:
+```rust
+fn macros() {
+  // Existing
+  let vec = js_path("$.values[?match(@, $.regex)]", &json)?;
+  // New
+  let q_ast: JpQuery = ::jsonpath_rust::json_query!($.values[?match(@, $.regex)]);
+}
+```
+
+This allows for query strings to be created infallibly at compile time for applications where query strings will be static strings in source code.
+
+#### Limitations Of Compiled Path Queries
+- Single quote strings are not allowed, however to replace this, rust's [raw string literals](https://doc.rust-lang.org/rust-by-example/std/str.html) such as `r"# ... #"` can be used.
+- The macro does not check whitespace, this means that with respect to whitespace, the domain of strings accepted by the macro is a superset of those accepted by the original RFC.
+- Due to  [constraints on rust identifiers](https://internals.rust-lang.org/t/supporting-emoji-in-identifiers/16838), emoji in member name shorthands such as `json_query!( $.☺ )` are not allowed
+  - Unicode characters still work in both string literals and bracket field access, ie: `json_query!( $["☺"] )`
+
 ### Python bindings
 
 Python bindings ([jsonpath-rust-bindings](https://github.com/night-crawler/jsonpath-rust-bindings)) are available on

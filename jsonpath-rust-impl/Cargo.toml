@@ -1,0 +1,17 @@
+[package]
+name = "jsonpath-rust-impl"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+jsonpath-ast = { path = "../jsonpath-ast", features = ["compiled-path"] }
+syn = "2.0.101"
+proc-macro2 = "1.0.95"
+quote = "1.0.40"
+
+[dev-dependencies]
+trybuild = "1.0.105"
+

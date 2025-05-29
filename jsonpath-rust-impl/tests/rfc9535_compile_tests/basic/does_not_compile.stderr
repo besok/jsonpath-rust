@@ -1,0 +1,55 @@
+error: unexpected token
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:16:41
+   |
+16 |     ::jsonpath_rust_impl::json_query!($.&);
+   |                                         ^
+
+error: unexpected token
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:22:41
+   |
+22 |     ::jsonpath_rust_impl::json_query!($.1);
+   |                                         ^
+
+error: unexpected token, expected `]`
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:28:43
+   |
+28 |     ::jsonpath_rust_impl::json_query!($[0 2]);
+   |                                           ^
+
+error: unexpected token
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:34:41
+   |
+34 |     ::jsonpath_rust_impl::json_query!($[,0]);
+   |                                         ^
+
+error: unexpected end of input
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:40:43
+   |
+40 |     ::jsonpath_rust_impl::json_query!($[0,]);
+   |                                           ^
+
+error: unexpected end of input
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:46:41
+   |
+46 |     ::jsonpath_rust_impl::json_query!($[]);
+   |                                         ^
+
+error: unexpected end of input
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:52:5
+   |
+52 |     ::jsonpath_rust_impl::json_query!($..);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: this error originates in the macro `::jsonpath_rust_impl::json_query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected token
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:58:41
+   |
+58 |     ::jsonpath_rust_impl::json_query!($[@.a]);
+   |                                         ^
+
+error: unexpected token
+  --> tests/rfc9535_compile_tests/basic/does_not_compile.rs:64:41
+   |
+64 |     ::jsonpath_rust_impl::json_query!($[$.a]);
+   |                                         ^
