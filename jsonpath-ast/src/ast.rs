@@ -61,22 +61,23 @@ macro_rules! terminating_from_pest {
 use super::parse::{JSPathParser, Rule};
 #[cfg(feature = "compiled-path")]
 use crate::syn_parse::parse_impl::{
-    ParseUtilsExt, parse_bool, parse_float, validate_function_name, validate_js_int,
-    validate_js_str, validate_member_name_shorthand,
+    parse_bool, parse_float, validate_js_int, validate_js_str,
+    validate_member_name_shorthand, ParseUtilsExt,
 };
 use derive_new::new;
 use from_pest::{ConversionError, FromPest, Void};
-use pest::Parser;
 use pest::iterators::{Pair, Pairs};
+use pest::Parser;
 use pest_ast::FromPest;
 use proc_macro2::Span;
-#[allow(unused_imports)]
-use syn::LitBool;
+use quote::ToTokens;
 #[cfg(feature = "compiled-path")]
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Bracket;
-use syn::{Ident, Token, token};
+#[allow(unused_imports)]
+use syn::LitBool;
+use syn::{token, Token};
 #[cfg(feature = "compiled-path")]
 use syn_derive::Parse;
 
@@ -611,12 +612,12 @@ impl<'pest> FromPest<'pest> for CompOp {
 }
 
 #[derive(Debug, new, PartialEq)]
-#[cfg_attr(feature = "compiled-path", derive(Parse))]
+// #[cfg_attr(feature = "compiled-path", derive(Parse))]
 pub struct FunctionExpr {
     pub(crate) name: FunctionName,
-    #[cfg_attr(feature = "compiled-path", syn(parenthesized))]
+    // #[cfg_attr(feature = "compiled-path", syn(parenthesized))]
     pub(crate) paren: token::Paren,
-    #[cfg_attr(feature = "compiled-path", syn(in = paren))]
+    // #[cfg_attr(feature = "compiled-path", syn(in = paren))]
     // #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated(i)))]
     pub(crate) args: PestIgnoredPunctuated<FunctionArgument, Token![,]>,
 }
@@ -650,9 +651,27 @@ impl<'pest> from_pest::FromPest<'pest> for FunctionExpr {
 
 #[derive(Debug, new, PartialEq)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct FunctionName {
-    #[cfg_attr(feature = "compiled-path", parse(validate_function_name))]
-    name: Ident,
+pub enum FunctionName {
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::length))]
+    Length(kw::length),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::value))]
+    Value(kw::value),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::count))]
+    Count(kw::count),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::search))]
+    Search(kw::search),
+    #[cfg_attr(feature = "compiled-path", parse(peek = Token![match]))]
+    Match(Token![match]),
+    #[cfg_attr(feature = "compiled-path", parse(peek = Token![in]))]
+    In(Token![in]),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::nin))]
+    Nin(kw::nin),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::none_of))]
+    NoneOf(kw::none_of),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::any_of))]
+    AnyOf(kw::any_of),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::subset_of))]
+    SubsetOf(kw::subset_of),
 }
 
 impl<'pest> FromPest<'pest> for FunctionName {
@@ -666,12 +685,20 @@ impl<'pest> FromPest<'pest> for FunctionName {
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
         if matches!(
             pair.as_rule(),
-            Rule::function_name_one_arg | Rule::function_name_two_arg
+            Rule::function_name
         ) {
-            let mut inner = pair.into_inner();
-            let inner = &mut inner;
-            let this = FunctionName {
-                name: Ident::new(inner.to_string().as_str().trim(), Span::call_site()),
+            let this = match pair.as_str().trim() {
+                "length" => Self::Length(Default::default()),
+                "value" => Self::Value(Default::default()),
+                "count" => Self::Count(Default::default()),
+                "search" => Self::Search(Default::default()),
+                "match" => Self::Match(Default::default()),
+                "in" => Self::In(Default::default()),
+                "nin" => Self::Nin(Default::default()),
+                "none_of" => Self::NoneOf(Default::default()),
+                "any_of" => Self::AnyOf(Default::default()),
+                "subset_of" => Self::SubsetOf(Default::default()),
+                _ => unreachable!("Invalid function name should be impossible, error in pest grammar")
             };
             *pest = clone;
             Ok(this)

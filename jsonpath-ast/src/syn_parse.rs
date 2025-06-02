@@ -1,24 +1,25 @@
 #[cfg(feature = "compiled-path")]
 pub(crate) mod parse_impl {
     use crate::ast::parse::{JSPathParser, Rule};
+    use crate::ast::{kw, CompOp, IndexSelector, Main, NameSelector};
     use crate::ast::{
         AbsSingularQuery, AtomExpr, Bool, BracketName, BracketedSelection, ChildSegment, CompExpr,
-        Comparable, DescendantSegment, EOI, FilterSelector, FunctionArgument, FunctionExpr,
-        FunctionName, IndexSegment, JPQuery, JSInt, JSString, Literal, LogicalExpr, LogicalExprAnd,
-        MemberNameShorthand, NameSegment, NotOp, Null, Number, ParenExpr, PestIgnoredPunctuated,
-        PestLiteralWithoutRule, RelQuery, RelSingularQuery, Root, Segment, Segments, Selector,
-        SingularQuery, SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector,
-        SliceStart, SliceStep, Test, TestExpr, WildcardSelector,
-        WildcardSelectorOrMemberNameShorthand,
+        Comparable, DescendantSegment, FilterSelector, FunctionArgument, FunctionExpr, FunctionName,
+        IndexSegment, JPQuery, JSInt, JSString, Literal, LogicalExpr, LogicalExprAnd, MemberNameShorthand,
+        NameSegment, NotOp, Null, Number, ParenExpr, PestIgnoredPunctuated, PestLiteralWithoutRule,
+        RelQuery, RelSingularQuery, Root, Segment, Segments, Selector, SingularQuery,
+        SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector, SliceStart,
+        SliceStep, Test, TestExpr, WildcardSelector, WildcardSelectorOrMemberNameShorthand,
+        EOI,
     };
-    use crate::ast::{CompOp, IndexSelector, Main, NameSelector, kw};
     use pest::Parser;
     use proc_macro2::{Ident, TokenStream};
-    use quote::{ToTokens, quote};
+    use quote::{quote, ToTokens};
     use syn::parse::{Parse, ParseStream};
     use syn::punctuated::Punctuated;
+    use syn::spanned::Spanned;
     use syn::token::Token;
-    use syn::{LitBool, LitInt, LitStr, Token, token};
+    use syn::{token, LitBool, LitInt, LitStr, Token};
 
     pub trait ParseUtilsExt: Parse {
         fn peek(input: ParseStream) -> bool;
@@ -629,11 +630,27 @@ pub(crate) mod parse_impl {
 
     impl ToTokens for FunctionName {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            tokens.extend(quote! {
-                ::jsonpath_ast::ast::FunctionName::new(
-                    ::proc_macro2::Ident::new("function_name", ::proc_macro2::Span::call_site())
-                )
-            });
+            // tokens.extend(quote! {
+            //     ::jsonpath_ast::ast::FunctionName::new(
+            //         ::proc_macro2::Ident::new("function_name", ::proc_macro2::Span::call_site())
+            //     )
+            // });
+            let variant = match self {
+                // Literal::Number(inner) => {
+                //     quote!(new_number(#inner))
+                // }
+                FunctionName::Length(_) => { quote!(new_length(Default::default())) }
+                FunctionName::Value(_) => { quote!(new_value(Default::default())) }
+                FunctionName::Count(_) => { quote!(new_count(Default::default())) }
+                FunctionName::Search(_) => { quote!(new_search(Default::default())) }
+                FunctionName::Match(_) => { quote!(new_match(Default::default())) }
+                FunctionName::In(_) => { quote!(new_in(Default::default())) }
+                FunctionName::Nin(_) => { quote!(new_nin(Default::default())) }
+                FunctionName::NoneOf(_) => { quote!(new_none_of(Default::default())) }
+                FunctionName::AnyOf(_) => { quote!(new_any_of(Default::default())) }
+                FunctionName::SubsetOf(_) => { quote!(new_subset_of(Default::default())) }
+            };
+            tokens.extend(quote!(::jsonpath_ast::ast::FunctionName::#variant))
         }
     }
 
@@ -840,9 +857,13 @@ pub(crate) mod parse_impl {
     impl ToTokens for TestExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self { not_op, test } = self;
+            let repr_not = match not_op {
+                Some(not_op) => quote! {Some(#not_op)},
+                None => quote! {None},
+            };
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::TestExpr::new(
-                    #not_op,
+                    #repr_not,
                     #test
                 )
             });
@@ -992,7 +1013,11 @@ pub(crate) mod parse_impl {
 
     impl ParseUtilsExt for CompExpr {
         fn peek(input: ParseStream) -> bool {
-            Comparable::peek(input)
+            let fork = input.fork();
+            // This is very suboptimal but the only option because at this point in the stream a comp_expr and a test_expr
+            //  look identical if they're both functions, IE: $[?match(@, $.regex)] is a test_exp while $[?match(@, $.regex) == true]
+            //  is a comp_exp
+            fork.parse::<Comparable>().is_ok() && fork.parse::<CompOp>().is_ok()
         }
     }
     impl ParseUtilsExt for TestExpr {
@@ -1084,6 +1109,27 @@ pub(crate) mod parse_impl {
         Ok(num)
     }
 
+    fn function_name_expected_args(name: &FunctionName) -> (String, usize) {
+        (format!("{:?}", name), match name {
+            FunctionName::Length(_) | FunctionName::Value(_) | FunctionName::Count(_) => { 1 },
+            FunctionName::Search(_) | FunctionName::Match(_)
+            | FunctionName::In(_) | FunctionName::Nin(_)
+            | FunctionName::NoneOf(_) | FunctionName::AnyOf(_) | FunctionName::SubsetOf(_) => { 2 },
+        })
+    }
+    impl Parse for FunctionExpr {
+        fn parse(__input: ParseStream) -> ::syn::Result<Self> {
+            let paren;
+            let ret = Self { name: __input.parse()?, paren: syn::parenthesized!(paren in __input ), args: PestIgnoredPunctuated::parse_separated_nonempty(&paren)? };
+            let (func_name, expected_num_args) = function_name_expected_args(&ret.name);
+            if expected_num_args == ret.args.0.len() {
+                Ok(ret)
+            } else {
+                Err(syn::Error::new(ret.args.span(), format!("Invalid number of arguments for function {}, expected {}", func_name, expected_num_args)))
+            }
+        }
+    }
+
     impl ParseUtilsExt for FunctionExpr {
         fn peek(input: ParseStream) -> bool {
             FunctionName::peek(input)
@@ -1103,53 +1149,6 @@ pub(crate) mod parse_impl {
                 || input.peek(kw::any_of)
                 || input.peek(kw::subset_of)
         }
-    }
-
-    pub fn validate_function_name(input: ParseStream) -> Result<Ident, syn::Error> {
-        if input.peek(kw::length) {
-            input.parse::<kw::length>()?;
-            return Ok(Ident::new("length", input.span()));
-        }
-        if input.peek(kw::value) {
-            input.parse::<kw::value>()?;
-            return Ok(Ident::new("value", input.span()));
-        }
-        if input.peek(kw::count) {
-            input.parse::<kw::count>()?;
-            return Ok(Ident::new("count", input.span()));
-        }
-        if input.peek(kw::search) {
-            input.parse::<kw::search>()?;
-            return Ok(Ident::new("search", input.span()));
-        }
-        if input.peek(Token![match]) {
-            input.parse::<Token![match]>()?;
-            return Ok(Ident::new("match", input.span()));
-        }
-        if input.peek(Token![in]) {
-            input.parse::<Token![in]>()?;
-            return Ok(Ident::new("in", input.span()));
-        }
-        if input.peek(kw::nin) {
-            input.parse::<kw::nin>()?;
-            return Ok(Ident::new("nin", input.span()));
-        }
-        if input.peek(kw::none_of) {
-            input.parse::<kw::none_of>()?;
-            return Ok(Ident::new("none_of", input.span()));
-        }
-        if input.peek(kw::any_of) {
-            input.parse::<kw::any_of>()?;
-            return Ok(Ident::new("any_of", input.span()));
-        }
-        if input.peek(kw::subset_of) {
-            input.parse::<kw::subset_of>()?;
-            return Ok(Ident::new("subset_of", input.span()));
-        }
-        Err(syn::Error::new(
-            input.span(),
-            "invalid function name, expected one of: length, value, count, search, match, in, nin, none_of, any_of, subset_of",
-        ))
     }
 
     impl ParseUtilsExt for RelQuery {
