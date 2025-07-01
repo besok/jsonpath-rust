@@ -70,7 +70,7 @@ where
 
     fn as_array(&self) -> Option<&Vec<Self>>;
 
-    fn as_object(&self) -> Option<Vec<(&String, &Self)>>;
+    fn as_object(&self) -> Option<Vec<(&str, &Self)>>;
 
     fn as_str(&self) -> Option<&str>;
 
@@ -156,9 +156,9 @@ impl Queryable for Value {
         self.as_array()
     }
 
-    fn as_object(&self) -> Option<Vec<(&String, &Self)>> {
+    fn as_object(&self) -> Option<Vec<(&str, &Self)>> {
         self.as_object()
-            .map(|v| v.into_iter().map(|(k, v)| (k, v)).collect())
+            .map(|v| v.into_iter().map(|(k, v)| (k.as_str(), v)).collect())
     }
 
     fn as_str(&self) -> Option<&str> {
