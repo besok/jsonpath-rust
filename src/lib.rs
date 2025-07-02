@@ -95,7 +95,7 @@ extern crate pest;
 
 use crate::query::queryable::Queryable;
 use crate::query::{Queried, QueryPath, QueryRef};
-use serde_json::Value;
+use serde_json::Value; 
 
 /// A trait for types that can be queried with JSONPath.
 pub trait JsonPath: Queryable {

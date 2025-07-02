@@ -66,3 +66,5 @@
   - add method to process parsed query
 - **`1.0.2`**
   - improve grammar
+- **`1.0.3`**
+  - change String to str for as objects
