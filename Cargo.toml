@@ -23,8 +23,8 @@ serde = { version = "1.0", features = ["derive"] }
 criterion = "0.5.1"
 
 
-[features]
-compiled-path = ["jsonpath-ast/compiled-path", "dep:jsonpath-rust-impl"]
+#[features]
+#compiled-path = ["jsonpath-ast/compiled-path", "dep:jsonpath-rust-impl"]
 
 [[bench]]
 name = "regex"
