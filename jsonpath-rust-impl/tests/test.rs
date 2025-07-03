@@ -9,7 +9,7 @@ mod tests {
 
     #[test]
     fn scratch() {
-        let q_ast = json_query!($.values[?match(@, $.regex)]).into();
+        let q_ast = json_query!($.values[?match(@, $.regex)]);
         json_query!( $..[1] );
         json_query!( $[1,::] );
 
@@ -57,7 +57,7 @@ mod tests {
 
     /// Common function to run trybuild for all in suite dir
     fn trybuild(dir: &str) {
-        let t = ::trybuild::TestCases::new();
+        let t = trybuild::TestCases::new();
         let fail_path = format!("tests/rfc9535_compile_tests/{}/does_not_compile.rs", dir);
         t.compile_fail(fail_path);
     }
