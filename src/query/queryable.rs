@@ -1,7 +1,7 @@
 use crate::parser::errors::JsonPathError;
 use crate::parser::model::{JpQuery, Segment, Selector};
 use crate::parser::{parse_json_path, Parsed};
-use crate::query::QueryPath;
+use crate::query::{QueryPath, Queried};
 use crate::JsonPath;
 use serde_json::Value;
 use std::borrow::Cow;
@@ -138,6 +138,37 @@ where
         T: Into<QueryPath>,
     {
         None
+    }
+
+    /// Deletes all elements matching the given JSONPath
+    /// 
+    /// # Arguments
+    /// * `path` - JSONPath string specifying elements to delete
+    /// 
+    /// # Returns
+    /// * `Ok(usize)` - Number of elements deleted
+    /// * `Err(JsonPathError)` - If the path is invalid or deletion fails
+    /// 
+    /// # Examples
+    /// ```
+    /// use serde_json::json;
+    /// use jsonpath_rust::JsonPath;
+    /// use crate::jsonpath_rust::query::queryable::Queryable;
+    /// 
+    /// let mut data = json!({
+    ///     "users": [
+    ///         {"name": "Alice", "age": 30},
+    ///         {"name": "Bob", "age": 25},
+    ///         {"name": "Charlie", "age": 35}
+    ///     ]
+    /// });
+    /// 
+    /// // Delete users older than 30
+    /// let deleted = data.delete_by_path("$.users[?(@.age > 30)]").unwrap();
+    /// assert_eq!(deleted, 1);
+    /// ```
+    fn delete_by_path(&mut self, _path: &str) -> Queried<usize> {
+        Err(JsonPathError::InvalidJsonPath("Deletion not supported".to_string()))
     }
 }
 
@@ -280,118 +311,34 @@ impl Queryable for Value {
             .ok()
             .and_then(|p| self.pointer_mut(p.as_str()))
     }
-}
 
-fn convert_js_path(path: &str) -> Parsed<String> {
-    let JpQuery { segments } = parse_json_path(path)?;
-
-    let mut path = String::new();
-    for segment in segments {
-        match segment {
-            Segment::Selector(Selector::Name(name)) => {
-                path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
-            }
-            Segment::Selector(Selector::Index(index)) => {
-                path.push_str(&format!("/{}", index));
-            }
-            s => {
-                return Err(JsonPathError::InvalidJsonPath(format!(
-                    "Invalid segment: {:?}",
-                    s
-                )));
-            }
-        }
-    }
-    Ok(path)
-}
-
-pub trait QueryableDeletable: Queryable {
-    /// Deletes all elements matching the given JSONPath
-    /// 
-    /// # Arguments
-    /// * `path` - JSONPath string specifying elements to delete
-    /// 
-    /// # Returns
-    /// * `Ok(usize)` - Number of elements deleted
-    /// * `Err(JsonPathError)` - If the path is invalid or deletion fails
-    /// 
-    /// # Examples
-    /// ```
-    /// use serde_json::json;
-    /// use crate::jsonpath_rust::query::queryable::QueryableDeletable;
-    /// use jsonpath_rust::JsonPath;
-    /// 
-    /// let mut data = json!({
-    ///     "users": [
-    ///         {"name": "Alice", "age": 30},
-    ///         {"name": "Bob", "age": 25},
-    ///         {"name": "Charlie", "age": 35}
-    ///     ]
-    /// });
-    /// 
-    /// // Delete users older than 30
-    /// let deleted = data.delete_by_path("$.users[?(@.age > 30)]").unwrap();
-    /// assert_eq!(deleted, 1);
-    /// ```
-    fn delete_by_path(&mut self, path: &str) -> Result<usize, JsonPathError>;
-    
-    /// Deletes a single element at the given path
-    /// Returns true if an element was deleted, false otherwise
-    fn delete_single(&mut self, path: &str) -> Result<bool, JsonPathError>;
-}
-
-impl QueryableDeletable for Value {
-    fn delete_by_path(&mut self, path: &str) -> Result<usize, JsonPathError> {
-        
-        let matching_paths = self.query_only_path(path)
-            .map_err(|_| JsonPathError::InvalidJsonPath("Failed to query path".to_string()))?;
-        
-        if matching_paths.is_empty() {
-            return Ok(0);
-        }
-        
+    fn delete_by_path(&mut self, path: &str) -> Queried<usize> {
         let mut deletions = Vec::new();
-        for query_path in &matching_paths {
+        for query_path in &self.query_only_path(path)? {
             if let Some(deletion_info) = parse_deletion_path(query_path)? {
                 deletions.push(deletion_info);
             }
         }
         
         // Sort deletions to handle array indices correctly (delete from end to start)
-        deletions.sort_by(|a, b| {
-            // First sort by path depth (deeper paths first)
-            let depth_cmp = b.path_depth().cmp(&a.path_depth());
-            if depth_cmp != std::cmp::Ordering::Equal {
-                return depth_cmp;
-            }
-            
-            // Then by array index (higher indices first)
-            match (a, b) {
-                (DeletionInfo::ArrayIndex { index: idx_a, .. }, 
-                 DeletionInfo::ArrayIndex { index: idx_b, .. }) => {
-                    idx_b.cmp(idx_a)
+        deletions.sort_by(|a, b|
+            b.path_depth().cmp(&a.path_depth()).then_with(|| {
+                match (a, b) {
+                    (
+                        DeletionInfo::ArrayIndex { index: idx_a, .. },
+                        DeletionInfo::ArrayIndex { index: idx_b, .. },
+                    ) => idx_b.cmp(idx_a),
+                    _ => std::cmp::Ordering::Equal,
                 }
-                _ => std::cmp::Ordering::Equal
-            }
-        });
+            })
+        );
         
         // Perform deletions
-        let mut deleted_count = 0;
-        for deletion in deletions {
-            if execute_deletion(self, &deletion)? {
-                deleted_count += 1;
-            }
-        }
+        let deleted_count = deletions
+            .iter()
+            .try_fold(0, |c, d| execute_deletion(self, d).map(|deleted| if deleted { c + 1 } else { c }))?;
         
         Ok(deleted_count)
-    }
-    
-    fn delete_single(&mut self, path: &str) -> Result<bool, JsonPathError> {
-        if let Some(deletion_info) = parse_deletion_path(path)? {
-            execute_deletion(self, &deletion_info)
-        } else {
-            Ok(false)
-        }
     }
 }
 
@@ -444,10 +391,11 @@ fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPat
                 Segment::Selector(Selector::Index(index)) => {
                     parent_path.push_str(&format!("/{}", index));
                 }
-                _ => {
-                    return Err(JsonPathError::InvalidJsonPath(
-                        "Unsupported segment type for deletion".to_string()
-                    ));
+                e => {
+                    return Err(JsonPathError::InvalidJsonPath(format!(
+                        "Unsupported segment to be deleted: {:?}",
+                        e
+                    )));
                 }
             }
         } else {
@@ -465,10 +413,11 @@ fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPat
                         index: *index as usize,
                     }));
                 }
-                _ => {
-                    return Err(JsonPathError::InvalidJsonPath(
-                        "Unsupported final segment for deletion".to_string()
-                    ));
+                e => {
+                    return Err(JsonPathError::InvalidJsonPath(format!(
+                        "Unsupported segment to be deleted: {:?}",
+                        e
+                    )));
                 }
             }
         }
@@ -477,7 +426,7 @@ fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPat
     Ok(None)
 }
 
-fn execute_deletion(value: &mut Value, deletion: &DeletionInfo) -> Result<bool, JsonPathError> {
+fn execute_deletion(value: &mut Value, deletion: &DeletionInfo) -> Queried<bool> {
     match deletion {
         DeletionInfo::Root => {
             *value = Value::Null;
@@ -525,10 +474,33 @@ fn execute_deletion(value: &mut Value, deletion: &DeletionInfo) -> Result<bool, 
     }
 }
 
+fn convert_js_path(path: &str) -> Parsed<String> {
+    let JpQuery { segments } = parse_json_path(path)?;
+
+    let mut path = String::new();
+    for segment in segments {
+        match segment {
+            Segment::Selector(Selector::Name(name)) => {
+                path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
+            }
+            Segment::Selector(Selector::Index(index)) => {
+                path.push_str(&format!("/{}", index));
+            }
+            s => {
+                return Err(JsonPathError::InvalidJsonPath(format!(
+                    "Invalid segment: {:?}",
+                    s
+                )));
+            }
+        }
+    }
+    Ok(path)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::parser::Parsed;
-    use crate::query::queryable::{convert_js_path, Queryable, QueryableDeletable};
+    use crate::query::queryable::{convert_js_path, Queryable};
     use crate::query::Queried;
     use crate::JsonPath;
     use serde_json::{json, Value};
@@ -773,8 +745,8 @@ mod tests {
             "test": "value"
         });
         
-        let deleted = data.delete_single("$").unwrap();
-        assert_eq!(deleted, true);
+        let deleted = data.delete_by_path("$").unwrap();
+        assert_eq!(deleted, 1);
         assert_eq!(data, Value::Null);
     }
 }
