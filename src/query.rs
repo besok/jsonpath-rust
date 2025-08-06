@@ -170,6 +170,8 @@ mod tests {
       ],
      "expensive": 10 }"#
     }
+    
+    #[test]
     fn update_by_path_test() -> Queried<()> {
         let mut json = json!([
             {"verb": "RUN","distance":[1]},
@@ -177,7 +179,7 @@ mod tests {
             {"verb": "DO NOT RUN"}
         ]);
 
-        let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
+        let path = json.query_only_path("$[?(@.verb == 'RUN')]")?;
         let elem = path.first().cloned().unwrap_or_default();
 
         if let Some(v) = json

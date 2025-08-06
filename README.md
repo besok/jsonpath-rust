@@ -226,7 +226,7 @@ The path is supported with the limited elements namely only the elements with th
             {"verb": "DO NOT RUN"}
         ]);
 
-    let path = json.query_only_path("$.[?(@.verb == 'RUN')]")?;
+    let path = json.query_only_path("$[?(@.verb == 'RUN')]")?;
     let elem = path.first().unwrap_or_default();
 
     if let Some(v) = json
