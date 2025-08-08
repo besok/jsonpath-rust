@@ -1,7 +1,8 @@
 use crate::parser::errors::JsonPathError;
 use crate::parser::model::{JpQuery, Segment, Selector};
 use crate::parser::{parse_json_path, Parsed};
-use crate::query::QueryPath;
+use crate::query::{Queried, QueryPath};
+use crate::JsonPath;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -70,7 +71,7 @@ where
 
     fn as_array(&self) -> Option<&Vec<Self>>;
 
-    fn as_object(&self) -> Option<Vec<(&String, &Self)>>;
+    fn as_object(&self) -> Option<Vec<(&str, &Self)>>;
 
     fn as_str(&self) -> Option<&str>;
 
@@ -138,6 +139,39 @@ where
     {
         None
     }
+
+    /// Deletes all elements matching the given JSONPath
+    ///
+    /// # Arguments
+    /// * `path` - JSONPath string specifying elements to delete
+    ///
+    /// # Returns
+    /// * `Ok(usize)` - Number of elements deleted
+    /// * `Err(JsonPathError)` - If the path is invalid or deletion fails
+    ///
+    /// # Examples
+    /// ```
+    /// use serde_json::json;
+    /// use jsonpath_rust::JsonPath;
+    /// use crate::jsonpath_rust::query::queryable::Queryable;
+    ///
+    /// let mut data = json!({
+    ///     "users": [
+    ///         {"name": "Alice", "age": 30},
+    ///         {"name": "Bob", "age": 25},
+    ///         {"name": "Charlie", "age": 35}
+    ///     ]
+    /// });
+    ///
+    /// // Delete users older than 30
+    /// let deleted = data.delete_by_path("$.users[?(@.age > 30)]").unwrap();
+    /// assert_eq!(deleted, 1);
+    /// ```
+    fn delete_by_path(&mut self, _path: &str) -> Queried<usize> {
+        Err(JsonPathError::InvalidJsonPath(
+            "Deletion not supported".to_string(),
+        ))
+    }
 }
 
 impl Queryable for Value {
@@ -156,9 +190,9 @@ impl Queryable for Value {
         self.as_array()
     }
 
-    fn as_object(&self) -> Option<Vec<(&String, &Self)>> {
+    fn as_object(&self) -> Option<Vec<(&str, &Self)>> {
         self.as_object()
-            .map(|v| v.into_iter().map(|(k, v)| (k, v)).collect())
+            .map(|v| v.into_iter().map(|(k, v)| (k.as_str(), v)).collect())
     }
 
     fn as_str(&self) -> Option<&str> {
@@ -279,6 +313,168 @@ impl Queryable for Value {
             .ok()
             .and_then(|p| self.pointer_mut(p.as_str()))
     }
+
+    fn delete_by_path(&mut self, path: &str) -> Queried<usize> {
+        let mut deletions = Vec::new();
+        for query_path in &self.query_only_path(path)? {
+            if let Some(deletion_info) = parse_deletion_path(query_path)? {
+                deletions.push(deletion_info);
+            }
+        }
+
+        // Sort deletions to handle array indices correctly (delete from end to start)
+        deletions.sort_by(|a, b| {
+            b.path_depth()
+                .cmp(&a.path_depth())
+                .then_with(|| match (a, b) {
+                    (
+                        DeletionInfo::ArrayIndex { index: idx_a, .. },
+                        DeletionInfo::ArrayIndex { index: idx_b, .. },
+                    ) => idx_b.cmp(idx_a),
+                    _ => std::cmp::Ordering::Equal,
+                })
+        });
+
+        // Perform deletions
+        let deleted_count = deletions.iter().try_fold(0, |c, d| {
+            execute_deletion(self, d).map(|deleted| if deleted { c + 1 } else { c })
+        })?;
+
+        Ok(deleted_count)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum DeletionInfo {
+    ObjectField {
+        parent_path: String,
+        field_name: String,
+    },
+    ArrayIndex {
+        parent_path: String,
+        index: usize,
+    },
+    Root,
+}
+
+impl DeletionInfo {
+    fn path_depth(&self) -> usize {
+        match self {
+            DeletionInfo::Root => 0,
+            DeletionInfo::ObjectField { parent_path, .. }
+            | DeletionInfo::ArrayIndex { parent_path, .. } => parent_path.matches('/').count(),
+        }
+    }
+}
+
+fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPathError> {
+    if query_path == "$" {
+        return Ok(Some(DeletionInfo::Root));
+    }
+
+    let JpQuery { segments } = parse_json_path(query_path)?;
+
+    if segments.is_empty() {
+        return Ok(None);
+    }
+
+    let mut parent_path = String::new();
+    let mut segments_iter = segments.iter().peekable();
+
+    while let Some(segment) = segments_iter.next() {
+        if segments_iter.peek().is_some() {
+            // Not the last segment, add to parent path
+            match segment {
+                Segment::Selector(Selector::Name(name)) => {
+                    parent_path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
+                }
+                Segment::Selector(Selector::Index(index)) => {
+                    parent_path.push_str(&format!("/{}", index));
+                }
+                e => {
+                    return Err(JsonPathError::InvalidJsonPath(format!(
+                        "Unsupported segment to be deleted: {:?}",
+                        e
+                    )));
+                }
+            }
+        } else {
+            match segment {
+                Segment::Selector(Selector::Name(name)) => {
+                    let field_name = name.trim_matches(|c| c == '\'').to_string();
+                    return Ok(Some(DeletionInfo::ObjectField {
+                        parent_path,
+                        field_name,
+                    }));
+                }
+                Segment::Selector(Selector::Index(index)) => {
+                    return Ok(Some(DeletionInfo::ArrayIndex {
+                        parent_path,
+                        index: *index as usize,
+                    }));
+                }
+                e => {
+                    return Err(JsonPathError::InvalidJsonPath(format!(
+                        "Unsupported segment to be deleted: {:?}",
+                        e
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+fn execute_deletion(value: &mut Value, deletion: &DeletionInfo) -> Queried<bool> {
+    match deletion {
+        DeletionInfo::Root => {
+            *value = Value::Null;
+            Ok(true)
+        }
+        DeletionInfo::ObjectField {
+            parent_path,
+            field_name,
+        } => {
+            let parent = if parent_path.is_empty() {
+                value
+            } else {
+                value.pointer_mut(parent_path).ok_or_else(|| {
+                    JsonPathError::InvalidJsonPath("Parent path not found".to_string())
+                })?
+            };
+
+            if let Some(obj) = parent.as_object_mut() {
+                Ok(obj.remove(field_name).is_some())
+            } else {
+                Err(JsonPathError::InvalidJsonPath(
+                    "Parent is not an object".to_string(),
+                ))
+            }
+        }
+        DeletionInfo::ArrayIndex { parent_path, index } => {
+            let parent = if parent_path.is_empty() {
+                value
+            } else {
+                value.pointer_mut(parent_path).ok_or_else(|| {
+                    JsonPathError::InvalidJsonPath("Parent path not found".to_string())
+                })?
+            };
+
+            if let Some(arr) = parent.as_array_mut() {
+                if *index < arr.len() {
+                    arr.remove(*index);
+                    Ok(true)
+                } else {
+                    Ok(false) // Index out of bounds
+                }
+            } else {
+                Err(JsonPathError::InvalidJsonPath(
+                    "Parent is not an array".to_string(),
+                ))
+            }
+        }
+    }
 }
 
 fn convert_js_path(path: &str) -> Parsed<String> {
@@ -310,7 +506,7 @@ mod tests {
     use crate::query::queryable::{convert_js_path, Queryable};
     use crate::query::Queried;
     use crate::JsonPath;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     #[test]
     fn in_smoke() -> Queried<()> {
@@ -445,5 +641,117 @@ mod tests {
         }
 
         Ok(())
+    }
+    #[test]
+    fn test_delete_object_field() {
+        let mut data = json!({
+            "users": {
+                "alice": {"age": 30},
+                "bob": {"age": 25}
+            }
+        });
+
+        let deleted = data.delete_by_path("$.users.alice").unwrap();
+        assert_eq!(deleted, 1);
+
+        let expected = json!({
+            "users": {
+                "bob": {"age": 25}
+            }
+        });
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_array_element() {
+        let mut data = json!({
+            "numbers": [1, 2, 3, 4, 5]
+        });
+
+        let deleted = data.delete_by_path("$.numbers[2]").unwrap();
+        assert_eq!(deleted, 1);
+
+        let expected = json!({
+            "numbers": [1, 2, 4, 5]
+        });
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_multiple_elements() {
+        let mut data = json!({
+            "users": [
+                {"name": "Alice", "age": 30},
+                {"name": "Bob", "age": 25},
+                {"name": "Charlie", "age": 35},
+                {"name": "David", "age": 22}
+            ]
+        });
+
+        // Delete users older than 24
+        let deleted = data.delete_by_path("$.users[?(@.age > 24)]").unwrap();
+        assert_eq!(deleted, 3);
+
+        let expected = json!({
+            "users": [
+                {"name": "David", "age": 22}
+            ]
+        });
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_nested_fields() {
+        let mut data = json!({
+            "company": {
+                "departments": {
+                    "engineering": {"budget": 100000},
+                    "marketing": {"budget": 50000},
+                    "hr": {"budget": 30000}
+                }
+            }
+        });
+
+        let deleted = data
+            .delete_by_path("$.company.departments.marketing")
+            .unwrap();
+        assert_eq!(deleted, 1);
+
+        let expected = json!({
+            "company": {
+                "departments": {
+                    "engineering": {"budget": 100000},
+                    "hr": {"budget": 30000}
+                }
+            }
+        });
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_nonexistent_path() {
+        let mut data = json!({
+            "test": "value"
+        });
+
+        let deleted = data.delete_by_path("$.nonexistent").unwrap();
+        assert_eq!(deleted, 0);
+
+        // Data should remain unchanged
+        let expected = json!({
+            "test": "value"
+        });
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_root() {
+        let mut data = json!({
+            "test": "value"
+        });
+
+        let deleted = data.delete_by_path("$").unwrap();
+        assert_eq!(deleted, 1);
+        assert_eq!(data, Value::Null);
     }
 }
