@@ -1,24 +1,24 @@
 #[cfg(feature = "compiled-path")]
 pub(crate) mod parse_impl {
     use crate::ast::parse::{JSPathParser, Rule};
+    use crate::ast::{kw, CompOp, FnCallOneArg, FnCallTwoArg, IndexSelector, Main, NameSelector, NodesType, ReturnsLogical, ReturnsNodes, ReturnsValue, ValueType};
     use crate::ast::{
         AbsSingularQuery, AtomExpr, Bool, BracketName, BracketedSelection, ChildSegment, CompExpr,
-        Comparable, DescendantSegment, EOI, FilterSelector, FunctionArgument, FunctionExpr,
-        FunctionName, IndexSegment, JPQuery, JSInt, JSString, Literal, LogicalExpr, LogicalExprAnd,
-        MemberNameShorthand, NameSegment, NotOp, Null, Number, ParenExpr, PestIgnoredPunctuated,
-        PestLiteralWithoutRule, RelQuery, RelSingularQuery, Root, Segment, Segments, Selector,
-        SingularQuery, SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector,
-        SliceStart, SliceStep, Test, TestExpr, WildcardSelector,
-        WildcardSelectorOrMemberNameShorthand,
+        Comparable, DescendantSegment, FilterSelector, FunctionExpr, IndexSegment, JPQuery, JSInt, JSString, Literal, LogicalExpr, LogicalExprAnd, MemberNameShorthand,
+        NameSegment, NotOp, Null, Number, ParenExpr, PestLiteral, PestWithIgnoredPunctuation,
+        RelQuery, RelSingularQuery, Root, Segment, Segments, Selector, SingularQuery,
+        SingularQuerySegment, SingularQuerySegments, SliceEnd, SliceSelector, SliceStart,
+        SliceStep, Test, TestExpr, WildcardSelector, WildcardSelectorOrMemberNameShorthand,
+        EOI,
     };
-    use crate::ast::{CompOp, IndexSelector, Main, NameSelector, kw};
-    use pest::Parser;
+    use pest::Parser as PestParser;
     use proc_macro2::{Ident, TokenStream};
-    use quote::{ToTokens, quote};
+    use quote::{quote, ToTokens};
     use syn::parse::{Parse, ParseStream};
     use syn::punctuated::Punctuated;
+    use syn::spanned::Spanned;
     use syn::token::Token;
-    use syn::{LitBool, LitInt, LitStr, Token, token};
+    use syn::{token, LitBool, LitInt, LitStr, Token};
 
     pub trait ParseUtilsExt: Parse {
         fn peek(input: ParseStream) -> bool;
@@ -39,9 +39,9 @@ pub(crate) mod parse_impl {
         }
     }
 
-    impl<T: Parse, P: Parse> PestIgnoredPunctuated<T, P> {
+    impl<T: Parse, P: Parse> PestWithIgnoredPunctuation<T, P> {
         pub(crate) fn parse_terminated(input: ParseStream) -> syn::Result<Self> {
-            Ok(PestIgnoredPunctuated(Punctuated::parse_terminated(input)?))
+            Ok(PestWithIgnoredPunctuation(Punctuated::parse_terminated(input)?))
         }
 
         pub(crate) fn parse_separated_nonempty(input: ParseStream) -> syn::Result<Self>
@@ -55,32 +55,32 @@ pub(crate) mod parse_impl {
                     std::any::type_name::<T>()
                 )))
             } else {
-                Ok(PestIgnoredPunctuated(res))
+                Ok(PestWithIgnoredPunctuation(res))
             }
         }
     }
 
-    impl<T: Parse, P: Parse> Parse for PestIgnoredPunctuated<T, P> {
+    impl<T: Parse, P: Parse> Parse for PestWithIgnoredPunctuation<T, P> {
         fn parse(input: ParseStream) -> syn::Result<Self> {
             Self::parse_terminated(input)
         }
     }
 
-    impl<T: Default + Parse> Parse for PestLiteralWithoutRule<T> {
+    impl<T: Default + Parse> Parse for PestLiteral<T> {
         fn parse(input: ParseStream) -> syn::Result<Self> {
-            Ok(PestLiteralWithoutRule(input.parse::<T>()?))
+            Ok(PestLiteral(input.parse::<T>()?))
         }
     }
-    impl<T: ToTokens> ToTokens for PestLiteralWithoutRule<T> {
-        fn to_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
+    impl<T: ToTokens> ToTokens for PestLiteral<T> {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self { 0: __0 } = self;
             {
                 {
-                    let __expr: fn(&mut ::proc_macro2::TokenStream, _) = |tokens, val: &T| {
+                    let __expr: fn(&mut TokenStream, _) = |tokens, val: &T| {
                         let mut sub = TokenStream::new();
                         val.to_tokens(&mut sub);
                         tokens.extend(
-                            quote! { ::jsonpath_ast::ast::PestLiteralWithoutRule::new(Default::default()) },
+                            quote! { ::jsonpath_ast::ast::PestLiteral::new(Default::default()) },
                         );
                     };
                     __expr(tokens, __0)
@@ -258,7 +258,7 @@ pub(crate) mod parse_impl {
         }
     }
 
-    impl<T: Parse, P: Parse> ToTokens for PestIgnoredPunctuated<T, P>
+    impl<T: Parse, P: Parse> ToTokens for PestWithIgnoredPunctuation<T, P>
     where
         T: ToTokens,
         P: ToTokens,
@@ -627,29 +627,106 @@ pub(crate) mod parse_impl {
         }
     }
 
-    impl ToTokens for FunctionName {
+    // impl ToTokens for FunctionName {
+    //     fn to_tokens(&self, tokens: &mut TokenStream) {
+    //         // tokens.extend(quote! {
+    //         //     ::jsonpath_ast::ast::FunctionName::new(
+    //         //         ::proc_macro2::Ident::new("function_name", ::proc_macro2::Span::call_site())
+    //         //     )
+    //         // });
+    //         let variant = match self {
+    //             // Literal::Number(inner) => {
+    //             //     quote!(new_number(#inner))
+    //             // }
+    //             FunctionName::Length(_) => { quote!(new_length(Default::default())) }
+    //             FunctionName::Value(_) => { quote!(new_value(Default::default())) }
+    //             FunctionName::Count(_) => { quote!(new_count(Default::default())) }
+    //             FunctionName::Search(_) => { quote!(new_search(Default::default())) }
+    //             FunctionName::Match(_) => { quote!(new_match(Default::default())) }
+    //             FunctionName::In(_) => { quote!(new_in(Default::default())) }
+    //             FunctionName::Nin(_) => { quote!(new_nin(Default::default())) }
+    //             FunctionName::NoneOf(_) => { quote!(new_none_of(Default::default())) }
+    //             FunctionName::AnyOf(_) => { quote!(new_any_of(Default::default())) }
+    //             FunctionName::SubsetOf(_) => { quote!(new_subset_of(Default::default())) }
+    //         };
+    //         tokens.extend(quote!(::jsonpath_ast::ast::FunctionName::#variant))
+    //     }
+    // }
+
+    impl ToTokens for FunctionExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
+            let variant = match self {
+                FunctionExpr::ReturnsValue(v) => { quote!(new_returns_value(#v)) }
+                FunctionExpr::ReturnsLogical(v) => { quote!(new_returns_logical(#v)) }
+                FunctionExpr::ReturnsNodes(v) => { quote!(new_returns_nodes(#v)) }
+            };
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::FunctionName::new(
-                    ::proc_macro2::Ident::new("function_name", ::proc_macro2::Span::call_site())
-                )
+                ::jsonpath_ast::ast::FunctionExpr::#variant
             });
         }
     }
 
-    impl ToTokens for FunctionExpr {
+    impl ToTokens for ReturnsValue {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            let Self {
-                name,
-                paren: _,
-                args,
-            } = self;
+            let variant = match self {
+                ReturnsValue::Length(FnCallOneArg{arg, ..}) => { quote!(new_length(Default::default(), #arg)) }
+                ReturnsValue::Value(FnCallOneArg{arg, ..}) => { quote!(new_value(Default::default(), #arg)) }
+                ReturnsValue::Count(FnCallOneArg{arg, ..}) => { quote!(new_count(Default::default(), #arg)) }
+            };
             tokens.extend(quote! {
-                ::jsonpath_ast::ast::FunctionExpr::new(
-                    #name,
-                    Default::default(),
-                    #args
-                )
+                ::jsonpath_ast::ast::ReturnsValue::#variant
+            });
+        }
+    }
+
+    impl ToTokens for ReturnsLogical {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let variant = match self {
+                ReturnsLogical::Search(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_search(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::Match(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_match(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::In(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_in(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::Nin(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_nin(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::NoneOf(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_none_of(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::AnyOf(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_any_of(Default::default(), #arg1, Default::default(), #arg2))}
+                ReturnsLogical::SubsetOf(FnCallTwoArg{arg1, arg2, ..}) => {quote!(new_subset_of(Default::default(), #arg1, Default::default(), #arg2))}
+            };
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::ReturnsLogical::#variant
+            });
+        }
+    }
+
+    impl ToTokens for ReturnsNodes {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            // let variant = match self {
+            // };
+            tokens.extend(quote! {
+                compile_error!("No functions return nodes type yet, if this is no longer true update the ToTokens impl for ReturnsNodes")
+            });
+        }
+    }
+
+    impl ToTokens for ValueType {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let variant = match self {
+                ValueType::Literal(v) => {quote!(new_literal(#v))}
+                ValueType::SingularQuery(v) => {quote!(new_singular_query(#v))}
+                ValueType::ValueFunction(v) => {quote!(new_value_function(#v))}
+            };
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::ValueType::#variant
+            });
+        }
+    }
+
+    impl ToTokens for NodesType {
+        fn to_tokens(&self, tokens: &mut TokenStream) {
+            let variant = match self {
+                NodesType::SubQuery(v) => {quote!(new_sub_query(#v))}
+                NodesType::NodesFunction(v) => {quote!(new_nodes_function(#v))}
+            };
+            tokens.extend(quote! {
+                ::jsonpath_ast::ast::NodesType::#variant
             });
         }
     }
@@ -792,33 +869,33 @@ pub(crate) mod parse_impl {
         }
     }
 
-    impl ToTokens for FunctionArgument {
-        fn to_tokens(&self, tokens: &mut TokenStream) {
-            match self {
-                Self::Literal(literal) => {
-                    let mut literal_tokens = TokenStream::new();
-                    literal.to_tokens(&mut literal_tokens);
-                    tokens.extend(quote! {
-                        ::jsonpath_ast::ast::FunctionArgument::Literal(#literal_tokens)
-                    });
-                }
-                Self::Test(test) => {
-                    let mut test_tokens = TokenStream::new();
-                    test.to_tokens(&mut test_tokens);
-                    tokens.extend(quote! {
-                        ::jsonpath_ast::ast::FunctionArgument::Test(#test_tokens)
-                    });
-                }
-                Self::LogicalExpr(expr) => {
-                    let mut expr_tokens = TokenStream::new();
-                    expr.to_tokens(&mut expr_tokens);
-                    tokens.extend(quote! {
-                        ::jsonpath_ast::ast::FunctionArgument::LogicalExpr(#expr_tokens)
-                    });
-                }
-            }
-        }
-    }
+    // impl ToTokens for FunctionArgument {
+    //     fn to_tokens(&self, tokens: &mut TokenStream) {
+    //         match self {
+    //             Self::Literal(literal) => {
+    //                 let mut literal_tokens = TokenStream::new();
+    //                 literal.to_tokens(&mut literal_tokens);
+    //                 tokens.extend(quote! {
+    //                     ::jsonpath_ast::ast::FunctionArgument::Literal(#literal_tokens)
+    //                 });
+    //             }
+    //             Self::Test(test) => {
+    //                 let mut test_tokens = TokenStream::new();
+    //                 test.to_tokens(&mut test_tokens);
+    //                 tokens.extend(quote! {
+    //                     ::jsonpath_ast::ast::FunctionArgument::Test(#test_tokens)
+    //                 });
+    //             }
+    //             Self::LogicalExpr(expr) => {
+    //                 let mut expr_tokens = TokenStream::new();
+    //                 expr.to_tokens(&mut expr_tokens);
+    //                 tokens.extend(quote! {
+    //                     ::jsonpath_ast::ast::FunctionArgument::LogicalExpr(#expr_tokens)
+    //                 });
+    //             }
+    //         }
+    //     }
+    // }
 
     impl ToTokens for Test {
         fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -840,9 +917,13 @@ pub(crate) mod parse_impl {
     impl ToTokens for TestExpr {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             let Self { not_op, test } = self;
+            let repr_not = match not_op {
+                Some(not_op) => quote! {Some(#not_op)},
+                None => quote! {None},
+            };
             tokens.extend(quote! {
                 ::jsonpath_ast::ast::TestExpr::new(
-                    #not_op,
+                    #repr_not,
                     #test
                 )
             });
@@ -887,7 +968,7 @@ pub(crate) mod parse_impl {
                 None
             };
             let __paren_backing_token_stream;
-            let paren: PestLiteralWithoutRule<token::Paren> =
+            let paren: PestLiteral<token::Paren> =
                 syn::parenthesized!(__paren_backing_token_stream in input ).into();
             let expr: LogicalExpr = __paren_backing_token_stream.parse()?;
             Ok(ParenExpr {
@@ -992,7 +1073,11 @@ pub(crate) mod parse_impl {
 
     impl ParseUtilsExt for CompExpr {
         fn peek(input: ParseStream) -> bool {
-            Comparable::peek(input)
+            let fork = input.fork();
+            // This is very suboptimal but the only option because at this point in the stream a comp_expr and a test_expr
+            //  look identical if they're both functions, IE: $[?match(@, $.regex)] is a test_exp while $[?match(@, $.regex) == true]
+            //  is a comp_exp
+            fork.parse::<Comparable>().is_ok() && fork.parse::<CompOp>().is_ok()
         }
     }
     impl ParseUtilsExt for TestExpr {
@@ -1084,13 +1169,28 @@ pub(crate) mod parse_impl {
         Ok(num)
     }
 
-    impl ParseUtilsExt for FunctionExpr {
-        fn peek(input: ParseStream) -> bool {
-            FunctionName::peek(input)
-        }
-    }
+    // fn function_name_expected_args(name: &FunctionName) -> (String, usize) {
+    //     (format!("{:?}", name), match name {
+    //         FunctionName::Length(_) | FunctionName::Value(_) | FunctionName::Count(_) => { 1 },
+    //         FunctionName::Search(_) | FunctionName::Match(_)
+    //         | FunctionName::In(_) | FunctionName::Nin(_)
+    //         | FunctionName::NoneOf(_) | FunctionName::AnyOf(_) | FunctionName::SubsetOf(_) => { 2 },
+    //     })
+    // }
+    // impl Parse for FunctionExpr {
+    //     fn parse(__input: ParseStream) -> ::syn::Result<Self> {
+    //         let paren;
+    //         let ret = Self { name: __input.parse()?, paren: syn::parenthesized!(paren in __input ), args: PestWithIgnoredPunctuation::parse_separated_nonempty(&paren)? };
+    //         let (func_name, expected_num_args) = function_name_expected_args(&ret.name);
+    //         if expected_num_args == ret.args.0.len() {
+    //             Ok(ret)
+    //         } else {
+    //             Err(syn::Error::new(ret.args.span(), format!("Invalid number of arguments for function {}, expected {}", func_name, expected_num_args)))
+    //         }
+    //     }
+    // }
 
-    impl ParseUtilsExt for FunctionName {
+    impl ParseUtilsExt for FunctionExpr {
         fn peek(input: ParseStream) -> bool {
             input.peek(kw::length)
                 || input.peek(kw::value)
@@ -1105,52 +1205,41 @@ pub(crate) mod parse_impl {
         }
     }
 
-    pub fn validate_function_name(input: ParseStream) -> Result<Ident, syn::Error> {
-        if input.peek(kw::length) {
-            input.parse::<kw::length>()?;
-            return Ok(Ident::new("length", input.span()));
+    impl ParseUtilsExt for ReturnsValue {
+        fn peek(input: ParseStream) -> bool {
+            input.peek(kw::value) || input.peek(kw::length) || input.peek(kw::count)
         }
-        if input.peek(kw::value) {
-            input.parse::<kw::value>()?;
-            return Ok(Ident::new("value", input.span()));
-        }
-        if input.peek(kw::count) {
-            input.parse::<kw::count>()?;
-            return Ok(Ident::new("count", input.span()));
-        }
-        if input.peek(kw::search) {
-            input.parse::<kw::search>()?;
-            return Ok(Ident::new("search", input.span()));
-        }
-        if input.peek(Token![match]) {
-            input.parse::<Token![match]>()?;
-            return Ok(Ident::new("match", input.span()));
-        }
-        if input.peek(Token![in]) {
-            input.parse::<Token![in]>()?;
-            return Ok(Ident::new("in", input.span()));
-        }
-        if input.peek(kw::nin) {
-            input.parse::<kw::nin>()?;
-            return Ok(Ident::new("nin", input.span()));
-        }
-        if input.peek(kw::none_of) {
-            input.parse::<kw::none_of>()?;
-            return Ok(Ident::new("none_of", input.span()));
-        }
-        if input.peek(kw::any_of) {
-            input.parse::<kw::any_of>()?;
-            return Ok(Ident::new("any_of", input.span()));
-        }
-        if input.peek(kw::subset_of) {
-            input.parse::<kw::subset_of>()?;
-            return Ok(Ident::new("subset_of", input.span()));
-        }
-        Err(syn::Error::new(
-            input.span(),
-            "invalid function name, expected one of: length, value, count, search, match, in, nin, none_of, any_of, subset_of",
-        ))
     }
+
+    impl ParseUtilsExt for ReturnsLogical {
+        fn peek(input: ParseStream) -> bool {
+            input.peek(kw::search)
+            | input.peek(Token![match])
+            | input.peek(Token![in])
+            | input.peek(kw::nin)
+            | input.peek(kw::none_of)
+            | input.peek(kw::any_of)
+            | input.peek(kw::subset_of )
+        }
+    }
+
+    impl<NameToken, Arg> Parse for FnCallOneArg<NameToken, Arg>
+    where
+        NameToken: Default + Parse,
+        Arg: Parse,
+    {
+        fn parse(__input: ParseStream) -> syn::Result<Self> { Ok(Self { name: __input.parse()?, arg: __input.parse()? }) }
+    }
+
+    impl<NameToken: Default, Arg1, Arg2> Parse for FnCallTwoArg<NameToken, Arg1, Arg2>
+    where
+        NameToken: Default + Parse,
+        Arg1: Parse,
+        Arg2: Parse,
+    {
+        fn parse(__input: ParseStream) -> syn::Result<Self> { Ok(Self { name: __input.parse()?, arg1: __input.parse()?, c: __input.parse()?, arg2: __input.parse()? }) }
+    }
+
 
     impl ParseUtilsExt for RelQuery {
         fn peek(input: ParseStream) -> bool {

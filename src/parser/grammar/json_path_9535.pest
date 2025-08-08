@@ -16,22 +16,65 @@ step = {":" ~ S ~ int?}
 start = {int}
 end = {int}
 slice_selector = { start? ~ S ~ ":" ~ S ~ end? ~ S ~ step? }
-filter_selector = {"?"~ S ~ logical_expr}
+filter_selector = {"?" ~ S ~ logical_expr}
 logical_expr = {logical_expr_and ~ S ~ ("||" ~ S ~ logical_expr_and)*}
 logical_expr_and = {atom_expr ~ S ~ ("&&" ~ S ~ atom_expr)*}
 atom_expr = {paren_expr | comp_expr| test_expr}
 paren_expr = {not_op? ~ S ~ "(" ~ S ~ logical_expr ~ S ~ ")"}
 comp_expr = { comparable ~ S ~ comp_op ~ S ~ comparable }
 test_expr = {not_op? ~ S ~ test}
-test = {rel_query | jp_query | function_expr}
-rel_query = {curr ~ S ~ segments}
-function_expr = { ( function_name_one_arg ~ one_arg ) | ( function_name_two_arg ~ two_arg ) }
-function_name_one_arg = { "length" | "value" | "count" }
-function_name_two_arg = { "search" | "match" |  "in" | "nin" | "none_of" | "any_of" | "subset_of" }
-function_argument = { literal | test | logical_expr }
-one_arg = _{ "(" ~ S ~ function_argument ~ S ~ ")" }
-two_arg = _{ "(" ~ S ~ function_argument ~ S ~ "," ~ S ~ function_argument ~ S ~ ")" }
-comparable = { literal | singular_query | function_expr }
+test = {
+    filter_query // existence/non-existence
+    // Per RFC: [function expressions may be used] As a test-expr in a logical expression:
+    // The function's declared result type is LogicalType or (giving rise to conversion as per Section 2.4.2) NodesType.
+    | ( &( returns_logical_type | returns_nodes_type ) ~ function_expr ) // LogicalType or NodesType
+}
+filter_query = _{ rel_query | jp_query }
+rel_query = {curr ~ segments}
+
+function_expr = { returns_value_type | returns_logical_type | returns_nodes_type }
+// https://github.com/pest-parser/pest/issues/333 would be awesome for this but it doesn't exist yet and it's been 7 years
+// Lookahead to peek the names and then homogenize them into the same rule till we refine the parser code
+length_func_call = { "length" ~ "(" ~ S ~ value_type ~ S ~ ")" }
+value_func_call = { "value" ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
+count_func_call = { "count" ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
+search_func_call = { "search" ~ "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+match_func_call = { "match" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+in_func_call = { "in" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+nin_func_call = { "nin" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+none_of_func_call = { "none_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+any_of_func_call = { "any_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+subset_of_func_call = { "subset_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+
+returns_value_type = { length_func_call | value_func_call | count_func_call }
+returns_logical_type = { search_func_call | match_func_call | in_func_call | nin_func_call | none_of_func_call | any_of_func_call | subset_of_func_call }
+// Currently no functions return this, so never match for now. To add a node which returns NodesType, replace !ANY
+returns_nodes_type = { !ANY }
+
+// When the declared type of the parameter is ValueType and the argument is one of the following:
+//  - A value expressed as a literal.
+//  - A singular query. In this case:
+//      - If the query results in a nodelist consisting of a single node, the argument is the value of the node.
+//      - If the query results in an empty nodelist, the argument is the special result Nothing.
+value_type = { literal | singular_query | returns_value_type }
+// When the declared type of the parameter is LogicalType and the argument is one of the following:
+//  - A function expression with declared result type NodesType. In this case, the argument is converted to LogicalType as per Section 2.4.2.
+//  - A logical-expr that is not a function expression.
+logical_type = {
+    logical_expr // TODO why is this not allowed to be a function_expr? we guarantee it's return is a logical type(or is coercible to one)
+    // | returns_logical_type // this case is actually covered as a subset of logical_expr
+    | nodes_type
+}
+// When the declared type of the parameter is NodesType and the argument is a query (which includes singular query).
+nodes_type = { jp_query | returns_nodes_type }
+
+
+// Removed, a literal is a ValueType, and a logical_expr is just a test with more rules around it, both are LogicalType
+// function_argument = { literal | test | logical_expr }
+
+// Per RFC: As a comparable in a comparison:
+//  The function's declared result type is ValueType.
+comparable = { literal | singular_query | ( &returns_value_type ~ function_expr ) }
 literal = { number | string | bool | null }
 bool = {"true" | "false"}
 null = {"null"}

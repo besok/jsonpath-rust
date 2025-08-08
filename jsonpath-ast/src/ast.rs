@@ -6,12 +6,9 @@ pub mod parse {
 }
 
 pub(crate) mod kw {
-    // syn::custom_keyword!(in);
-    syn::custom_keyword!(nin);
-    syn::custom_keyword!(size);
-    syn::custom_keyword!(none_of);
-    syn::custom_keyword!(any_of);
-    syn::custom_keyword!(subset_of);
+    use crate::ast::KnowsRule;
+    use crate::parse::Rule;
+    use syn::Token;
 
     syn::custom_keyword!(length);
     syn::custom_keyword!(value);
@@ -19,8 +16,24 @@ pub(crate) mod kw {
     syn::custom_keyword!(search);
     // reserved
     // syn::custom_keyword!(match);
+    // syn::custom_keyword!(in);
+    syn::custom_keyword!(nin);
+    syn::custom_keyword!(none_of);
+    syn::custom_keyword!(any_of);
+    syn::custom_keyword!(subset_of);
 
     syn::custom_keyword!(null);
+
+    impl KnowsRule for length { const RULE: Rule = Rule::length_func_call; }
+    impl KnowsRule for value { const RULE: Rule = Rule::value_func_call; }
+    impl KnowsRule for count { const RULE: Rule = Rule::count_func_call; }
+    impl KnowsRule for search { const RULE: Rule = Rule::search_func_call; }
+    impl KnowsRule for Token![match] { const RULE: Rule = Rule::match_func_call; }
+    impl KnowsRule for Token![in] { const RULE: Rule = Rule::in_func_call; }
+    impl KnowsRule for nin { const RULE: Rule = Rule::nin_func_call; }
+    impl KnowsRule for none_of { const RULE: Rule = Rule::none_of_func_call; }
+    impl KnowsRule for any_of { const RULE: Rule = Rule::any_of_func_call; }
+    impl KnowsRule for subset_of { const RULE: Rule = Rule::subset_of_func_call; }
 }
 
 macro_rules! terminating_from_pest {
@@ -61,33 +74,38 @@ macro_rules! terminating_from_pest {
 use super::parse::{JSPathParser, Rule};
 #[cfg(feature = "compiled-path")]
 use crate::syn_parse::parse_impl::{
-    ParseUtilsExt, parse_bool, parse_float, validate_function_name, validate_js_int,
-    validate_js_str, validate_member_name_shorthand,
+    parse_bool, parse_float, validate_js_int, validate_js_str,
+    validate_member_name_shorthand, ParseUtilsExt,
 };
 use derive_new::new;
 use from_pest::{ConversionError, FromPest, Void};
-use pest::Parser;
 use pest::iterators::{Pair, Pairs};
+use pest::Parser;
 use pest_ast::FromPest;
 use proc_macro2::Span;
-#[allow(unused_imports)]
-use syn::LitBool;
+use quote::ToTokens;
 #[cfg(feature = "compiled-path")]
 use syn::parse::ParseStream;
 use syn::punctuated::Punctuated;
 use syn::token::Bracket;
-use syn::{Ident, Token, token};
+#[allow(unused_imports)]
+use syn::LitBool;
+use syn::{token, Token};
 #[cfg(feature = "compiled-path")]
 use syn_derive::Parse;
 
 pub trait KnowsRule {
     const RULE: Rule;
+
+    fn matches_rule(other: Rule) -> bool {
+        other == Self::RULE
+    }
 }
 
 #[derive(Debug, new, PartialEq)]
-pub struct PestIgnoredPunctuated<T, P>(pub(crate) Punctuated<T, P>);
+pub struct PestWithIgnoredPunctuation<T, P>(pub(crate) Punctuated<T, P>);
 
-impl<'pest, T, P> FromPest<'pest> for PestIgnoredPunctuated<T, P>
+impl<'pest, T, P> FromPest<'pest> for PestWithIgnoredPunctuation<T, P>
 where
     T: FromPest<'pest, Rule = Rule, FatalError = Void> + KnowsRule + std::fmt::Debug,
     P: Default,
@@ -100,7 +118,7 @@ where
     ) -> Result<Self, ConversionError<Self::FatalError>> {
         let parsed_items = Vec::<T>::from_pest(pest)?;
 
-        Ok(PestIgnoredPunctuated(Punctuated::from_iter(
+        Ok(PestWithIgnoredPunctuation(Punctuated::from_iter(
             parsed_items.into_iter(),
         )))
     }
@@ -108,14 +126,14 @@ where
 
 /// Allows for syn to parse things that pest checks but does not store as rules
 #[derive(Debug, Default, new, PartialEq)]
-pub struct PestLiteralWithoutRule<T>(pub(crate) T);
+pub struct PestLiteral<T>(pub(crate) T);
 
-impl<T> From<T> for PestLiteralWithoutRule<T> {
+impl<T> From<T> for PestLiteral<T> {
     fn from(value: T) -> Self {
         Self(value)
     }
 }
-impl<'pest, T: Default> FromPest<'pest> for PestLiteralWithoutRule<T> {
+impl<'pest, T: Default> FromPest<'pest> for PestLiteral<T> {
     type Rule = Rule;
     type FatalError = Void;
 
@@ -123,7 +141,7 @@ impl<'pest, T: Default> FromPest<'pest> for PestLiteralWithoutRule<T> {
     fn from_pest(
         _pest: &mut Pairs<'pest, Self::Rule>,
     ) -> Result<Self, ConversionError<Self::FatalError>> {
-        Ok(PestLiteralWithoutRule(T::default()))
+        Ok(PestLiteral(T::default()))
     }
 }
 
@@ -152,7 +170,7 @@ pub struct EOI;
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::jp_query))]
 pub struct JPQuery {
-    pub(crate) root: PestLiteralWithoutRule<Root>,
+    pub(crate) root: PestLiteral<Root>,
     pub(crate) segments: Segments,
 }
 
@@ -174,8 +192,8 @@ pub enum Segment {
     // THIS MUST BE FIRST
     #[cfg_attr(feature = "compiled-path", parse(peek_func = DescendantSegment::peek))]
     Descendant(
-        PestLiteralWithoutRule<Token![.]>,
-        PestLiteralWithoutRule<Token![.]>,
+        PestLiteral<Token![.]>,
+        PestLiteral<Token![.]>,
         DescendantSegment,
     ),
     #[cfg_attr(feature = "compiled-path", parse(peek_func = ChildSegment::peek))]
@@ -191,7 +209,7 @@ pub enum ChildSegment {
     // search for `[` or `.`(must NOT be `..` because that is a descendant segment but syn will parse that as `..` not 2 periods)
     #[cfg_attr(feature = "compiled-path", parse(peek = Token![.]))]
     WildcardOrShorthand(
-        PestLiteralWithoutRule<token::Dot>,
+        PestLiteral<token::Dot>,
         WildcardSelectorOrMemberNameShorthand,
     ),
 }
@@ -202,9 +220,9 @@ pub struct BracketedSelection {
     #[cfg_attr(feature = "compiled-path", syn(bracketed))]
     pub(crate) arg_bracket: token::Bracket,
     #[cfg_attr(feature = "compiled-path", syn(in = arg_bracket))]
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestWithIgnoredPunctuation::parse_separated_nonempty(i)
     ))]
-    pub(crate) selectors: PestIgnoredPunctuated<Selector, Token![,]>,
+    pub(crate) selectors: PestWithIgnoredPunctuation<Selector, Token![,]>,
 }
 
 impl<'pest> from_pest::FromPest<'pest> for BracketedSelection {
@@ -382,7 +400,7 @@ impl KnowsRule for Selector {
 pub struct SliceSelector(
     #[cfg_attr(feature = "compiled-path", parse(SliceStart::maybe_parse))]
     pub(crate)  Option<SliceStart>,
-    pub(crate) PestLiteralWithoutRule<Token![:]>,
+    pub(crate) PestLiteral<Token![:]>,
     #[cfg_attr(feature = "compiled-path", parse(SliceEnd::maybe_parse))] pub(crate) Option<SliceEnd>,
     #[cfg_attr(feature = "compiled-path", parse(SliceStep::maybe_parse))]
     pub(crate)  Option<SliceStep>,
@@ -392,7 +410,7 @@ pub struct SliceSelector(
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::step))]
 pub struct SliceStep(
-    pub(crate) PestLiteralWithoutRule<Token![:]>,
+    pub(crate) PestLiteral<Token![:]>,
     pub(crate) JSInt,
 );
 
@@ -415,7 +433,7 @@ pub struct IndexSelector(pub(crate) JSInt);
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::filter_selector))]
 pub struct FilterSelector {
-    pub q: PestLiteralWithoutRule<Token![?]>,
+    pub q: PestLiteral<Token![?]>,
     pub expr: LogicalExpr,
 }
 
@@ -423,18 +441,18 @@ pub struct FilterSelector {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr))]
 pub struct LogicalExpr {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestWithIgnoredPunctuation::parse_separated_nonempty(i)
     ))]
-    pub ands: PestIgnoredPunctuated<LogicalExprAnd, Token![||]>,
+    pub ands: PestWithIgnoredPunctuation<LogicalExprAnd, Token![||]>,
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::logical_expr_and))]
 pub struct LogicalExprAnd {
-    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_separated_nonempty(i)
+    #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestWithIgnoredPunctuation::parse_separated_nonempty(i)
     ))]
-    pub atoms: PestIgnoredPunctuated<AtomExpr, Token![&&]>,
+    pub atoms: PestWithIgnoredPunctuation<AtomExpr, Token![&&]>,
 }
 impl KnowsRule for LogicalExprAnd {
     const RULE: Rule = Rule::logical_expr_and;
@@ -496,7 +514,7 @@ pub struct ParenExpr {
     // #[cfg_attr(feature = "compiled-path", parse(peek_func = NotOp::peek))]
     pub(crate) not_op: Option<NotOp>,
     // #[paren]
-    pub(crate) paren: PestLiteralWithoutRule<token::Paren>,
+    pub(crate) paren: PestLiteral<token::Paren>,
     // #[inside(paren)]
     pub(crate) expr: LogicalExpr,
 }
@@ -610,36 +628,37 @@ impl<'pest> FromPest<'pest> for CompOp {
     }
 }
 
-#[derive(Debug, new, PartialEq)]
+#[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct FunctionExpr {
-    pub(crate) name: FunctionName,
-    #[cfg_attr(feature = "compiled-path", syn(parenthesized))]
-    pub(crate) paren: token::Paren,
-    #[cfg_attr(feature = "compiled-path", syn(in = paren))]
-    // #[cfg_attr(feature = "compiled-path", parse(|i: ParseStream| PestIgnoredPunctuated::parse_terminated(i)))]
-    pub(crate) args: PestIgnoredPunctuated<FunctionArgument, Token![,]>,
+#[pest_ast(rule(Rule::function_expr))]
+pub enum FunctionExpr {
+    ReturnsValue(ReturnsValue),
+    ReturnsLogical(ReturnsLogical),
+    ReturnsNodes(ReturnsNodes)
 }
 
-impl<'pest> from_pest::FromPest<'pest> for FunctionExpr {
+#[derive(Debug, new, PartialEq)]
+pub struct FnCallOneArg<NameToken, Arg>
+where
+    NameToken: Default,
+{
+    pub(crate) name: PestLiteral<NameToken>,
+    pub(crate) arg: Arg,
+}
+
+impl<'pest, N, Arg> FromPest<'pest> for FnCallOneArg<N, Arg>
+where
+    N: Default + KnowsRule,
+    Arg: FromPest<'pest, Rule = Rule, FatalError = Void>,
+{
     type Rule = Rule;
     type FatalError = Void;
-    fn from_pest(pest: &mut Pairs<'pest, Rule>) -> Result<Self, ConversionError<Void>> {
+
+    fn from_pest(pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::function_expr {
-            let mut inner = pair.into_inner();
-            let inner = &mut inner;
-            let this = FunctionExpr {
-                name: ::from_pest::FromPest::from_pest(inner)?,
-                paren: Default::default(),
-                args: FromPest::from_pest(inner)?,
-            };
-            if inner.clone().next().is_some() {
-                Err(ConversionError::Extraneous {
-                    current_node: "FunctionExpr",
-                })?;
-            }
+        if N::matches_rule(pair.as_rule()) {
+            let this = Self { name: Default::default(), arg: Arg::from_pest(pest)? };
             *pest = clone;
             Ok(this)
         } else {
@@ -649,29 +668,31 @@ impl<'pest> from_pest::FromPest<'pest> for FunctionExpr {
 }
 
 #[derive(Debug, new, PartialEq)]
-#[cfg_attr(feature = "compiled-path", derive(Parse))]
-pub struct FunctionName {
-    #[cfg_attr(feature = "compiled-path", parse(validate_function_name))]
-    name: Ident,
+pub struct FnCallTwoArg<NameToken: Default, Arg1, Arg2> {
+    pub(crate) name: PestLiteral<NameToken>,
+    pub(crate) arg1: Arg1,
+    pub(crate) c: PestLiteral<token::Comma>,
+    pub(crate) arg2: Arg2,
 }
 
-impl<'pest> FromPest<'pest> for FunctionName {
+impl<'pest, N, Arg1, Arg2> FromPest<'pest> for FnCallTwoArg<N, Arg1, Arg2>
+where
+    N: Default + KnowsRule,
+    Arg1: FromPest<'pest, Rule = Rule, FatalError = Void>,
+    Arg2: FromPest<'pest, Rule = Rule, FatalError = Void>,
+{
     type Rule = Rule;
     type FatalError = Void;
 
-    fn from_pest(
-        pest: &mut Pairs<'pest, Self::Rule>,
-    ) -> Result<Self, ConversionError<Self::FatalError>> {
+    fn from_pest(pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
-        if matches!(
-            pair.as_rule(),
-            Rule::function_name_one_arg | Rule::function_name_two_arg
-        ) {
-            let mut inner = pair.into_inner();
-            let inner = &mut inner;
-            let this = FunctionName {
-                name: Ident::new(inner.to_string().as_str().trim(), Span::call_site()),
+        if N::matches_rule(pair.as_rule()) {
+            let this = Self {
+                name: Default::default(),
+                arg1: Arg1::from_pest(pest)?,
+                c: Default::default(),
+                arg2: Arg2::from_pest(pest)?
             };
             *pest = clone;
             Ok(this)
@@ -683,24 +704,157 @@ impl<'pest> FromPest<'pest> for FunctionName {
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
-#[pest_ast(rule(Rule::function_argument))]
-pub enum FunctionArgument {
+#[pest_ast(rule(Rule::returns_value_type))]
+pub enum ReturnsValue {
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::length))]
+    Length(FnCallOneArg<kw::length, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::value))]
+    Value(FnCallOneArg<kw::value, NodesType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::count))]
+    Count(FnCallOneArg<kw::count, NodesType>),
+}
+
+#[derive(Debug, new, PartialEq, FromPest)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+#[pest_ast(rule(Rule::returns_logical_type))]
+pub enum ReturnsLogical {
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::search))]
+    Search(FnCallTwoArg<kw::search, ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = Token![match]))]
+    Match(FnCallTwoArg<Token![match], ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = Token![in]))]
+    In(FnCallTwoArg<Token![in], ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::nin))]
+    Nin(FnCallTwoArg<kw::nin, ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::none_of))]
+    NoneOf(FnCallTwoArg<kw::none_of, ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::any_of))]
+    AnyOf(FnCallTwoArg<kw::any_of, ValueType, ValueType>),
+    #[cfg_attr(feature = "compiled-path", parse(peek = kw::subset_of))]
+    SubsetOf(FnCallTwoArg<kw::subset_of, ValueType, ValueType>),
+}
+
+
+#[derive(Debug, PartialEq/*, FromPest*/)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+// #[pest_ast(rule(Rule::returns_nodes_type))]
+#[allow(private_bounds)]
+pub(crate) enum ReturnsNodes {
+    // IF YOU PUT SOMETHING HERE YOU MUST REMOVE CURRENT IMPL OF `FromPest for ReturnsNodes`(currently just unreachable!())
+}
+
+impl<'pest> from_pest::FromPest<'pest> for ReturnsNodes {
+    type Rule = Rule;
+    type FatalError = Void;
+
+    fn from_pest(_pest: &mut Pairs<'pest, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+        unreachable!()
+    }
+}
+
+
+// #[derive(Debug, new, PartialEq)]
+// #[cfg_attr(feature = "compiled-path", derive(Parse))]
+// pub enum FunctionName {
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::length))]
+//     Length(kw::length),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::value))]
+//     Value(kw::value),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::count))]
+//     Count(kw::count),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::search))]
+//     Search(kw::search),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = Token![match]))]
+//     Match(Token![match]),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = Token![in]))]
+//     In(Token![in]),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::nin))]
+//     Nin(kw::nin),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::none_of))]
+//     NoneOf(kw::none_of),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::any_of))]
+//     AnyOf(kw::any_of),
+//     #[cfg_attr(feature = "compiled-path", parse(peek = kw::subset_of))]
+//     SubsetOf(kw::subset_of),
+// }
+
+// impl<'pest> FromPest<'pest> for FunctionName {
+//     type Rule = Rule;
+//     type FatalError = Void;
+//
+//     fn from_pest(
+//         pest: &mut Pairs<'pest, Self::Rule>,
+//     ) -> Result<Self, ConversionError<Self::FatalError>> {
+//         let mut clone = pest.clone();
+//         let pair = clone.next().ok_or(ConversionError::NoMatch)?;
+//         if matches!(
+//             pair.as_rule(),
+//             Rule::function_name
+//         ) {
+//             let this = match pair.as_str().trim() {
+//                 "length" => Self::Length(Default::default()),
+//                 "value" => Self::Value(Default::default()),
+//                 "count" => Self::Count(Default::default()),
+//                 "search" => Self::Search(Default::default()),
+//                 "match" => Self::Match(Default::default()),
+//                 "in" => Self::In(Default::default()),
+//                 "nin" => Self::Nin(Default::default()),
+//                 "none_of" => Self::NoneOf(Default::default()),
+//                 "any_of" => Self::AnyOf(Default::default()),
+//                 "subset_of" => Self::SubsetOf(Default::default()),
+//                 _ => unreachable!("Invalid function name should be impossible, error in pest grammar")
+//             };
+//             *pest = clone;
+//             Ok(this)
+//         } else {
+//             Err(ConversionError::NoMatch)
+//         }
+//     }
+// }
+
+// #[derive(Debug, new, PartialEq, FromPest)]
+// #[cfg_attr(feature = "compiled-path", derive(Parse))]
+// #[pest_ast(rule(Rule::function_argument))]
+// pub enum FunctionArgument {
+//     #[cfg_attr(feature = "compiled-path", parse(peek_func = Literal::peek))]
+//     Literal(Literal),
+//     #[cfg_attr(feature = "compiled-path", parse(peek_func = Test::peek))]
+//     Test(Test),
+//     #[cfg_attr(feature = "compiled-path", parse(peek_func = LogicalExpr::peek))]
+//     LogicalExpr(LogicalExpr),
+// }
+// impl KnowsRule for FunctionArgument {
+//     const RULE: Rule = Rule::function_argument;
+// }
+
+#[derive(Debug, new, PartialEq, FromPest)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+#[pest_ast(rule(Rule::value_type))]
+pub enum ValueType {
     #[cfg_attr(feature = "compiled-path", parse(peek_func = Literal::peek))]
     Literal(Literal),
-    #[cfg_attr(feature = "compiled-path", parse(peek_func = Test::peek))]
-    Test(Test),
-    #[cfg_attr(feature = "compiled-path", parse(peek_func = LogicalExpr::peek))]
-    LogicalExpr(LogicalExpr),
+    #[cfg_attr(feature = "compiled-path", parse(peek_func = SingularQuery::peek))]
+    SingularQuery(SingularQuery),
+    #[cfg_attr(feature = "compiled-path", parse(peek_func = ReturnsValue::peek))]
+    ValueFunction(Box<ReturnsValue>)
 }
-impl KnowsRule for FunctionArgument {
-    const RULE: Rule = Rule::function_argument;
+
+
+#[derive(Debug, new, PartialEq, FromPest)]
+#[cfg_attr(feature = "compiled-path", derive(Parse))]
+#[pest_ast(rule(Rule::nodes_type))]
+pub enum NodesType {
+    #[cfg_attr(feature = "compiled-path", parse(peek_func = JPQuery::peek))]
+    SubQuery(JPQuery),
+    NodesFunction(Box<ReturnsNodes>),
 }
+
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::rel_query))]
 pub struct RelQuery {
-    pub(crate) curr: PestLiteralWithoutRule<Token![@]>,
+    pub(crate) curr: PestLiteral<Token![@]>,
     pub(crate) segments: Segments,
 }
 
@@ -718,7 +872,7 @@ pub enum SingularQuery {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::rel_singular_query))]
 pub struct RelSingularQuery {
-    pub(crate) curr: PestLiteralWithoutRule<Token![@]>,
+    pub(crate) curr: PestLiteral<Token![@]>,
     pub(crate) segments: SingularQuerySegments,
 }
 
@@ -726,7 +880,7 @@ pub struct RelSingularQuery {
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::abs_singular_query))]
 pub struct AbsSingularQuery {
-    pub(crate) root: PestLiteralWithoutRule<Root>,
+    pub(crate) root: PestLiteral<Root>,
     pub(crate) segments: SingularQuerySegments,
 }
 
@@ -782,14 +936,14 @@ pub enum NameSegment {
     #[cfg_attr(feature = "compiled-path", parse(peek = token::Bracket))]
     BracketedName(BracketName),
     #[cfg_attr(feature = "compiled-path", parse(peek = Token![.]))]
-    DotName(PestLiteralWithoutRule<Token![.]>, MemberNameShorthand),
+    DotName(PestLiteral<Token![.]>, MemberNameShorthand),
 }
 
 #[derive(Debug, new, PartialEq, FromPest)]
 #[pest_ast(rule(Rule::name_selector))]
 pub struct BracketName {
     // #[cfg_attr(feature = "compiled-path", syn(bracketed))]
-    pub(crate) bracket: PestLiteralWithoutRule<Bracket>,
+    pub(crate) bracket: PestLiteral<Bracket>,
     // #[cfg_attr(feature = "compiled-path", syn(in = bracket))]
     pub(crate) name: JSString,
 }
@@ -798,7 +952,7 @@ pub struct BracketName {
 #[pest_ast(rule(Rule::index_segment))]
 pub struct IndexSegment {
     // #[cfg_attr(feature = "compiled-path", syn(bracketed))]
-    pub(crate) bracket: PestLiteralWithoutRule<Bracket>,
+    pub(crate) bracket: PestLiteral<Bracket>,
     // #[cfg_attr(feature = "compiled-path", syn(in = bracket))]
     pub(crate) index: JSInt,
 }
@@ -885,4 +1039,4 @@ terminating_from_pest!(Bool, Rule::bool, |inner: Pair<Rule>| Bool(
 #[derive(Debug, new, PartialEq, FromPest)]
 #[cfg_attr(feature = "compiled-path", derive(Parse))]
 #[pest_ast(rule(Rule::null))]
-pub struct Null(pub(crate) PestLiteralWithoutRule<kw::null>);
+pub struct Null(pub(crate) PestLiteral<kw::null>);

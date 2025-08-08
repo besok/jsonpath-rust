@@ -134,11 +134,11 @@ pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
 
 pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
     let fn_str = rule.as_str();
-    let mut elems = rule.into_inner();
-    let name = elems
-        .next()
-        .map(|e| e.as_str())
-        .ok_or(JsonPathError::empty("function expression"))?;
+    let mut elems = rule.into_inner().next().ok_or(JsonPathError::empty("function rule was empty"))?;
+    match elems.as_rule() {
+        Rule::returns_logical_type =>
+    }
+    let name = todo!();
 
     // Check if the function name is valid namely nothing between the name and the opening parenthesis
     if fn_str
@@ -153,7 +153,7 @@ pub fn function_expr(rule: Pair<Rule>) -> Parsed<TestFunction> {
         )))
     } else {
         let mut args = vec![];
-        for arg in elems {
+        for arg in elems.into_inner() {
             let next = next_down(arg)?;
             match next.as_rule() {
                 Rule::literal => args.push(FnArg::Literal(literal(next)?)),
@@ -173,7 +173,10 @@ pub fn test(rule: Pair<Rule>) -> Parsed<Test> {
     match child.as_rule() {
         Rule::jp_query => Ok(Test::AbsQuery(jp_query(child)?)),
         Rule::rel_query => Ok(Test::RelQuery(rel_query(child)?)),
-        Rule::function_expr => Ok(Test::Function(Box::new(function_expr(child)?))),
+        Rule::function_expr => {
+            let func = function_expr(child).map(|f| f)?;
+            Ok(Test::Function(Box::new(func)))
+        },
         _ => Err(child.into()),
     }
 }
