@@ -32,21 +32,24 @@ test = {
 filter_query = _{ rel_query | jp_query }
 rel_query = {curr ~ segments}
 
-
-function_expr = { length_func_call | search_func_call | match_func_call | in_func_call | nin_func_call | none_of_func_call | any_of_func_call | subset_of_func_call }
+function_expr = { returns_value_type | returns_logical_type | returns_nodes_type }
 // https://github.com/pest-parser/pest/issues/333 would be awesome for this but it doesn't exist yet and it's been 7 years
 // Lookahead to peek the names and then homogenize them into the same rule till we refine the parser code
-length_func_call = _{ &"length" ~ function_name ~ "(" ~ S ~ value_type ~ S ~ ")" }
-value_func_call = _{ &"value" ~ function_name ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
-count_func_call = _{ &"count" ~ function_name ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
-search_func_call = _{ &"search" ~ function_name ~ "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
-match_func_call = _{ &"match" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+length_func_call = { "length" ~ "(" ~ S ~ value_type ~ S ~ ")" }
+value_func_call = { "value" ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
+count_func_call = { "count" ~ "(" ~ S ~ nodes_type ~ S ~ ")" }
+search_func_call = { "search" ~ "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+match_func_call = { "match" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+in_func_call = { "in" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+nin_func_call = { "nin" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+none_of_func_call = { "none_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+any_of_func_call = { "any_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+subset_of_func_call = { "subset_of" ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
 
-in_func_call = _{ &"in" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
-nin_func_call = _{ &"nin" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
-none_of_func_call = _{ &"none_of" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
-any_of_func_call = _{ &"any_of" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
-subset_of_func_call = _{ &"subset_of" ~ function_name ~  "(" ~ S ~ value_type ~ S ~ "," ~ S ~ value_type ~ S ~ ")" }
+returns_value_type = { length_func_call | value_func_call | count_func_call }
+returns_logical_type = { search_func_call | match_func_call | in_func_call | nin_func_call | none_of_func_call | any_of_func_call | subset_of_func_call }
+// Currently no functions return this, so never match for now. To add a node which returns NodesType, replace !ANY
+returns_nodes_type = { !ANY }
 
 // When the declared type of the parameter is ValueType and the argument is one of the following:
 //  - A value expressed as a literal.
@@ -58,7 +61,7 @@ value_type = { literal | singular_query | returns_value_type }
 //  - A function expression with declared result type NodesType. In this case, the argument is converted to LogicalType as per Section 2.4.2.
 //  - A logical-expr that is not a function expression.
 logical_type = {
-    logical_expr // TODO why is this not allowed to be a function_expr? we guarantee it's return is a logical type
+    logical_expr // TODO why is this not allowed to be a function_expr? we guarantee it's return is a logical type(or is coercible to one)
     // | returns_logical_type // this case is actually covered as a subset of logical_expr
     | nodes_type
 }
@@ -66,12 +69,6 @@ logical_type = {
 nodes_type = { jp_query | returns_nodes_type }
 
 
-returns_value_type = _{ length_func_call | value_func_call | count_func_call }
-returns_logical_type = _{ search_func_call | match_func_call | in_func_call | nin_func_call | none_of_func_call | any_of_func_call | subset_of_func_call }
-// Currently no functions return this, so never match for now. To add a node which returns NodesType, replace !ANY
-returns_nodes_type = _{ !ANY }
-
-function_name = { "length" | "value" | "count" | "search" | "match" |  "in" | "nin" | "none_of" | "any_of" | "subset_of" }
 // Removed, a literal is a ValueType, and a logical_expr is just a test with more rules around it, both are LogicalType
 // function_argument = { literal | test | logical_expr }
 
