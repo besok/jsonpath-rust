@@ -46,7 +46,7 @@ impl<'a, T: Queryable> From<(&'a T, &str)> for QueryRef<'a, T> {
 }
 
 impl<'a, T: Queryable> QueryRef<'a, T> {
-    pub fn val(self) -> &'a T {
+    pub fn val(&self) -> &'a T {
         self.0
     }
     pub fn path(self) -> QueryPath {
