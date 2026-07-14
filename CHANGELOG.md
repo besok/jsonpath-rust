@@ -70,3 +70,5 @@
   - change String to str for as objects
 - **`1.0.4`**
   - added function to remove a part by path
+- **`1.0.5`**
+  - make the fields of QueryRef public. remove val and path methods.
