@@ -29,34 +29,34 @@ pub trait Query {
     fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T>;
 }
 
-/// The resulting type of JSONPath query.
+/// The resulting type of the JSONPath query.
 /// It can either be a value or a reference to a value with its path.
 #[derive(Debug, Clone, PartialEq)]
-pub struct QueryRef<'a, T: Queryable>(&'a T, QueryPath);
+pub struct QueryRef<'a, T: Queryable> {
+    pub val: &'a T,
+    pub path: QueryPath,
+}
 
 impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryRef<'a, T> {
-    fn from((inner, path): (&'a T, QueryPath)) -> Self {
-        QueryRef(inner, path)
+    fn from((val, path): (&'a T, QueryPath)) -> Self {
+        QueryRef { val, path }
     }
 }
 impl<'a, T: Queryable> From<(&'a T, &str)> for QueryRef<'a, T> {
-    fn from((inner, path): (&'a T, &str)) -> Self {
-        QueryRef(inner, path.to_string())
-    }
-}
-
-impl<'a, T: Queryable> QueryRef<'a, T> {
-    pub fn val(self) -> &'a T {
-        self.0
-    }
-    pub fn path(self) -> QueryPath {
-        self.1
+    fn from((val, path): (&'a T, &str)) -> Self {
+        QueryRef {
+            val,
+            path: path.to_string(),
+        }
     }
 }
 
 impl<'a, T: Queryable> From<Pointer<'a, T>> for QueryRef<'a, T> {
     fn from(pointer: Pointer<'a, T>) -> Self {
-        QueryRef(pointer.inner, pointer.path)
+        QueryRef {
+            val: pointer.inner,
+            path: pointer.path,
+        }
     }
 }
 
@@ -84,7 +84,7 @@ pub fn js_path_process<'a, 'b, T: Queryable>(
 pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<&'a T>> {
     Ok(js_path(path, value)?
         .into_iter()
-        .map(|r| r.val())
+        .map(|r| r.val)
         .collect::<Vec<_>>())
 }
 
@@ -92,7 +92,7 @@ pub fn js_path_vals<'a, T: Queryable>(path: &str, value: &'a T) -> Queried<Vec<&
 pub fn js_path_path<T: Queryable>(path: &str, value: &T) -> Queried<Vec<QueryPath>> {
     Ok(js_path(path, value)?
         .into_iter()
-        .map(|r| r.path())
+        .map(|r| r.path)
         .collect::<Vec<_>>())
 }
 
@@ -170,7 +170,7 @@ mod tests {
       ],
      "expensive": 10 }"#
     }
-    
+
     #[test]
     fn update_by_path_test() -> Queried<()> {
         let mut json = json!([
