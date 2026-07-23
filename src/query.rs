@@ -37,6 +37,15 @@ pub struct QueryRef<'a, T: Queryable> {
     pub path: QueryPath,
 }
 
+impl<'a, T: Queryable> QueryRef<'a, T> {
+    pub fn val(self) -> &'a T {
+        self.val
+    }
+    pub fn path(self) -> QueryPath {
+        self.path
+    }
+}
+
 impl<'a, T: Queryable> From<(&'a T, QueryPath)> for QueryRef<'a, T> {
     fn from((val, path): (&'a T, QueryPath)) -> Self {
         QueryRef { val, path }
