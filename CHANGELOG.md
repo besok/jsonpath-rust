@@ -74,3 +74,5 @@
   - make the fields of QueryRef public. remove val and path methods.
 - **`1.0.6`**
   - add val and path methods.
+- **`1.0.7`**
+  - fix bugs with parsing (RFC related issues)
