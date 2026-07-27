@@ -580,7 +580,7 @@ mod tests {
 
         let vec = js_path("$['\\/']", &json)?;
 
-        assert_eq!(vec, vec![(&json!("A"), "$['\\/']".to_string()).into(),]);
+        assert_eq!(vec, vec![(&json!("A"), "$['/']".to_string()).into(),]);
 
         Ok(())
     }
@@ -658,7 +658,7 @@ mod tests {
         });
 
         let vec = js_path("$[\"a'\"]", &json)?;
-        assert_eq!(vec, vec![(&json!("A"), "$['\"a\'\"']".to_string()).into(),]);
+        assert_eq!(vec, vec![(&json!("A"), "$['a\\'']".to_string()).into(),]);
 
         Ok(())
     }
@@ -801,7 +801,7 @@ mod tests {
     #[test]
     fn tab_key() -> Queried<()> {
         let json = json!({
-          "\\t": "A"
+          "\t": "A"
         });
         let vec = json.query_with_path("$['\\t']")?;
         assert_eq!(vec, vec![(&json!("A"), "$['\\t']".to_string()).into()]);
@@ -821,10 +821,151 @@ mod tests {
     #[test]
     fn carr_return() -> Queried<()> {
         let json = json!({
-          "\\r": "A"
+          "\r": "A"
         });
         let vec = json.query_with_path("$['\\r']")?;
         assert_eq!(vec, vec![(&json!("A"), "$['\\r']".to_string()).into()]);
+
+        Ok(())
+    }
+
+    // RFC 9535, section 2.3.1.2, table 4: the quotes go and every escape becomes its character.
+    #[test]
+    fn escaped_name_selectors() -> Queried<()> {
+        let escapes = [
+            ("\\b", "\u{0008}"),
+            ("\\f", "\u{000C}"),
+            ("\\n", "\n"),
+            ("\\r", "\r"),
+            ("\\t", "\t"),
+            ("\\/", "/"),
+            ("\\\\", "\\"),
+            ("\\u263A", "\u{263A}"),
+            ("\\u263a", "\u{263A}"),
+            ("\\uD834\\uDD1E", "\u{1D11E}"),
+            ("\\ud83d\\ude00", "\u{1F600}"),
+            ("\\uD7FF", "\u{D7FF}"),
+            ("\\uE000", "\u{E000}"),
+            ("\\u0000", "\u{0000}"),
+            ("\\u001b", "\u{001B}"),
+        ];
+        for (escaped, name) in escapes {
+            let json = json!({ name: "A" });
+            for selector in [format!("$[\"{}\"]", escaped), format!("$['{}']", escaped)] {
+                let found: Vec<&Value> = json.query(&selector)?;
+                assert_eq!(found, vec![&json!("A")], "{}", selector);
+            }
+        }
+
+        // only the delimiting quote needs escaping, and the other one must stay literal
+        assert_eq!(json!({"\"": "A"}).query("$[\"\\\"\"]")?, vec![&json!("A")]);
+        assert_eq!(json!({"'": "A"}).query("$['\\'']")?, vec![&json!("A")]);
+        assert_eq!(
+            json!({"'a'": "A"}).query("$['\\'a\\'']")?,
+            vec![&json!("A")]
+        );
+        assert_eq!(json!({"a\"b": "A"}).query("$['a\"b']")?, vec![&json!("A")]);
+
+        // a \u escape denotes one scalar value, so a lone surrogate is not a name
+        assert!(parse_json_path("$[\"\\uD800\"]").is_err());
+        assert!(parse_json_path("$[\"\\uDC00\"]").is_err());
+        assert!(parse_json_path("$[\"\\uD800\\uD800\"]").is_err());
+
+        Ok(())
+    }
+
+    // The same conversion applies to string literals used in filters.
+    #[test]
+    fn escaped_string_literals() -> Queried<()> {
+        let json = json!(["quoted' literal", "quoted\\' literal", "a\tb", "a\\tb"]);
+
+        assert_eq!(
+            json.query("$[?@ == 'quoted\\' literal']")?,
+            vec![&json!("quoted' literal")]
+        );
+        assert_eq!(json.query("$[?@ == \"a\\tb\"]")?, vec![&json!("a\tb")]);
+        assert_eq!(json.query("$[?@ == 'a\\\\tb']")?, vec![&json!("a\\tb")]);
+
+        Ok(())
+    }
+
+    // An I-Regexp is the value of its string literal: unescaped once, and never trimmed.
+    #[test]
+    fn regex_argument_is_the_literal_value() -> Queried<()> {
+        // 'a\\.c' denotes a backslash followed by the any-character dot
+        let json = json!(["a.c", "a\\bc", "abc"]);
+        assert_eq!(
+            json.query("$[?match(@, 'a\\\\\\\\.c')]")?,
+            vec![&json!("a\\bc")]
+        );
+
+        // \/ is a JSONPath escape, not a regex one
+        let json = json!(["a/b", "ab"]);
+        assert_eq!(json.query("$[?match(@, 'a\\/b')]")?, vec![&json!("a/b")]);
+
+        // a pattern is never trimmed: it may legitimately start and end with a quote
+        let json = json!(["\"x\"", "yxy"]);
+        assert_eq!(json.query("$[?search(@, '\"x\"')]")?, vec![&json!("\"x\"")]);
+
+        Ok(())
+    }
+
+    // A Normalized Path (RFC 9535, section 2.7) has to select the node it was produced from.
+    #[test]
+    fn normalized_paths_round_trip() -> Queried<()> {
+        let names = [
+            "a",
+            "",
+            " ",
+            "'",
+            "\"",
+            "\\",
+            "\\'",
+            "/",
+            "~",
+            "a/b",
+            "a~b",
+            "~0",
+            "'a'",
+            "\"a\"",
+            "\u{0008}",
+            "\u{000C}",
+            "\n",
+            "\r",
+            "\t",
+            "\u{0000}",
+            "\u{000B}",
+            "\u{001F}",
+            "\u{007F}",
+            "\u{263A}",
+            "\u{1F600}",
+        ];
+        for name in names {
+            let json = json!({ name: "A" });
+
+            let paths = json.query_only_path("$[*]")?;
+            assert_eq!(paths.len(), 1, "{:?}", name);
+
+            let found: Vec<&Value> = json.query(&paths[0])?;
+            assert_eq!(found, vec![&json!("A")], "{:?} -> {}", name, paths[0]);
+            assert_eq!(json.reference(&paths[0]), Some(&json!("A")), "{}", paths[0]);
+        }
+
+        // the escapes that section 2.7 fixes, in one and only one form
+        assert_eq!(
+            json!({"'\\\t\u{000B}/": "A"}).query_only_path("$[*]")?,
+            vec!["$['\\'\\\\\\t\\u000b/']".to_string()]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn delete_by_path_with_slash_in_name() -> Queried<()> {
+        let mut json = json!({"a/b": {"c": 1, "d": 2}});
+
+        assert_eq!(json.delete_by_path("$['a/b']['c']")?, 1);
+        assert_eq!(json, json!({"a/b": {"d": 2}}));
 
         Ok(())
     }
