@@ -155,13 +155,7 @@ fn prepare_regex(pattern: String, substring: bool) -> String {
     } else {
         pattern.to_string()
     };
-    let pattern = if pattern.contains("\\\\") {
-        pattern.replace("\\\\", "\\")
-    } else {
-        pattern.to_string()
-    };
-
-    pattern.trim_matches(|c| c == '\'' || c == '"').to_string()
+    pattern
 }
 
 fn value<T: Queryable>(state: State<T>) -> State<T> {

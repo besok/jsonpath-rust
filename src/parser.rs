@@ -112,9 +112,9 @@ pub fn segment(child: Pair<Rule>) -> Parsed<Segment> {
 pub fn selector(rule: Pair<Rule>) -> Parsed<Selector> {
     let child = next_down(rule)?;
     match child.as_rule() {
-        Rule::name_selector => Ok(Selector::Name(
-            validate_js_str(child.as_str().trim())?.to_string(),
-        )),
+        Rule::name_selector => Ok(Selector::Name(unquote_and_unescape(validate_js_str(
+            child.as_str().trim(),
+        )?)?)),
         Rule::wildcard_selector => Ok(Selector::Wildcard),
         Rule::index_selector => Ok(Selector::Index(
             child
@@ -213,9 +213,13 @@ pub fn singular_query_segments(rule: Pair<Rule>) -> Parsed<Vec<SingularQuerySegm
     for r in rule.into_inner() {
         match r.as_rule() {
             Rule::name_segment => {
-                segments.push(SingularQuerySegment::Name(
-                    next_down(r)?.as_str().trim().to_string(),
-                ));
+                let name = next_down(r)?;
+                segments.push(SingularQuerySegment::Name(match name.as_rule() {
+                    Rule::name_selector => {
+                        unquote_and_unescape(validate_js_str(name.as_str().trim())?)?
+                    }
+                    _ => name.as_str().trim().to_string(),
+                }));
             }
             Rule::index_segment => {
                 segments.push(SingularQuerySegment::Index(
@@ -297,6 +301,77 @@ fn validate_js_str(s: &str) -> Parsed<&str> {
     Ok(s)
 }
 
+/// Converts a string literal to the string it denotes, per RFC 9535, section 2.3.1.2:
+/// the quotes are removed and every escape sequence is replaced by the character it names.
+fn unquote_and_unescape(literal: &str) -> Parsed<String> {
+    let invalid =
+        || JsonPathError::InvalidJsonPath(format!("Invalid string literal `{}`", literal));
+
+    let body = literal
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .or_else(|| {
+            literal
+                .strip_prefix('\'')
+                .and_then(|s| s.strip_suffix('\''))
+        })
+        .ok_or_else(invalid)?;
+
+    if !body.contains('\\') {
+        return Ok(body.to_string());
+    }
+
+    let mut unescaped = String::with_capacity(body.len());
+    let mut chars = body.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            unescaped.push(ch);
+            continue;
+        }
+        match chars.next().ok_or_else(invalid)? {
+            'b' => unescaped.push('\u{0008}'),
+            'f' => unescaped.push('\u{000C}'),
+            'n' => unescaped.push('\n'),
+            'r' => unescaped.push('\r'),
+            't' => unescaped.push('\t'),
+            '/' => unescaped.push('/'),
+            '\\' => unescaped.push('\\'),
+            '"' => unescaped.push('"'),
+            '\'' => unescaped.push('\''),
+            'u' => unescaped.push(unescape_unicode(&mut chars).ok_or_else(invalid)?),
+            _ => return Err(invalid()),
+        }
+    }
+    Ok(unescaped)
+}
+
+/// Reads the `XXXX` of a `\uXXXX` escape, joining a surrogate pair into one scalar value.
+fn unescape_unicode(chars: &mut std::str::Chars) -> Option<char> {
+    fn hex4(chars: &mut std::str::Chars) -> Option<u32> {
+        let mut code = 0;
+        for _ in 0..4 {
+            code = code * 16 + chars.next()?.to_digit(16)?;
+        }
+        Some(code)
+    }
+
+    match hex4(chars)? {
+        high @ 0xD800..=0xDBFF => {
+            if chars.next()? != '\\' || chars.next()? != 'u' {
+                return None;
+            }
+            match hex4(chars)? {
+                low @ 0xDC00..=0xDFFF => {
+                    char::from_u32(0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00))
+                }
+                _ => None,
+            }
+        }
+        0xDC00..=0xDFFF => None,
+        code => char::from_u32(code),
+    }
+}
+
 pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     fn parse_number(num: &str) -> Parsed<Literal> {
         let num = num.trim();
@@ -311,17 +386,9 @@ pub fn literal(rule: Pair<Rule>) -> Parsed<Literal> {
     }
 
     fn parse_string(string: &str) -> Parsed<Literal> {
-        let string = validate_js_str(string.trim())?;
-        if string.starts_with('\'') && string.ends_with('\'') {
-            Ok(Literal::String(string[1..string.len() - 1].to_string()))
-        } else if string.starts_with('"') && string.ends_with('"') {
-            Ok(Literal::String(string[1..string.len() - 1].to_string()))
-        } else {
-            Err(JsonPathError::InvalidJsonPath(format!(
-                "Invalid string literal `{}`",
-                string
-            )))
-        }
+        Ok(Literal::String(unquote_and_unescape(validate_js_str(
+            string.trim(),
+        )?)?))
     }
 
     let first = next_down(rule)?;

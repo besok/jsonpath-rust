@@ -40,7 +40,7 @@ macro_rules! q_segment {
         SingularQuerySegment::Name(stringify!($name).to_string())
     };
     ([$name:ident]) => {
-        SingularQuerySegment::Name(format!("\"{}\"", stringify!($name)))
+        SingularQuerySegment::Name(stringify!($name).to_string())
     };
     ([$index:expr]) => {
         SingularQuerySegment::Index($index)
@@ -199,7 +199,7 @@ macro_rules! selector {
         Selector::Name(stringify!($name).to_string())
     };
     ([$name:ident]) => {
-        Selector::Name(format!("\"{}\"", stringify!($name)))
+        Selector::Name(stringify!($name).to_string())
     };
     ([$index:expr]) => {
         Selector::Index($index)
