@@ -72,13 +72,14 @@ hexchar = _{ non_surrogate | (high_surrogate ~ "\\" ~ "u" ~ low_surrogate) }
 number = { (int | "-0") ~ frac? ~ exp? }
 frac = { "." ~ DIGIT+ }
 exp = { ("e" | "E") ~ ("-" | "+")? ~ DIGIT+ }
-non_surrogate = _{ (DIGIT | "A" | "B" | "C" | "E" | "F") ~ HEXDIG{3} | ("D" ~ ('0'..'7') ~ HEXDIG{2}) }
+// ABNF quoted strings are case-insensitive, so hex digits may be either case (RFC 9535, 2.3.1.1)
+non_surrogate = _{ (DIGIT | ^"A" | ^"B" | ^"C" | ^"E" | ^"F") ~ HEXDIG{3} | (^"D" ~ ('0'..'7') ~ HEXDIG{2}) }
 
-high_surrogate = _{ "D" ~ ("8" | "9" | "A" | "B") ~ HEXDIG{2} }
+high_surrogate = _{ ^"D" ~ ("8" | "9" | ^"A" | ^"B") ~ HEXDIG{2} }
 
-low_surrogate = _{ "D" ~ ("C" | "D" | "E" | "F") ~ HEXDIG{2} }
+low_surrogate = _{ ^"D" ~ (^"C" | ^"D" | ^"E" | ^"F") ~ HEXDIG{2} }
 
-HEXDIG = _{ DIGIT | "A" | "B" | "C" | "D" | "E" | "F" }
+HEXDIG = _{ DIGIT | 'a'..'f' | 'A'..'F' }
 DIGIT = _{ ASCII_DIGIT }
 DIGIT1 = _{ ASCII_NONZERO_DIGIT}
 ALPHA = { ASCII_ALPHA }

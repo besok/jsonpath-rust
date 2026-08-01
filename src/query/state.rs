@@ -198,6 +198,28 @@ pub(crate) struct Pointer<'a, T: Queryable> {
     pub path: QueryPath,
 }
 
+/// Renders a member name as a `normal-name-selector` of a Normalized Path (RFC 9535, section 2.7):
+/// single quotes, and only `'`, `\` and the C0 controls escaped.
+fn normal_name_selector(name: &str) -> String {
+    let mut selector = String::with_capacity(name.len() + 2);
+    selector.push('\'');
+    for ch in name.chars() {
+        match ch {
+            '\u{0008}' => selector.push_str("\\b"),
+            '\u{000C}' => selector.push_str("\\f"),
+            '\n' => selector.push_str("\\n"),
+            '\r' => selector.push_str("\\r"),
+            '\t' => selector.push_str("\\t"),
+            '\'' => selector.push_str("\\'"),
+            '\\' => selector.push_str("\\\\"),
+            c if c < '\u{0020}' => selector.push_str(&format!("\\u{:04x}", c as u32)),
+            c => selector.push(c),
+        }
+    }
+    selector.push('\'');
+    selector
+}
+
 impl<'a, T: Queryable> Display for Pointer<'a, T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}='{}'", self.inner, self.path)
@@ -210,13 +232,10 @@ impl<'a, T: Queryable> Pointer<'a, T> {
     }
 
     pub fn key(inner: &'a T, path: QueryPath, key: &str) -> Self {
-        let path = if key.starts_with("'") && key.ends_with("'") {
-            format!("{}[{}]", path, key)
-        } else {
-            format!("{}['{}']", path, key)
-        };
-
-        Pointer { inner, path }
+        Pointer {
+            inner,
+            path: format!("{}[{}]", path, normal_name_selector(key)),
+        }
     }
     pub fn idx(inner: &'a T, path: QueryPath, index: usize) -> Self {
         Pointer {

@@ -65,8 +65,8 @@ where
         + PartialEq,
 {
     /// Retrieves a reference to the value associated with the given key.
-    /// It is the responsibility of the implementation to handle enclosing single and double quotes.
-    /// The key will be normalized (quotes trimmed, whitespace handled, the escape symbols handled) before lookup.
+    /// The key is the member name itself: the parser has already removed the quotes
+    /// and replaced the escape sequences (RFC 9535, section 2.3.1.2).
     fn get(&self, key: &str) -> Option<&Self>;
 
     fn as_array(&self) -> Option<&Vec<Self>>;
@@ -176,13 +176,6 @@ where
 
 impl Queryable for Value {
     fn get(&self, key: &str) -> Option<&Self> {
-        let key = if key.starts_with("'") && key.ends_with("'") {
-            key.trim_matches(|c| c == '\'')
-        } else if key.starts_with('"') && key.ends_with('"') {
-            key.trim_matches(|c| c == '"')
-        } else {
-            key
-        };
         self.get(key)
     }
 
@@ -367,6 +360,11 @@ impl DeletionInfo {
     }
 }
 
+/// Encodes a member name as a JSON Pointer reference token (RFC 6901, section 3).
+fn pointer_token(name: &str) -> String {
+    name.replace('~', "~0").replace('/', "~1")
+}
+
 fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPathError> {
     if query_path == "$" {
         return Ok(Some(DeletionInfo::Root));
@@ -386,7 +384,7 @@ fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPat
             // Not the last segment, add to parent path
             match segment {
                 Segment::Selector(Selector::Name(name)) => {
-                    parent_path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
+                    parent_path.push_str(&format!("/{}", pointer_token(name)));
                 }
                 Segment::Selector(Selector::Index(index)) => {
                     parent_path.push_str(&format!("/{}", index));
@@ -401,7 +399,7 @@ fn parse_deletion_path(query_path: &str) -> Result<Option<DeletionInfo>, JsonPat
         } else {
             match segment {
                 Segment::Selector(Selector::Name(name)) => {
-                    let field_name = name.trim_matches(|c| c == '\'').to_string();
+                    let field_name = name.to_string();
                     return Ok(Some(DeletionInfo::ObjectField {
                         parent_path,
                         field_name,
@@ -484,7 +482,7 @@ fn convert_js_path(path: &str) -> Parsed<String> {
     for segment in segments {
         match segment {
             Segment::Selector(Selector::Name(name)) => {
-                path.push_str(&format!("/{}", name.trim_matches(|c| c == '\'')));
+                path.push_str(&format!("/{}", pointer_token(&name)));
             }
             Segment::Selector(Selector::Index(index)) => {
                 path.push_str(&format!("/{}", index));
