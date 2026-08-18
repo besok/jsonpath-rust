@@ -21,18 +21,69 @@ pub(super) struct JSPathParser;
 
 pub type Parsed<T> = Result<T, JsonPathError>;
 
+/// The maximum nesting depth of parentheses and brackets accepted in a query.
+///
+/// Parsing is recursive (both in the underlying PEG parser and in the AST
+/// construction that follows), so a query that nests grouping constructs
+/// unboundedly would recurse until the stack overflows and the process aborts.
+/// Real-world queries nest only a handful of levels, so this limit is generous
+/// while still keeping stack usage bounded.
+const MAX_NESTING_DEPTH: usize = 128;
+
 /// Parses a string into a [JsonPath].
 ///
 /// # Errors
 ///
 /// Returns a variant of [crate::JsonPathParserError] if the parsing operation failed.
 pub fn parse_json_path(jp_str: &str) -> Parsed<JpQuery> {
+    check_nesting_depth(jp_str)?;
     JSPathParser::parse(Rule::main, jp_str)
         .map_err(Box::new)?
         .next()
         .ok_or(JsonPathError::UnexpectedPestOutput)
         .and_then(next_down)
         .and_then(jp_query)
+}
+
+/// Rejects queries whose parentheses/brackets nest deeper than
+/// [`MAX_NESTING_DEPTH`] before they reach the recursive parser.
+///
+/// Grouping (`(...)` in filters and `[...]` selections/filters) is the only
+/// source of parser recursion, so scanning the raw input for the deepest run of
+/// still-open `(`/`[` bounds the recursion depth without first having to build
+/// the parse tree. Brackets and parentheses that appear inside a string literal
+/// are data rather than grouping tokens, so string contents are skipped.
+fn check_nesting_depth(jp_str: &str) -> Parsed<()> {
+    let mut depth: usize = 0;
+    let mut string_delim: Option<char> = None;
+    let mut escaped = false;
+
+    for c in jp_str.chars() {
+        if let Some(delim) = string_delim {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == delim {
+                string_delim = None;
+            }
+            continue;
+        }
+
+        match c {
+            '\'' | '"' => string_delim = Some(c),
+            '(' | '[' => {
+                depth += 1;
+                if depth > MAX_NESTING_DEPTH {
+                    return Err(JsonPathError::MaxNestingDepthExceeded(MAX_NESTING_DEPTH));
+                }
+            }
+            ')' | ']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    Ok(())
 }
 
 pub fn jp_query(rule: Pair<Rule>) -> Parsed<JpQuery> {

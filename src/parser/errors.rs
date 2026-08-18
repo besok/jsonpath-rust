@@ -30,6 +30,8 @@ pub enum JsonPathError {
     EmptyInner(String),
     #[error("Invalid json path: {0}")]
     InvalidJsonPath(String),
+    #[error("JSONPath nesting depth exceeds the maximum of {0}")]
+    MaxNestingDepthExceeded(usize),
 }
 
 impl JsonPathError {
