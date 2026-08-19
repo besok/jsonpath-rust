@@ -76,3 +76,4 @@
   - add val and path methods.
 - **`1.0.7`**
   - remove unfinished compiled paths
+  - fix bugs with parsing (RFC related issues)
