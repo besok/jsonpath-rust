@@ -77,3 +77,5 @@
 - **`1.0.7`**
   - remove unfinished compiled paths
   - fix bugs with parsing (RFC related issues)
+- **`1.0.8`**
+  - add fail fast validation for parser depth for recursion
