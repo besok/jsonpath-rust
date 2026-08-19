@@ -262,3 +262,36 @@ fn parse_global() {
         // .assert_fail("$..\ra")
     ;
 }
+
+#[test]
+fn deeply_nested_filter_is_rejected_instead_of_overflowing_stack() {
+    // Deeply nested grouping used to recurse until the stack overflowed and the
+    // process aborted. It must now be rejected with a normal error.
+    let depth = 100_000;
+    let query = format!("$[?{}@.a{}]", "(".repeat(depth), ")".repeat(depth));
+    assert!(matches!(
+        parse_json_path(&query),
+        Err(crate::parser::errors::JsonPathError::MaxNestingDepthExceeded(_))
+    ));
+}
+
+#[test]
+fn deeply_nested_brackets_are_rejected_instead_of_overflowing_stack() {
+    let depth = 100_000;
+    let query = format!("${}", "[?@".repeat(depth));
+    assert!(parse_json_path(&query).is_err());
+}
+
+#[test]
+fn brackets_inside_string_literals_do_not_count_towards_nesting() {
+    // The `[` characters here are data inside a name selector, not grouping, so
+    // the query must still parse successfully.
+    let name = "[".repeat(500);
+    let query = format!("$['{}']", name);
+    assert!(parse_json_path(&query).is_ok());
+}
+
+#[test]
+fn moderate_nesting_still_parses() {
+    assert!(parse_json_path("$[?((@.a == 1) && (@.b == 2))]").is_ok());
+}
