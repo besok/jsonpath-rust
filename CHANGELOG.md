@@ -79,3 +79,5 @@
   - fix bugs with parsing (RFC related issues)
 - **`1.0.9`**
   - add fail fast validation for parser depth for recursion
+- **`1.0.10(accidental version)`**
+  - add fail fast validation for parser depth for recursion
