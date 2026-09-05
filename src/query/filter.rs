@@ -98,6 +98,28 @@ mod tests {
     }
 
     #[test]
+    fn existence_of_empty_containers() {
+        let json = json!({
+          "a": {
+            "empty_array": {"b": []},
+            "empty_object": {"b": {}},
+            "empty_string": {"b": ""},
+            "no_b": {"c": 1}
+          }
+        });
+        // RFC 9535 2.3.5.2: a test expression is true when the nodelist it
+        // produces is non-empty, whatever the value of the nodes.
+        assert_eq!(
+            js_path("$.a[?@.b]", &json),
+            Ok(vec![
+                (&json!({"b": []}), "$['a']['empty_array']".to_string()).into(),
+                (&json!({"b": {}}), "$['a']['empty_object']".to_string()).into(),
+                (&json!({"b": ""}), "$['a']['empty_string']".to_string()).into(),
+            ])
+        );
+    }
+
+    #[test]
     fn existence_or() {
         let json = json!({
           "a": {
