@@ -81,3 +81,5 @@
   - add fail fast validation for parser depth for recursion
 - **`1.0.10(accidental version)`**
   - add fail fast validation for parser depth for recursion
+- **`1.0.11`**
+  - small correction accordance to the spec
