@@ -24,22 +24,12 @@ impl Query for FilterAtom {
                         res
                     }
                 } else {
-                    let struct_check = |s: &T| {
-                        if let Some(arr) = s.as_array() {
-                            !arr.is_empty()
-                        } else if let Some(obj) = s.as_object() {
-                            !obj.is_empty()
-                        } else if let Some(str) = s.as_str() {
-                            !str.is_empty()
-                        } else {
-                            true
-                        }
-                    };
-
+                    // RFC 9535 2.3.5.2: a test expression is true when the
+                    // nodelist it produces is non-empty. The value of the nodes
+                    // does not take part in the decision.
                     let struct_presented = match res.data {
-                        Data::Ref(v) => struct_check(v.inner),
-                        Data::Refs(e) if e.is_empty() => false,
-                        Data::Refs(elems) => elems.iter().map(|v| v.inner).all(struct_check),
+                        Data::Ref(_) => true,
+                        Data::Refs(elems) => !elems.is_empty(),
                         _ => false,
                     };
 
