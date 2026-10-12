@@ -139,23 +139,41 @@ fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -
     }
 }
 
+/// Translates an I-Regexp ([RFC9485]) into the syntax of the `regex` crate.
+///
+/// An I-Regexp `.` matches any character except `\n` and `\r` (RFC9485, section 5.3),
+/// but the crate's `.` matches `\r`, so `.` outside a character class becomes `[^\n\r]`.
+/// For match() the whole pattern is anchored, so `a|b` does not match "ab".
 fn prepare_regex(pattern: String, substring: bool) -> String {
-    let pattern = if !substring {
-        let pattern = if pattern.starts_with('^') {
-            pattern
-        } else {
-            format!("^{}", pattern)
-        };
-        let pattern = if pattern.ends_with('$') {
-            pattern
-        } else {
-            format!("{}$", pattern)
-        };
-        pattern
+    let mut translated = String::with_capacity(pattern.len());
+    let mut chars = pattern.chars();
+    let mut in_class = false;
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                translated.push(c);
+                if let Some(escaped) = chars.next() {
+                    translated.push(escaped);
+                }
+            }
+            '[' if !in_class => {
+                in_class = true;
+                translated.push(c);
+            }
+            ']' if in_class => {
+                in_class = false;
+                translated.push(c);
+            }
+            '.' if !in_class => translated.push_str(r"[^\n\r]"),
+            _ => translated.push(c),
+        }
+    }
+
+    if substring {
+        translated
     } else {
-        pattern.to_string()
-    };
-    pattern
+        format!("^(?:{translated})$")
+    }
 }
 
 fn value<T: Queryable>(state: State<T>) -> State<T> {
