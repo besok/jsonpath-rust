@@ -910,6 +910,49 @@ mod tests {
         Ok(())
     }
 
+    // An I-Regexp dot matches any character except \n and \r (RFC 9485, section 5.3).
+    #[test]
+    fn regex_dot_does_not_match_line_breaks() -> Queried<()> {
+        let json = json!(["a", "\r", "\n", "\u{2028}", "\r\n", "x\ry"]);
+        assert_eq!(
+            json.query("$[?match(@, '.')]")?,
+            vec![&json!("a"), &json!("\u{2028}")]
+        );
+        assert_eq!(
+            json.query("$[?search(@, '.')]")?,
+            vec![&json!("a"), &json!("\u{2028}"), &json!("x\ry")]
+        );
+        assert_eq!(
+            json.query("$[?match(@, 'x[.\\r]y')]")?,
+            vec![&json!("x\ry")]
+        );
+        assert_eq!(json.query("$[?match(@, 'x\\\\.y')]")?, Vec::<&Value>::new());
+
+        Ok(())
+    }
+
+    // match() anchors the whole pattern, not just its first and last branch.
+    #[test]
+    fn regex_match_anchors_alternation() -> Queried<()> {
+        let json = json!(["a", "b", "ab", "xb", "ax"]);
+        assert_eq!(
+            json.query("$[?match(@, 'a|b')]")?,
+            vec![&json!("a"), &json!("b")]
+        );
+        assert_eq!(
+            json.query("$[?search(@, 'a|b')]")?,
+            vec![
+                &json!("a"),
+                &json!("b"),
+                &json!("ab"),
+                &json!("xb"),
+                &json!("ax")
+            ]
+        );
+
+        Ok(())
+    }
+
     // A Normalized Path (RFC 9535, section 2.7) has to select the node it was produced from.
     #[test]
     fn normalized_paths_round_trip() -> Queried<()> {
