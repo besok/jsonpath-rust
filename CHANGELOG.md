@@ -83,3 +83,5 @@
   - add fail fast validation for parser depth for recursion
 - **`1.0.11`**
   - small correction accordance to the spec
+- **`1.0.12`**
+  - Fix bugs with regex
