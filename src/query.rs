@@ -953,6 +953,39 @@ mod tests {
         Ok(())
     }
 
+    // Each node is tested against every pattern in the filter, however many there are.
+    #[test]
+    fn regex_several_patterns_in_one_filter() -> Queried<()> {
+        let json = json!([
+            {"name": "widget-7", "sku": "SKU-000017"},
+            {"name": "widget-17", "sku": "SKU-000020"},
+            {"name": "gadget-7", "sku": "SKU-000011"}
+        ]);
+        assert_eq!(
+            json.query("$[?match(@.name, 'widget-[0-9]*7') && search(@.sku, '0{3}1')]")?,
+            vec![&json!({"name": "widget-7", "sku": "SKU-000017"})]
+        );
+
+        let json = json!(["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
+        let filter = (0..10)
+            .map(|i| format!("match(@, 'a{i}')"))
+            .collect::<Vec<_>>()
+            .join(" || ");
+        assert_eq!(
+            json.query(&format!("$[?{filter}]"))?,
+            (0..10).map(|i| &json[i]).collect::<Vec<_>>()
+        );
+
+        // an invalid pattern matches nothing
+        assert_eq!(json.query("$[?match(@, 'a[')]")?, Vec::<&Value>::new());
+        assert_eq!(
+            json.query("$[?search(@, '1')]")?,
+            vec![&json!("a1"), &json!("a10")]
+        );
+
+        Ok(())
+    }
+
     // A Normalized Path (RFC 9535, section 2.7) has to select the node it was produced from.
     #[test]
     fn normalized_paths_round_trip() -> Queried<()> {

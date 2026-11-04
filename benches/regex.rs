@@ -18,9 +18,9 @@ fn regex_perf_test_with_reuse(cfg: &SearchData) {
 }
 
 fn regex_perf_test_without_reuse() {
-    let json = Box::new(json!({
+    let json = Box::new(json!([{
         "author":"abcd(Rees)",
-    }));
+    }]));
 
     let _v = json.query(PATH).expect("the path is correct");
 }
@@ -31,9 +31,9 @@ fn json_path_compiling() {
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let data = SearchData {
-        json: json!({
+        json: json!([{
             "author":"abcd(Rees)",
-        }),
+        }]),
         path: parse_json_path(PATH).unwrap(),
     };
     c.bench_function("regex bench with reuse", |b| {

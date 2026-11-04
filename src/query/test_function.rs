@@ -4,6 +4,8 @@ use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 use regex::Regex;
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 impl TestFunction {
     pub fn apply<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
@@ -118,7 +120,7 @@ fn count<T: Queryable>(state: State<T>) -> State<T> {
 /// if the string matches the I-Regexp and is LogicalFalse otherwise.
 fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -> State<'a, T> {
     let to_state = |b| State::bool(b, lhs.root);
-    let regex = |v: &str, r: Regex| {
+    let regex = |v: &str, r: &Regex| {
         if substr {
             r.find(v).is_some()
         } else {
@@ -132,11 +134,41 @@ fn regex<'a, T: Queryable>(lhs: State<'a, T>, rhs: State<'a, T>, substr: bool) -
     };
 
     match (to_str(lhs), to_str(rhs)) {
-        (Some(lhs), Some(rhs)) => Regex::new(&prepare_regex(rhs, substr))
-            .map(|re| to_state(regex(&lhs, re)))
+        (Some(lhs), Some(rhs)) => cached_regex(&prepare_regex(rhs, substr))
+            .map(|re| to_state(regex(&lhs, &re)))
             .unwrap_or(to_state(false)),
         _ => to_state(false),
     }
+}
+
+/// How many compiled patterns each thread keeps for `match()` and `search()`.
+const REGEX_CACHE_SIZE: usize = 8;
+
+thread_local! {
+    // match() and search() run once per node, usually with the same few patterns,
+    // so each thread keeps the patterns it compiled last.
+    static REGEX_CACHE: RefCell<Vec<(String, Rc<Regex>)>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+/// Returns the compiled `pattern`, reusing it if it is among the last `REGEX_CACHE_SIZE` compiled
+/// on this thread.
+fn cached_regex(pattern: &str) -> Result<Rc<Regex>, regex::Error> {
+    REGEX_CACHE
+        .try_with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if let Some((_, regex)) = cache.iter().find(|(p, _)| p == pattern) {
+                return Ok(Rc::clone(regex));
+            }
+            let regex = Rc::new(Regex::new(pattern)?);
+            if cache.len() == REGEX_CACHE_SIZE {
+                cache.remove(0);
+            }
+            cache.push((pattern.to_owned(), Rc::clone(&regex)));
+            Ok(regex)
+        })
+        // The cache is gone while the thread's locals are being destroyed.
+        .unwrap_or_else(|_| Regex::new(pattern).map(Rc::new))
 }
 
 /// Translates an I-Regexp ([RFC9485]) into the syntax of the `regex` crate.
