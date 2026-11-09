@@ -1,21 +1,30 @@
 use crate::parser::model::{Comparable, Literal, SingularQuery, SingularQuerySegment};
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::selector::{process_index, process_key};
 use crate::query::state::{Data, State};
 use crate::query::Query;
 
 impl Query for Comparable {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        step: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
-            Comparable::Literal(lit) => lit.process(step),
-            Comparable::Function(tf) => tf.process(step),
-            Comparable::SingularQuery(query) => query.process(step),
+            Comparable::Literal(lit) => lit.process_with_context(step, ctx),
+            Comparable::Function(tf) => tf.process_with_context(step, ctx),
+            Comparable::SingularQuery(query) => query.process_with_context(step, ctx),
         }
     }
 }
 
 impl Query for Literal {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         let val = match self {
             Literal::Int(v) => (*v).into(),
             Literal::Float(v) => (*v).into(),
@@ -29,16 +38,26 @@ impl Query for Literal {
 }
 
 impl Query for SingularQuery {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        step: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
-            SingularQuery::Current(segments) => segments.process(step),
-            SingularQuery::Root(segments) => segments.process(step.shift_to_root()),
+            SingularQuery::Current(segments) => segments.process_with_context(step, ctx),
+            SingularQuery::Root(segments) => {
+                segments.process_with_context(step.shift_to_root(), ctx)
+            }
         }
     }
 }
 
 impl Query for SingularQuerySegment {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        step: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
             SingularQuerySegment::Index(idx) => step.flat_map(|d| process_index(d, idx)),
             SingularQuerySegment::Name(key) => step.flat_map(|d| process_key(d, key)),
@@ -47,9 +66,14 @@ impl Query for SingularQuerySegment {
 }
 
 impl Query for Vec<SingularQuerySegment> {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        self.iter()
-            .fold(state, |next, segment| segment.process(next))
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
+        self.iter().fold(state, |next, segment| {
+            segment.process_with_context(next, ctx)
+        })
     }
 }
 

@@ -1,6 +1,7 @@
 mod atom;
 mod comparable;
 mod comparison;
+mod context;
 mod filter;
 mod jp_query;
 pub mod queryable;
@@ -18,6 +19,8 @@ use crate::query::state::{Data, Pointer};
 use state::State;
 use std::borrow::Cow;
 
+pub use context::JsonPathEvalContext;
+
 /// A type that can be queried with JSONPath, typically string
 pub type QueryPath = String;
 
@@ -26,7 +29,17 @@ pub type Queried<T> = Result<T, JsonPathError>;
 
 /// Main internal trait to implement the logic of processing jsonpath.
 pub trait Query {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T>;
+    /// Processes the state on its own, reusing nothing from one call to the next.
+    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+        self.process_with_context(state, &mut JsonPathEvalContext::default())
+    }
+
+    /// Processes the state, reusing what `ctx` keeps.
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T>;
 }
 
 /// The resulting type of the JSONPath query.
@@ -81,11 +94,23 @@ pub fn js_path_process<'a, 'b, T: Queryable>(
     path: &'b JpQuery,
     value: &'a T,
 ) -> Queried<Vec<QueryRef<'a, T>>> {
-    match path.process(State::root(value)).data {
-        Data::Ref(p) => Ok(vec![p.into()]),
-        Data::Refs(refs) => Ok(refs.into_iter().map(Into::into).collect()),
-        Data::Value(v) => Err(v.into()),
-        Data::Nothing => Ok(vec![]),
+    path.execute_with_context(value, &mut JsonPathEvalContext::default())
+}
+
+impl JpQuery {
+    /// Processes the query like [`js_path_process`], reusing what `ctx` keeps from the
+    /// earlier calls. One context serves any number of queries and documents.
+    pub fn execute_with_context<'a, T: Queryable>(
+        &self,
+        value: &'a T,
+        ctx: &mut JsonPathEvalContext,
+    ) -> Queried<Vec<QueryRef<'a, T>>> {
+        match self.process_with_context(State::root(value), ctx).data {
+            Data::Ref(p) => Ok(vec![p.into()]),
+            Data::Refs(refs) => Ok(refs.into_iter().map(Into::into).collect()),
+            Data::Value(v) => Err(v.into()),
+            Data::Nothing => Ok(vec![]),
+        }
     }
 }
 
@@ -110,7 +135,7 @@ mod tests {
     use crate::parser::errors::JsonPathError;
     use crate::parser::{parse_json_path, Parsed};
     use crate::query::queryable::Queryable;
-    use crate::query::{js_path, js_path_process, Queried, QueryRef};
+    use crate::query::{js_path, js_path_process, JsonPathEvalContext, Queried, QueryRef};
     use crate::JsonPath;
     use serde_json::{json, Value};
 
@@ -953,34 +978,64 @@ mod tests {
         Ok(())
     }
 
-    // Each node is tested against every pattern in the filter, however many there are.
+    // A context decides how often a pattern is compiled, never what a query selects.
     #[test]
-    fn regex_several_patterns_in_one_filter() -> Queried<()> {
-        let json = json!([
+    fn regex_with_context() -> Queried<()> {
+        fn select<'a>(
+            path: &str,
+            json: &'a Value,
+            ctx: &mut JsonPathEvalContext,
+        ) -> Queried<Vec<&'a Value>> {
+            let found = parse_json_path(path)?.execute_with_context(json, ctx)?;
+            assert_eq!(found, json.query_with_path(path)?);
+            Ok(found.into_iter().map(QueryRef::val).collect())
+        }
+
+        // one context for all the queries and both documents
+        let mut ctx = JsonPathEvalContext::with_regex_cache();
+
+        let items = json!([
             {"name": "widget-7", "sku": "SKU-000017"},
             {"name": "widget-17", "sku": "SKU-000020"},
             {"name": "gadget-7", "sku": "SKU-000011"}
         ]);
         assert_eq!(
-            json.query("$[?match(@.name, 'widget-[0-9]*7') && search(@.sku, '0{3}1')]")?,
-            vec![&json!({"name": "widget-7", "sku": "SKU-000017"})]
+            select(
+                "$[?match(@.name, 'widget-[0-9]*7') && search(@.sku, '0{3}1')]",
+                &items,
+                &mut ctx
+            )?,
+            vec![&items[0]]
+        );
+        // a pattern per node, taken from the document
+        assert_eq!(
+            select("$[?search(@.sku, @.name)]", &items, &mut ctx)?,
+            Vec::<&Value>::new()
         );
 
-        let json = json!(["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
+        let names = json!(["a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10"]);
+        // more patterns than the context keeps
         let filter = (0..10)
             .map(|i| format!("match(@, 'a{i}')"))
             .collect::<Vec<_>>()
             .join(" || ");
         assert_eq!(
-            json.query(&format!("$[?{filter}]"))?,
-            (0..10).map(|i| &json[i]).collect::<Vec<_>>()
+            select(&format!("$[?{filter}]"), &names, &mut ctx)?,
+            (0..10).map(|i| &names[i]).collect::<Vec<_>>()
         );
-
-        // an invalid pattern matches nothing
-        assert_eq!(json.query("$[?match(@, 'a[')]")?, Vec::<&Value>::new());
+        // the same pattern for match() and for search()
         assert_eq!(
-            json.query("$[?search(@, '1')]")?,
-            vec![&json!("a1"), &json!("a10")]
+            select("$[?match(@, 'a1')]", &names, &mut ctx)?,
+            vec![&names[1]]
+        );
+        assert_eq!(
+            select("$[?search(@, 'a1')]", &names, &mut ctx)?,
+            vec![&names[1], &names[10]]
+        );
+        // an invalid pattern matches nothing
+        assert_eq!(
+            select("$[?match(@, 'a[')]", &names, &mut ctx)?,
+            Vec::<&Value>::new()
         );
 
         Ok(())

@@ -1,20 +1,25 @@
 use crate::parser::model::Filter;
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 
 impl Query for Filter {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         let root = state.root;
         state.flat_map(|p| {
             if p.is_internal() {
-                Data::Value(self.filter_item(p, root).into())
+                Data::Value(self.filter_item(p, root, ctx).into())
             } else if let Some(items) = p.inner.as_array() {
                 Data::Refs(
                     items
                         .into_iter()
                         .enumerate()
-                        .filter(|(_, item)| self.filter_item(Pointer::empty(*item), root))
+                        .filter(|(_, item)| self.filter_item(Pointer::empty(*item), root, ctx))
                         .map(|(idx, item)| Pointer::idx(item, p.path.clone(), idx))
                         .collect(),
                 )
@@ -22,7 +27,7 @@ impl Query for Filter {
                 Data::Refs(
                     items
                         .into_iter()
-                        .filter(|(_, item)| self.filter_item(Pointer::empty(*item), root))
+                        .filter(|(_, item)| self.filter_item(Pointer::empty(*item), root, ctx))
                         .map(|(key, item)| Pointer::key(item, p.path.clone(), key))
                         .collect(),
                 )
@@ -34,10 +39,14 @@ impl Query for Filter {
 }
 
 impl Filter {
-    fn process_elem<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+    fn process_elem<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         let process_cond = |filter: &Filter| {
             filter
-                .process(state.clone())
+                .process_with_context(state.clone(), ctx)
                 .ok_val()
                 .and_then(|v| v.as_bool())
                 .unwrap_or_default()
@@ -45,12 +54,17 @@ impl Filter {
         match self {
             Filter::Or(ors) => State::bool(ors.iter().any(process_cond), state.root),
             Filter::And(ands) => State::bool(ands.iter().all(process_cond), state.root),
-            Filter::Atom(atom) => atom.process(state),
+            Filter::Atom(atom) => atom.process_with_context(state, ctx),
         }
     }
 
-    fn filter_item<'a, T: Queryable>(&self, item: Pointer<'a, T>, root: &T) -> bool {
-        self.process_elem(State::data(root, Data::Ref(item.clone())))
+    fn filter_item<'a, T: Queryable>(
+        &self,
+        item: Pointer<'a, T>,
+        root: &T,
+        ctx: &mut JsonPathEvalContext,
+    ) -> bool {
+        self.process_elem(State::data(root, Data::Ref(item.clone())), ctx)
             .ok_val()
             .and_then(|v| v.as_bool())
             .unwrap_or_default()

@@ -1,18 +1,28 @@
 use crate::parser::model::{JpQuery, Segment};
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::State;
 use crate::query::Query;
 
 impl Query for JpQuery {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        self.segments.process(state)
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
+        self.segments.process_with_context(state, ctx)
     }
 }
 
 impl Query for Vec<Segment> {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
-        self.iter()
-            .fold(state, |next, segment| segment.process(next))
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
+        self.iter().fold(state, |next, segment| {
+            segment.process_with_context(next, ctx)
+        })
     }
 }
 

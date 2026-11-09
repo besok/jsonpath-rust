@@ -1,14 +1,19 @@
 use crate::parser::model::{Comparable, Comparison, Literal, SingularQuery, SingularQuerySegment};
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 
 impl Query for Comparison {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         let root = state.root;
         let (lhs, rhs) = self.vals();
-        let lhs = lhs.process(state.clone());
-        let rhs = rhs.process(state);
+        let lhs = lhs.process_with_context(state.clone(), ctx);
+        let rhs = rhs.process_with_context(state, ctx);
         match self {
             Comparison::Eq(..) => State::bool(eq(lhs, rhs), root),
             Comparison::Ne(..) => State::bool(!eq(lhs, rhs), root),

@@ -1,11 +1,16 @@
 use crate::parser::model::Selector;
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 use std::cmp::{max, min};
 
 impl Query for Selector {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        step: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
             Selector::Name(key) => step.flat_map(|d| process_key(d, key)),
             Selector::Index(idx) => step.flat_map(|d| process_index(d, idx)),
@@ -13,7 +18,7 @@ impl Query for Selector {
             Selector::Slice(start, end, sl_step) => {
                 step.flat_map(|d| process_slice(d, start, end, sl_step))
             }
-            Selector::Filter(f) => f.process(step),
+            Selector::Filter(f) => f.process_with_context(step, ctx),
         }
     }
 }
