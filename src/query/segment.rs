@@ -1,14 +1,21 @@
 use crate::parser::model::{Segment, Selector};
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, Pointer, State};
 use crate::query::Query;
 
 impl Query for Segment {
-    fn process<'a, T: Queryable>(&self, step: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        step: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
-            Segment::Descendant(segment) => segment.process(step.flat_map(process_descendant)),
-            Segment::Selector(selector) => selector.process(step),
-            Segment::Selectors(selectors) => process_selectors(step, selectors),
+            Segment::Descendant(segment) => {
+                segment.process_with_context(step.flat_map(process_descendant), ctx)
+            }
+            Segment::Selector(selector) => selector.process_with_context(step, ctx),
+            Segment::Selectors(selectors) => process_selectors(step, selectors, ctx),
         }
     }
 }
@@ -16,10 +23,11 @@ impl Query for Segment {
 fn process_selectors<'a, T: Queryable>(
     step: State<'a, T>,
     selectors: &Vec<Selector>,
+    ctx: &mut JsonPathEvalContext,
 ) -> State<'a, T> {
     selectors
         .into_iter()
-        .map(|s| s.process(step.clone()))
+        .map(|s| s.process_with_context(step.clone(), ctx))
         .reduce(State::reduce)
         .unwrap_or(step.root.into())
 }

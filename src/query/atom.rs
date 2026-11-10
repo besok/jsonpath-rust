@@ -1,13 +1,18 @@
 use crate::parser::model::FilterAtom;
+use crate::query::context::JsonPathEvalContext;
 use crate::query::queryable::Queryable;
 use crate::query::state::{Data, State};
 use crate::query::Query;
 
 impl Query for FilterAtom {
-    fn process<'a, T: Queryable>(&self, state: State<'a, T>) -> State<'a, T> {
+    fn process_with_context<'a, T: Queryable>(
+        &self,
+        state: State<'a, T>,
+        ctx: &mut JsonPathEvalContext,
+    ) -> State<'a, T> {
         match self {
             FilterAtom::Filter { expr, not } => {
-                let bool_res = expr.process(state);
+                let bool_res = expr.process_with_context(state, ctx);
                 if *not {
                     invert_bool(bool_res)
                 } else {
@@ -16,7 +21,7 @@ impl Query for FilterAtom {
             }
             FilterAtom::Test { expr, not } => {
                 let new_state = |b| State::bool(b, state.root);
-                let res = expr.process(state.clone());
+                let res = expr.process_with_context(state.clone(), ctx);
                 if expr.is_res_bool() {
                     if *not {
                         invert_bool(res)
@@ -40,7 +45,7 @@ impl Query for FilterAtom {
                     }
                 }
             }
-            FilterAtom::Comparison(cmp) => cmp.process(state),
+            FilterAtom::Comparison(cmp) => cmp.process_with_context(state, ctx),
         }
     }
 }

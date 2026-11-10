@@ -199,6 +199,34 @@ fn filter_data() -> Queried<()> {
 }
 ```
 
+### Reuse the compiled regular expressions
+
+`match()` and `search()` compile their pattern for every node they test.
+The library keeps no state between the calls, so to compile a pattern once, parse the query once
+and process it with a `JsonPathEvalContext` that has a regex cache.
+
+The context belongs to the caller. It serves any number of queries and documents,
+keeps the 8 patterns used last, and frees them when it is dropped.
+
+```rust
+fn regex_cache() -> Queried<()> {
+    let orders = json!([{"sku": "A-100"}, {"sku": "B-200"}, {"sku": "A-300"}]);
+    let returns = json!([{"sku": "A-100"}]);
+
+    let query = parse_json_path("$[?match(@.sku, 'A-[0-9]+')]")?;
+    let mut ctx = JsonPathEvalContext::with_regex_cache();
+
+    // the pattern is compiled once for the four nodes of the two documents
+    let ordered: Vec<QueryRef<Value>> = query.execute_with_context(&orders, &mut ctx)?;
+    let returned: Vec<QueryRef<Value>> = query.execute_with_context(&returns, &mut ctx)?;
+
+    assert_eq!(ordered.len(), 2);
+    assert_eq!(returned.len(), 1);
+
+    Ok(())
+}
+```
+
 ### Update the Queryable structure by path
 
 The library does not provide the functionality to update the json structure in the query itself.

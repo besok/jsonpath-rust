@@ -79,7 +79,7 @@ impl<'a, T: Queryable> State<'a, T> {
     }
     pub fn flat_map<F>(self, f: F) -> State<'a, T>
     where
-        F: Fn(Pointer<'a, T>) -> Data<'a, T>,
+        F: FnMut(Pointer<'a, T>) -> Data<'a, T>,
     {
         State {
             root: self.root,
@@ -141,9 +141,9 @@ impl<'a, T: Queryable> Data<'a, T> {
         }
     }
 
-    pub fn flat_map<F>(self, f: F) -> Data<'a, T>
+    pub fn flat_map<F>(self, mut f: F) -> Data<'a, T>
     where
-        F: Fn(Pointer<'a, T>) -> Data<'a, T>,
+        F: FnMut(Pointer<'a, T>) -> Data<'a, T>,
     {
         match self {
             Data::Ref(data) => f(data),
