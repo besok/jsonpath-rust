@@ -85,3 +85,5 @@
   - small correction accordance to the spec
 - **`1.0.12`**
   - Fix bugs with regex
+- **`1.0.13`**
+  - Add context to execute recurrent opearitons with cache (regex)
