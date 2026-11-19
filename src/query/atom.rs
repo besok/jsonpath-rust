@@ -12,7 +12,7 @@ impl Query for FilterAtom {
     ) -> State<'a, T> {
         match self {
             FilterAtom::Filter { expr, not } => {
-                let bool_res = expr.process_with_context(state, ctx);
+                let bool_res = expr.process_elem(state, ctx);
                 if *not {
                     invert_bool(bool_res)
                 } else {
@@ -102,12 +102,14 @@ mod tests {
         let atom_or = atom!(!filter_!(or f1.clone(), f2.clone()));
         let atom_and = atom!(!filter_!(and f1, f2));
 
+        // `@` is the root object: `@ > 2` is false and `@.b != @.a` is true,
+        // so `!(f1 || f2)` is false and `!(f1 && f2)` is true.
         assert_eq!(
             atom_or
                 .process(state.clone())
                 .ok_val()
                 .and_then(|v| v.as_bool()),
-            Some(true)
+            Some(false)
         );
         assert_eq!(
             atom_and.process(state).ok_val().and_then(|v| v.as_bool()),
