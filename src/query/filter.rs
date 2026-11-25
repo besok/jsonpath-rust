@@ -12,9 +12,7 @@ impl Query for Filter {
     ) -> State<'a, T> {
         let root = state.root;
         state.flat_map(|p| {
-            if p.is_internal() {
-                Data::Value(self.filter_item(p, root, ctx).into())
-            } else if let Some(items) = p.inner.as_array() {
+            if let Some(items) = p.inner.as_array() {
                 Data::Refs(
                     items
                         .into_iter()
@@ -39,14 +37,19 @@ impl Query for Filter {
 }
 
 impl Filter {
-    fn process_elem<'a, T: Queryable>(
+    /// Evaluates the filter expression as a logical expression against the
+    /// current node in `state` and returns a boolean state.
+    ///
+    /// Unlike [`Query::process_with_context`], which applies the filter as a
+    /// selector to the children of each node, this never selects anything.
+    pub(crate) fn process_elem<'a, T: Queryable>(
         &self,
         state: State<'a, T>,
         ctx: &mut JsonPathEvalContext,
     ) -> State<'a, T> {
         let process_cond = |filter: &Filter| {
             filter
-                .process_with_context(state.clone(), ctx)
+                .process_elem(state.clone(), ctx)
                 .ok_val()
                 .and_then(|v| v.as_bool())
                 .unwrap_or_default()
@@ -129,6 +132,36 @@ mod tests {
                 (&json!({"b": []}), "$['a']['empty_array']".to_string()).into(),
                 (&json!({"b": {}}), "$['a']['empty_object']".to_string()).into(),
                 (&json!({"b": ""}), "$['a']['empty_string']".to_string()).into(),
+            ])
+        );
+    }
+
+    #[test]
+    fn filter_on_current_node() {
+        let json = json!([[0], [0, 1], [0, 1, 2], [42]]);
+        // RFC 9535 2.3.5.1: a filter query on `@` selects the children of the
+        // current node, so `@[?@>1]` is non-empty when some child is > 1.
+        assert_eq!(
+            js_path("$[?@[?@>1]]", &json),
+            Ok(vec![
+                (&json!([0, 1, 2]), "$[2]".to_string()).into(),
+                (&json!([42]), "$[3]".to_string()).into(),
+            ])
+        );
+    }
+
+    #[test]
+    fn filter_on_current_node_in_logical_expr() {
+        let json = json!([[0], [0, 1], [0, 1, 2], {"a": 5}, []]);
+        assert_eq!(
+            js_path("$[?!@[?@>0] && length(@) > 0]", &json),
+            Ok(vec![(&json!([0]), "$[0]".to_string()).into()])
+        );
+        assert_eq!(
+            js_path("$[?(@[?@==2] || @.a)]", &json),
+            Ok(vec![
+                (&json!([0, 1, 2]), "$[2]".to_string()).into(),
+                (&json!({"a": 5}), "$[3]".to_string()).into(),
             ])
         );
     }
