@@ -131,6 +131,46 @@ fn function_expr_test() {
 }
 
 #[test]
+fn function_well_typedness() {
+    for valid in [
+        "$[?length(@.a) == 1]",
+        "$[?length($.a[0]['b']) == 1]",
+        "$[?length('a') == length(value(@..a))]",
+        "$[?length(count(@.*)) == 1]",
+        "$[?count(@..a) > 1 && !match(@.a, 'a')]",
+        "$[?value(@[?@.a]) == 1]",
+        "$[?search(value(@.*), $.re)]",
+        "$[?in(@.a, $.list[*])]",
+    ] {
+        assert!(parse_json_path(valid).is_ok(), "{valid}");
+    }
+
+    for invalid in [
+        // the result of the function is a value and must be compared
+        "$[?length(@.a)]",
+        "$[?!count(@.*)]",
+        "$[?@.a && (value(@.a))]",
+        // a parameter of type ValueType
+        "$[?length(@.*) == 1]",
+        "$[?length(@..a) == 1]",
+        "$[?length(@['a', 'b']) == 1]",
+        "$[?length(@[0:1]) == 1]",
+        "$[?length(match(@.a, 'a')) == 1]",
+        "$[?length((@.a)) == 1]",
+        "$[?match(@.*, 'a')]",
+        "$[?search(@.a, $..re)]",
+        // a parameter of type NodesType
+        "$[?count(1) == 1]",
+        "$[?count(value(@.a)) == 1]",
+        "$[?value('a') == 1]",
+        "$[?value(length(@.a)) == 1]",
+        "$[?value((@.a)) == 1]",
+    ] {
+        assert!(parse_json_path(invalid).is_err(), "{invalid}");
+    }
+}
+
+#[test]
 fn jq_test() {
     let atom = Filter::Atom(atom!(
         comparable!(> singular_query!(@ a b)),

@@ -308,6 +308,21 @@ pub enum Test {
 }
 
 impl Test {
+    /// Whether the test is a query that selects at most one node, whatever the data is.
+    pub(crate) fn is_singular_query(&self) -> bool {
+        match self {
+            Test::RelQuery(segments) | Test::AbsQuery(JpQuery { segments }) => {
+                segments.iter().all(|segment| {
+                    matches!(
+                        segment,
+                        Segment::Selector(Selector::Name(_) | Selector::Index(_))
+                    )
+                })
+            }
+            Test::Function(_) => false,
+        }
+    }
+
     pub fn is_res_bool(&self) -> bool {
         match self {
             Test::RelQuery(_) => false,
@@ -357,33 +372,54 @@ pub enum TestFunction {
 
 impl TestFunction {
     pub fn try_new(name: &str, args: Vec<FnArg>) -> Parsed<Self> {
-        fn with_node_type_validation<'a>(
-            a: &'a FnArg,
-            name: &str,
-        ) -> Result<&'a FnArg, JsonPathError> {
-            if a.is_lit() {
-                Err(JsonPathError::InvalidJsonPath(format!(
-                    "Invalid argument for the function `{}`: expected a node, got a literal",
-                    name
-                )))
-            } else if a.is_filter() {
-                Err(JsonPathError::InvalidJsonPath(format!(
-                    "Invalid argument for the function `{}`: expected a node, got a filter",
-                    name
-                )))
-            } else {
-                Ok(a)
-            }
+        // RFC 9535, section 2.4.3: a parameter of type ValueType takes a literal, a singular
+        // query or a function whose result is a value.
+        fn value_type(a: &FnArg, name: &str) -> Parsed<FnArg> {
+            let got = match a {
+                FnArg::Literal(_) => return Ok(a.clone()),
+                FnArg::Filter(_) => "a filter",
+                FnArg::Test(test) => match test.as_ref() {
+                    Test::Function(tf) if tf.is_comparable() => return Ok(a.clone()),
+                    Test::Function(_) => "a function that does not return a value",
+                    test if test.is_singular_query() => return Ok(a.clone()),
+                    _ => "a non-singular query",
+                },
+            };
+            Err(invalid_arg(name, "a value", got))
+        }
+
+        // A parameter of type NodesType takes a query.
+        fn nodes_type(a: &FnArg, name: &str) -> Parsed<FnArg> {
+            let got = match a {
+                FnArg::Literal(_) => "a literal",
+                FnArg::Filter(_) => "a filter",
+                FnArg::Test(test) => match test.as_ref() {
+                    Test::RelQuery(_) | Test::AbsQuery(_) => return Ok(a.clone()),
+                    Test::Function(_) => "a function",
+                },
+            };
+            Err(invalid_arg(name, "a node", got))
+        }
+
+        fn invalid_arg(name: &str, expected: &str, got: &str) -> JsonPathError {
+            JsonPathError::InvalidJsonPath(format!(
+                "Invalid argument for the function `{}`: expected {}, got {}",
+                name, expected, got
+            ))
         }
 
         match (name, args.as_slice()) {
-            ("length", [a]) => Ok(TestFunction::Length(Box::new(a.clone()))),
-            ("value", [a]) => Ok(TestFunction::Value(a.clone())),
-            ("count", [a]) => Ok(TestFunction::Count(
-                with_node_type_validation(a, name)?.clone(),
+            ("length", [a]) => Ok(TestFunction::Length(Box::new(value_type(a, name)?))),
+            ("value", [a]) => Ok(TestFunction::Value(nodes_type(a, name)?)),
+            ("count", [a]) => Ok(TestFunction::Count(nodes_type(a, name)?)),
+            ("search", [a, b]) => Ok(TestFunction::Search(
+                value_type(a, name)?,
+                value_type(b, name)?,
             )),
-            ("search", [a, b]) => Ok(TestFunction::Search(a.clone(), b.clone())),
-            ("match", [a, b]) => Ok(TestFunction::Match(a.clone(), b.clone())),
+            ("match", [a, b]) => Ok(TestFunction::Match(
+                value_type(a, name)?,
+                value_type(b, name)?,
+            )),
             ("length" | "value" | "count" | "match" | "search", args) => {
                 Err(JsonPathError::InvalidJsonPath(format!(
                     "Invalid number of arguments for the function `{}`: got {}",
