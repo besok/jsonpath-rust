@@ -485,9 +485,17 @@ pub fn filter_atom(pair: Pair<Rule>) -> Parsed<FilterAtom> {
                 }
             }
 
-            test_expr
-                .map(|expr| FilterAtom::test(expr, not))
-                .ok_or("Logical expression is absent".into())
+            match test_expr {
+                // RFC 9535, section 2.4.3: a function that returns a value is not a test.
+                Some(Test::Function(tf)) if tf.is_comparable() => {
+                    Err(JsonPathError::InvalidJsonPath(format!(
+                        "The result of the function `{}` must be compared",
+                        tf
+                    )))
+                }
+                Some(expr) => Ok(FilterAtom::test(expr, not)),
+                None => Err("Logical expression is absent".into()),
+            }
         }
         _ => Err(rule.into()),
     }

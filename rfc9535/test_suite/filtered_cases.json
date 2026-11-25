@@ -1,29 +1,5 @@
 [
   {
-    "name": "functions, value, result must be compared",
-    "reason": "To handle it later either at the parser level or during execution",
-    "expected_to_fix": true,
-    "issue": 1
-  },
-  {
-    "name": "functions, length, result must be compared",
-    "reason": "To handle it later either at the parser level or during execution",
-    "expected_to_fix": true,
-    "issue": 1
-  },
-  {
-    "name": "functions, count, result must be compared",
-    "reason": "To handle it later either at the parser level or during execution",
-    "expected_to_fix": true,
-    "issue": 1
-  },
-  {
-    "name": "functions, length, non-singular query arg",
-    "reason": "To handle it later either at the parser level or during execution",
-    "expected_to_fix": true,
-    "issue": 1
-  },
-  {
     "name": "basic, descendant segment, multiple selectors",
     "reason": "The result is correct but the order differs from expected since we process selector by selector",
     "expected_to_fix": false,
