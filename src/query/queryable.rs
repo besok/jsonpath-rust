@@ -308,8 +308,14 @@ impl Queryable for Value {
     }
 
     fn delete_by_path(&mut self, path: &str) -> Queried<usize> {
+        // A node can be selected more than once (`$[0, 0]`, overlapping filters),
+        // but it must be deleted once, or the next array element goes with it.
+        let mut query_paths = self.query_only_path(path)?;
+        query_paths.sort_unstable();
+        query_paths.dedup();
+
         let mut deletions = Vec::new();
-        for query_path in &self.query_only_path(path)? {
+        for query_path in &query_paths {
             if let Some(deletion_info) = parse_deletion_path(query_path)? {
                 deletions.push(deletion_info);
             }
@@ -324,6 +330,10 @@ impl Queryable for Value {
                         DeletionInfo::ArrayIndex { index: idx_a, .. },
                         DeletionInfo::ArrayIndex { index: idx_b, .. },
                     ) => idx_b.cmp(idx_a),
+                    // Keep the order total: `sort_by` may panic or misorder the
+                    // array indices when array and object deletions compare equal.
+                    (DeletionInfo::ArrayIndex { .. }, _) => std::cmp::Ordering::Less,
+                    (_, DeletionInfo::ArrayIndex { .. }) => std::cmp::Ordering::Greater,
                     _ => std::cmp::Ordering::Equal,
                 })
         });
@@ -696,6 +706,55 @@ mod tests {
             ]
         });
         assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_delete_node_selected_twice() {
+        let mut data = json!({
+            "users": [
+                {"name": "Alice", "age": 40, "banned": true},
+                {"name": "Bob", "age": 20},
+                {"name": "Charlie", "age": 35}
+            ]
+        });
+
+        // Alice matches both filters, Bob matches none.
+        let deleted = data
+            .delete_by_path("$.users[?@.age > 30, ?@.banned == true]")
+            .unwrap();
+        assert_eq!(deleted, 2);
+        assert_eq!(data, json!({"users": [{"name": "Bob", "age": 20}]}));
+
+        let mut data = json!([1, 2, 3]);
+        assert_eq!(data.delete_by_path("$[0, -3]").unwrap(), 1);
+        assert_eq!(data, json!([2, 3]));
+    }
+
+    #[test]
+    fn test_delete_array_elements_and_object_fields_at_same_depth() {
+        let mut data = json!({
+            "f0": [0, 1, 2, 3, 4, 5],
+            "f1": {"k": 1, "z": 2},
+            "f2": [0, 1, 2, 3, 4, 5, 6],
+            "f3": [0, 1, 2, 3, 4, 5, 6],
+            "f4": [0, 1, 2, 3],
+            "f5": {"k": 1, "z": 2},
+            "f6": {"k": 1, "z": 2}
+        });
+        let deleted = data.delete_by_path("$..[5, 'k', 1, 'z', 3, 0]").unwrap();
+        assert_eq!(deleted, 21);
+        assert_eq!(
+            data,
+            json!({
+                "f0": [2, 4],
+                "f1": {},
+                "f2": [2, 4, 6],
+                "f3": [2, 4, 6],
+                "f4": [2],
+                "f5": {},
+                "f6": {}
+            })
+        );
     }
 
     #[test]
